@@ -110,20 +110,24 @@ spec:
 
             # ── Install test dependencies inside the VM ──────────────────────
             # gnome-ponytail-daemon: bridges AT-SPI coords to Wayland surface coords
-            # Bootc images are read-only — dnf may fail; that is non-fatal.
-            # python3-pip may already be present (Bluefin includes it).
+            # ostree admin unlock creates a writable overlayfs on /usr so dnf can install.
+            # Changes are discarded on reboot but persist for the current test run.
             echo "Installing test dependencies on VM..." >&2
-            ${SSH} "sudo dnf install -y --quiet gnome-ponytail-daemon python3-pip 2>&1 | tail -3 || true"
-            # Fallback: bootstrap pip via ensurepip if dnf couldn't install python3-pip
+            ${SSH} "sudo ostree admin unlock 2>/dev/null || true"
+            ${SSH} "sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail -3"
+            # Fallback: bootstrap pip via ensurepip if python3-pip is absent
             ${SSH} "pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2"
             # User install to ~/.local/bin — works regardless of read-only rootfs
             ${SSH} "python3 -m pip install --quiet --user qecore behave dogtail 2>&1 | tail -3"
-            # behave-html-pretty-formatter needs explicit registration; skip for now
+            # qecore installs helper scripts to ~/.local/bin but qecore-headless may
+            # invoke them via /bin/sh which lacks ~/.local/bin in PATH. Symlink to
+            # /usr/local/bin so the unlocked overlay makes them globally reachable.
+            ${SSH} "for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \$f /usr/local/bin/\$(basename \$f) 2>/dev/null; done"
             echo "Dependencies installed." >&2
 
             # ── Copy test suite to VM ────────────────────────────────────────
             echo "Copying tests/${SUITE}/ to VM..." >&2
-            ${SSH} "mkdir -p /tmp/bluefin-tests"
+            ${SSH} "mkdir -p /tmp/bluefin-tests /tmp/results"
             ${SCP} /tests/${SUITE} ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/
 
             # ── Run tests via qecore-headless ────────────────────────────────
@@ -137,17 +141,13 @@ spec:
             fi
 
             # PATH must include ~/.local/bin for user-installed qecore-headless.
-            # Use absolute paths for both qecore-headless and behave so subprocess.Popen
-            # inside qecore-headless finds the behave binary regardless of its env.
+            # $BEHAVE_BIN is expanded by the remote shell so qecore-headless
+            # receives an absolute path — subprocess.Popen(shell=False) won't
+            # expand variables inside the command string it receives.
             ${SSH} "
-              USERBIN=\$(python3 -m site --user-base)/bin
-              export PATH=\$USERBIN:\$PATH
-              \$USERBIN/qecore-headless \
-                '\$USERBIN/behave /tmp/bluefin-tests/${SUITE}/features/ \
-                  --format json.pretty \
-                  --outfile /tmp/results/results.json \
-                  --no-capture \
-                  ${TAGS_ARG}'
+              export PATH=\$HOME/.local/bin:\$PATH
+              BEHAVE_BIN=\$(which behave)
+              \$HOME/.local/bin/qecore-headless \"\$BEHAVE_BIN /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}\"
             "
 
             # ── Collect results ──────────────────────────────────────────────

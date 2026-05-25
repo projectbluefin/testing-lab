@@ -27,14 +27,11 @@ def before_all(context) -> None:
         context.sandbox.attach_faf = False          # no ABRT integration in lab
         context.sandbox.production = False          # disable screencast/journal embeds locally
 
-        # gnome-shell is always running — register without desktop_file_exists
-        context.shell = context.sandbox.get_application(
-            name="gnome-shell",
-            a11y_app_name="gnome-shell",
-            desktop_file_exists=False,
-        )
+        # gnome-shell is always running — use context.sandbox.shell (qecore built-in)
+        # rather than get_application() which just re-wraps the same object.
+        context.shell = context.sandbox.shell
     except Exception as error:
-        print(f"Environment error: before_all: {error}")
+        print(f"Environment error: before_all: {error}", flush=True)
         context.failed_setup = traceback.format_exc()
 
 
@@ -42,7 +39,8 @@ def before_scenario(context, scenario) -> None:
     try:
         context.sandbox.before_scenario(context, scenario)
     except Exception:
-        context.embed("text/plain", traceback.format_exc(), "Before Scenario Error")
+        tb = traceback.format_exc()
+        print(f"HOOK_ERROR in before_scenario:\n{tb}", flush=True)
         sys.exit(1)
 
 
