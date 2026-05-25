@@ -8,26 +8,26 @@ Feature: GNOME Shell smoke tests
 
   @top_bar
   Scenario: GNOME Shell process is running and accessible via AT-SPI
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
 
   @top_bar
   Scenario: Panel is present in AT-SPI tree
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
     * Item "panel" "panel" is "showing" in "gnome-shell"
 
   @top_bar
   Scenario: Activities toggle button is visible in panel
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
     * Item "Activities" "toggle button" is "showing" in "gnome-shell"
 
   @top_bar
   Scenario: Clock toggle button is visible in panel
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
     * Item "clock" "toggle button" is "showing" in "gnome-shell"
 
   @top_bar
   Scenario: System menu toggle button is visible in panel
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
     * Item "System menu" "toggle button" is "showing" in "gnome-shell"
 
   # ── Activities overview ───────────────────────────────────────────────────
@@ -86,7 +86,7 @@ Feature: GNOME Shell smoke tests
 
   @regression @bluefin_4612
   Scenario: GNOME Shell extensions do not crash shell on load (bluefin#4612)
-    * Application "gnome-shell" is running
+    * GNOME Shell is accessible via AT-SPI
     * Run and save command output: "sh -c 'journalctl -b --no-pager 2>&1 | grep -c \"gnome-shell.*error\\|gnome-shell.*crash\"; true'"
     * Last command output "is" "0"
 

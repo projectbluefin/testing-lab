@@ -6,8 +6,12 @@ Left/Right click, Key combo, Press key, Type text, Run and save command output,
 Last command output, Wait N seconds.
 
 Custom steps here cover:
-- Application "gnome-shell" is running (override: retrying via context.sandbox.shell)
+- GNOME Shell accessibility check (retrying via context.sandbox.shell)
 - Activities overview state, search bar content.
+
+NOTE: We do NOT redefine 'Application "{name}" is running' — behave raises
+AmbiguousStep when a literal step conflicts with an existing wildcard step.
+Instead we use a distinct step name: 'GNOME Shell is accessible via AT-SPI'.
 
 Step patterns sourced from: modehnal/GNOMETerminalAutomation steps.py
 dogtail API: root.application(), Node.findChild(), Node.child(roleName=)
@@ -19,19 +23,20 @@ from dogtail import tree
 from qecore.common_steps import *  # noqa: F401,F403
 
 
-@step('Application "gnome-shell" is running')
-def application_gnome_shell_is_running(context) -> None:
-    """Override qecore common_step with a retrying AT-SPI check.
+@step("GNOME Shell is accessible via AT-SPI")
+def gnome_shell_is_accessible(context) -> None:
+    """Retrying gnome-shell AT-SPI check via qecore's built-in shell getter.
 
-    The common_step calls dogtail.tree.root.application() once; it races
-    against AT-SPI registration after GDM restarts.  context.sandbox.shell
-    uses qecore's own retry logic which is more reliable here.
+    The common 'Application "{name}" is running' step calls is_open() which
+    does not work for gnome-shell (compositor, not a regular window).
+    context.sandbox.shell uses qecore's own retry path and is the recommended
+    way to access gnome-shell per qecore docs.
     """
     last_exc = None
     for attempt in range(6):   # up to 30 s total
         try:
             shell = context.sandbox.shell
-            assert shell is not None, "gnome-shell is not registered in AT-SPI tree"
+            assert shell is not None, "gnome-shell not registered in AT-SPI tree"
             return
         except Exception as exc:   # noqa: BLE001
             last_exc = exc
