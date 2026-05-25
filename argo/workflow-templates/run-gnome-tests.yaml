@@ -127,8 +127,12 @@ spec:
             # /usr/local/bin so the unlocked overlay makes them globally reachable.
             ${SSH} "for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \$f /usr/local/bin/\$(basename \$f) 2>/dev/null; done"
             # uinput: needed for "Key combo with uinput" / "Press key with uinput" steps.
-            # Load kernel module and grant user-level access (survives until VM reboot).
-            ${SSH} "sudo modprobe uinput && sudo chmod 0666 /dev/uinput || true"
+            # Load kernel module, grant access, and fix SELinux label.
+            # The chcon is required on Bluefin/Fedora — chmod alone is not sufficient
+            # because SELinux still denies open() on uinput_device_t after chmod.
+            ${SSH} "sudo modprobe uinput 2>/dev/null || true"
+            ${SSH} "sudo chmod 0666 /dev/uinput 2>/dev/null || true"
+            ${SSH} "sudo chcon -t uinput_device_t /dev/uinput 2>/dev/null || true"
             echo "Dependencies installed." >&2
 
             # ── Copy test suite to VM ────────────────────────────────────────
@@ -161,8 +165,10 @@ spec:
             # ── Collect results ──────────────────────────────────────────────
             # Always SCP even when behave exits non-zero (test failures), so
             # artifacts are available for inspection on failed runs.
+            # Use trailing /. on source to copy CONTENTS not the directory itself
+            # (avoids /tmp/results/results/ nesting when dest already exists).
             echo "Collecting results..." >&2
-            ${SCP} ${VM_USER}@${VM_IP}:/tmp/results/ /tmp/results/ || true
+            ${SCP} ${VM_USER}@${VM_IP}:/tmp/results/. /tmp/results/ || true
 
             echo "Done. Results in /tmp/results/" >&2
             # Only the final result summary goes to stdout (Argo outputs.result)
@@ -175,7 +181,7 @@ spec:
                 print(f'{total - failed}/{total} scenarios passed')
             except Exception:
                 print('results.json not found')
-            "
+            " 2>/dev/null || echo "(python3 summary unavailable)"
             # Re-raise behave's exit code so Argo marks the step failed on test failures.
             exit ${BEHAVE_RC}
       volumes:

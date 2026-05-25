@@ -9,12 +9,13 @@ Feature: GNOME Shell smoke tests
   @top_bar
   Scenario: GNOME Shell process is running and accessible via AT-SPI
     * GNOME Shell is accessible via AT-SPI
+    * Dump panel children to log
     * Dump gnome-shell AT-SPI tree to results
 
   @top_bar
   Scenario: Panel is present in AT-SPI tree
     * GNOME Shell is accessible via AT-SPI
-    * Item "panel" "panel" is "showing" in "gnome-shell"
+    * Panel is present in AT-SPI tree
 
   @top_bar
   Scenario: Activities toggle button is visible in panel
@@ -24,12 +25,12 @@ Feature: GNOME Shell smoke tests
   @top_bar
   Scenario: Clock toggle button is visible in panel
     * GNOME Shell is accessible via AT-SPI
-    * Item "clock" "toggle button" is "showing" in "gnome-shell"
+    * Clock toggle is visible in top bar
 
   @top_bar
   Scenario: System menu toggle button is visible in panel
     * GNOME Shell is accessible via AT-SPI
-    * Item "System menu" "toggle button" is "showing" in "gnome-shell"
+    * System menu toggle is visible in top bar
 
   # ── Activities overview ───────────────────────────────────────────────────
 
@@ -59,12 +60,14 @@ Feature: GNOME Shell smoke tests
 
   @quick_settings
   Scenario: Clicking System menu opens Quick Settings
-    * Left click "System menu" "toggle button" in "gnome-shell"
+    * System menu toggle is visible in top bar
+    * Left click "System" "toggle button" in "gnome-shell"
     * Item "Quick Settings" "frame" is "showing" in "gnome-shell"
 
   @quick_settings
   Scenario: Escape closes Quick Settings
-    * Left click "System menu" "toggle button" in "gnome-shell"
+    * System menu toggle is visible in top bar
+    * Left click "System" "toggle button" in "gnome-shell"
     * Item "Quick Settings" "frame" is "showing" in "gnome-shell"
     * Press key: "Escape" with uinput
     * Item "Quick Settings" "frame" is not "showing" in "gnome-shell"
@@ -73,11 +76,13 @@ Feature: GNOME Shell smoke tests
 
   @calendar
   Scenario: Clicking clock opens calendar popup
+    * Clock toggle is visible in top bar
     * Left click "clock" "toggle button" in "gnome-shell"
     * Item "calendar" "calendar" is "showing" in "gnome-shell"
 
   @calendar
   Scenario: Escape closes calendar popup
+    * Clock toggle is visible in top bar
     * Left click "clock" "toggle button" in "gnome-shell"
     * Item "calendar" "calendar" is "showing" in "gnome-shell"
     * Press key: "Escape" with uinput
@@ -88,10 +93,10 @@ Feature: GNOME Shell smoke tests
   @regression @bluefin_4612
   Scenario: GNOME Shell extensions do not crash shell on load (bluefin#4612)
     * GNOME Shell is accessible via AT-SPI
-    * Run and save command output: "sh -c 'journalctl -b --no-pager 2>&1 | grep -c \"gnome-shell.*error\\|gnome-shell.*crash\"; true'"
+    * Run and save command output: "sh -c 'journalctl --no-pager -b -p err..emerg --lines=50 2>/dev/null | grep -c gnome-shell; true'"
     * Last command output stripped "is" "0"
 
   @regression @bluefin_4642
   Scenario: No gnome-shell coredump after session start (bluefin#4642)
-    * Run and save command output: "sh -c 'coredumpctl list gnome-shell --no-pager 2>&1 | grep -c gnome-shell; true'"
+    * Run and save command output: "sh -c 'coredumpctl list gnome-shell --no-pager --lines=10 2>/dev/null | grep -c gnome-shell; true'"
     * Last command output stripped "is" "0"

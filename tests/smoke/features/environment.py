@@ -36,6 +36,10 @@ def before_all(context) -> None:
 
 
 def before_scenario(context, scenario) -> None:
+    # Initialize qecore command output attributes (attribute name varies by version)
+    # qecore 4.16: command_stdout; older: last_command_output
+    context.command_stdout = ""
+    context.last_command_output = ""
     try:
         context.sandbox.before_scenario(context, scenario)
     except Exception:
