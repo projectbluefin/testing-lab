@@ -57,6 +57,9 @@ spec:
           - name: behave-json-results
             path: /tmp/results/results.json
             optional: true
+          - name: atspi-tree
+            path: /tmp/results/atspi_tree.txt
+            optional: true
           - name: runner-log
             path: /tmp/results/runner.log
             optional: true
@@ -118,7 +121,7 @@ spec:
             # Fallback: bootstrap pip via ensurepip if python3-pip is absent
             ${SSH} "pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2"
             # User install to ~/.local/bin — works regardless of read-only rootfs
-            ${SSH} "python3 -m pip install --quiet --user qecore behave dogtail 2>&1 | tail -3"
+            ${SSH} "python3 -m pip install --quiet --user qecore behave dogtail python-uinput 2>&1 | tail -3"
             # qecore installs helper scripts to ~/.local/bin but qecore-headless may
             # invoke them via /bin/sh which lacks ~/.local/bin in PATH. Symlink to
             # /usr/local/bin so the unlocked overlay makes them globally reachable.

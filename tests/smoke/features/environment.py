@@ -46,3 +46,20 @@ def before_scenario(context, scenario) -> None:
 
 def after_scenario(context, scenario) -> None:
     context.sandbox.after_scenario(context, scenario)
+
+
+def after_all(context) -> None:
+    """Dump gnome-shell AT-SPI tree to results for node name discovery."""
+    try:
+        shell = context.sandbox.shell
+        lines = []
+        for child in shell.children[:60]:
+            lines.append(f"role={child.roleName!r:30} name={child.name!r}")
+            for gc in child.children[:20]:
+                lines.append(f"  role={gc.roleName!r:30} name={gc.name!r}")
+        import os
+        os.makedirs("/tmp/results", exist_ok=True)
+        with open("/tmp/results/atspi_tree.txt", "w") as f:
+            f.write("\n".join(lines))
+    except Exception:   # noqa: BLE001
+        pass
