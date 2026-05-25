@@ -31,9 +31,9 @@ Argo Workflow / bluefin-qa-pipeline
   │     └── wait-for-vm-ready   → polls pod Ready, emits pod IP
   │
   ├── run-tests (run-gnome-tests)
-  │     └── tmt SSH runner pod  → SSHes to pod IP
-  │                               ~/.ssh/environment has AT-SPI vars
-  │                               Dogtail works via gnome-ponytail-daemon
+  │     └── Fedora runner pod   → SSHes to VM IP
+  │                               behave + qecore-headless + dogtail
+  │                               gnome-ponytail-daemon bridges AT-SPI → Wayland
   │
   └── cleanup (onExit, always)
         ├── delete VM
@@ -68,30 +68,28 @@ Issues filed: castrojo/copilot-config #329–332.
 | CDI | ✅ not used — hostDisk + reflink replaced CDI |
 | CDI insecure registry config | ✅ not applicable — no CDI/PVC path |
 | SSH secret `bluefin-test-ssh-key` | ✅ exists |
-| tmt runner image | ❌ deprecated — runner is now inline bash in run-gnome-tests |
+| tmt runner image | ✅ not used — runner is now behave+qecore in run-gnome-tests (Fedora container) |
 | First golden disk | ✅ at `/var/tmp/bluefin-golden/{latest,lts}/disk.raw` |
 
 ## Execution order (first run)
 
 ```bash
-# 1. Apply/refresh WorkflowTemplates (includes bluefin-qa-pipeline)
-just apply-templates
-
-# 2. SSH secret (idempotent)
+# 1. Bootstrap SSH secret (idempotent — skip if already exists)
 just setup-ssh-secret
-source .env.test-pubkey
+
+# 2. Deploy ArgoCD Application (syncs WorkflowTemplates automatically)
+just setup-argocd
 
 # 3. Pre-build golden disk for latest tag (~100s BIB if missing)
 just ensure-disk
 
-# 5. Run smoke tests
+# 4. Run smoke tests
 just run-tests
 ```
 
 ## Subsequent runs (warm)
 
 ```bash
-source .env.test-pubkey
 just run-tests          # ~4-5 min total, golden disk already present
 ```
 

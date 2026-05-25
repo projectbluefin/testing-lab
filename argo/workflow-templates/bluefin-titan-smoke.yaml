@@ -36,6 +36,22 @@ spec:
   templates:
     - name: run-smoke
       steps:
+        - - name: preflight-latest
+            template: preflight
+            arguments:
+              parameters:
+                - name: vm-ip
+                  value: "{{workflow.parameters.vm-ip-latest}}"
+                - name: label
+                  value: "titan-bluefin"
+          - name: preflight-lts
+            template: preflight
+            arguments:
+              parameters:
+                - name: vm-ip
+                  value: "{{workflow.parameters.vm-ip-lts}}"
+                - name: label
+                  value: "titan-lts"
         - - name: smoke-latest
             templateRef:
               name: run-gnome-tests
@@ -69,3 +85,57 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
                 - name: issue-title
                   value: "{{workflow.parameters.issue-title}} - titan-lts"
+
+    - name: preflight
+      inputs:
+        parameters:
+          - name: vm-ip
+          - name: label
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      podSpecPatch: |
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        securityContext:
+          runAsUser: 0
+      volumes:
+        - name: ssh-key
+          secret:
+            secretName: "{{workflow.parameters.ssh-key-secret}}"
+            defaultMode: 0400
+      script:
+        image: quay.io/fedora/fedora:latest
+        command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        volumeMounts:
+          - name: ssh-key
+            mountPath: /etc/ssh/test-key
+            readOnly: true
+        source: |
+          set -euo pipefail
+          VM_IP="{{inputs.parameters.vm-ip}}"
+          LABEL="{{inputs.parameters.label}}"
+          SSH="ssh -i /etc/ssh/test-key/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR bluefin-test@${VM_IP}"
+
+          if ! command -v ssh &>/dev/null; then
+            dnf install -y --quiet openssh-clients 2>&1 | tail -2
+          fi
+
+          echo "Preflight ${LABEL} (${VM_IP})..." >&2
+          STATE=$(${SSH} "systemctl is-system-running 2>/dev/null || echo unknown")
+          if [[ "${STATE}" != "running" && "${STATE}" != "degraded" ]]; then
+            echo "ERROR: systemd state '${STATE}' on ${LABEL}" >&2
+            exit 1
+          fi
+          FREE=$(${SSH} "df -BG / | awk 'NR==2{print \$4}' | tr -d G")
+          if [[ "${FREE}" -lt 2 ]]; then
+            echo "ERROR: only ${FREE}GB free on ${LABEL} root — need ≥ 2GB" >&2
+            exit 1
+          fi
+          echo "Preflight passed: ${LABEL} systemd=${STATE}, disk=${FREE}GB free" >&2

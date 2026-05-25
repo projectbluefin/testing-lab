@@ -126,7 +126,7 @@ All four SSH auth bugs were fixed. Golden disks built after 2026-05-25 do not ne
 4. **Key mismatch**: If the secret is regenerated, golden disks still have the old public key.
    No automated reconciliation exists. Always re-patch after secret rotation.
 
-**All four bugs are tracked in castrojo/copilot-config with label `homelab`.**
+**All four bugs are tracked and fixed. New issues go to castrojo/testing-lab.**
 
 ## Disk Layout (BIB --type raw --rootfs ext4)
 
@@ -184,10 +184,12 @@ tests/
   flatcar/        # Flatcar: systemd health, containerd, networking
 ```
 
-Tests use **pytest + dogtail** (AT-SPI). NOT behave. NOT qecore.
+Tests use **behave + qecore-headless + dogtail** (AT-SPI). NOT pytest. NOT tmt.
 
-Fixtures in `tests/developer/conftest.py` use `root.application("ptyxis")` —
-this is the correct AT-SPI app name for Ptyxis on Bluefin.
+- `qecore-headless` starts the GNOME Wayland session and hands off to behave
+- `dogtail` does AT-SPI tree traversal inside the VM
+- `gnome-ponytail-daemon` bridges AT-SPI coordinates to Wayland surface coordinates
+- Steps live in `tests/<suite>/features/steps/steps.py`
 
 ## Dogtail / Wayland Setup
 
@@ -302,85 +304,25 @@ Implications:
   gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
     --method org.gnome.Shell.Eval 'global.context.unsafe_mode = true'
   ```
-- Tracked in castrojo/copilot-config #351, #353
+- Tracked in castrojo/testing-lab #5
 
-### ConfigMap sync pattern (SSH-free test file updates)
+### Test file delivery (git-sync, not ConfigMap)
 
-To update test files on ghost's `/var/tmp/bluefin-tests` **without SSH**:
-1. Encode files as base64 and create a ConfigMap with `binaryData`
-2. Create a Job with a `hostPath` volume pointing to `/var/tmp/bluefin-tests`
-3. Init container: `cp /etc/config/<file> /host/<file>` (ConfigMap mount → hostPath)
+Test files are delivered to the runner pod via the `git-sync` initContainer in
+`run-gnome-tests`. It clones `castrojo/testing-lab` (depth 1) into `/workspace`
+at the start of every run. No ConfigMap sync, no hostPath for test files.
 
-```yaml
-# Skeleton
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: sync-test-files
-  namespace: argo
-spec:
-  template:
-    spec:
-      initContainers:
-        - name: sync
-          image: busybox
-          command: ["sh", "-c", "cp /etc/config/* /host/"]
-          volumeMounts:
-            - name: config
-              mountPath: /etc/config
-            - name: host
-              mountPath: /host
-      containers:
-        - name: done
-          image: busybox
-          command: ["true"]
-      restartPolicy: Never
-      volumes:
-        - name: config
-          configMap:
-            name: test-files-configmap
-        - name: host
-          hostPath:
-            path: /var/tmp/bluefin-tests
-            type: DirectoryOrCreate
-```
+To update tests: edit `tests/<suite>/`, commit, push to `main`.
 
-### Artifact reading via probe pods
+### Artifact reading
 
-No persistent artifact repository is configured. Artifacts in Argo pod `/tmp/` disappear when
-pods are deleted. **Titan VMs are persistent** and retain `/tmp/results/` between runs.
+`run-gnome-tests` prints `results.json` to stderr at run end (captured by Loki
+and retrievable via Argo MCP `get_workflow_logs`). Titan VMs retain
+`/tmp/results/` between runs — access via a future workflow step or Loki query.
 
-To read artifacts after a test run:
-1. Create a probe pod with the SSH key secret mounted
-2. `kubectl exec` into the probe pod
-3. SSH from probe pod into titan VM (10.42.0.75 or 10.42.0.76) and `cat /tmp/results/`
-
-```yaml
-# Probe pod skeleton
-apiVersion: v1
-kind: Pod
-metadata:
-  name: probe
-  namespace: argo
-spec:
-  containers:
-    - name: probe
-      image: fedora:latest
-      command: ["sleep", "3600"]
-      volumeMounts:
-        - name: ssh-key
-          mountPath: /root/.ssh
-  volumes:
-    - name: ssh-key
-      secret:
-        secretName: bluefin-test-ssh-key
-        defaultMode: 0600
-```
-
-Then: `kubectl exec -n argo probe -- ssh -o StrictHostKeyChecking=no bluefin-test@10.42.0.75 cat /tmp/results/results.json`
-
-**Note:** `podGC: OnWorkflowCompletion` keeps pods alive on FAILURE — but completed pods
-reject `kubectl exec`. Use probe pod + SSH to titan instead.
+**Note:** `podGC: OnWorkflowCompletion` deletes pods on success. On failure,
+pods linger until TTL. Use Argo MCP `get_workflow_logs` to read results without
+exec-ing into pods.
 
 ---
 
