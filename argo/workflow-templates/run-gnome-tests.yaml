@@ -150,13 +150,17 @@ spec:
             # $BEHAVE_BIN is expanded by the remote shell so qecore-headless
             # receives an absolute path — subprocess.Popen(shell=False) won't
             # expand variables inside the command string it receives.
+            # Save behave exit code so we can always SCP results before exiting.
+            BEHAVE_RC=0
             ${SSH} "
               export PATH=\$HOME/.local/bin:\$PATH
               BEHAVE_BIN=\$(which behave)
               \$HOME/.local/bin/qecore-headless \"\$BEHAVE_BIN /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}\"
-            "
+            " || BEHAVE_RC=$?
 
             # ── Collect results ──────────────────────────────────────────────
+            # Always SCP even when behave exits non-zero (test failures), so
+            # artifacts are available for inspection on failed runs.
             echo "Collecting results..." >&2
             ${SCP} ${VM_USER}@${VM_IP}:/tmp/results/ /tmp/results/ || true
 
@@ -172,6 +176,8 @@ spec:
             except Exception:
                 print('results.json not found')
             "
+            # Re-raise behave's exit code so Argo marks the step failed on test failures.
+            exit ${BEHAVE_RC}
       volumes:
         - name: ssh-key
           secret:

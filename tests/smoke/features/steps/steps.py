@@ -44,6 +44,7 @@ def dump_atspi_tree(context) -> None:
 
 
 
+@step("GNOME Shell is accessible via AT-SPI")
 def gnome_shell_is_accessible(context) -> None:
     """Retrying gnome-shell AT-SPI check via qecore's built-in shell getter.
 
@@ -63,6 +64,19 @@ def gnome_shell_is_accessible(context) -> None:
             sleep(5)
     raise AssertionError(
         f"gnome-shell not accessible via AT-SPI after 30 s: {last_exc}"
+    )
+
+
+@step('Last command output stripped "is" "{expected}"')
+def last_command_output_stripped_is(context, expected) -> None:
+    """Compare last command output after stripping whitespace/newlines.
+
+    grep -c always appends a trailing newline; use this step instead of
+    'Last command output "is"' when the command output has trailing whitespace.
+    """
+    actual = (context.last_command_output or "").strip()
+    assert actual == expected, (
+        f"\nWanted output: '{expected}'\nActual output: '{actual}'"
     )
 
 

@@ -89,9 +89,9 @@ Feature: GNOME Shell smoke tests
   Scenario: GNOME Shell extensions do not crash shell on load (bluefin#4612)
     * GNOME Shell is accessible via AT-SPI
     * Run and save command output: "sh -c 'journalctl -b --no-pager 2>&1 | grep -c \"gnome-shell.*error\\|gnome-shell.*crash\"; true'"
-    * Last command output "is" "0"
+    * Last command output stripped "is" "0"
 
   @regression @bluefin_4642
   Scenario: No gnome-shell coredump after session start (bluefin#4642)
     * Run and save command output: "sh -c 'coredumpctl list gnome-shell --no-pager 2>&1 | grep -c gnome-shell; true'"
-    * Last command output "is" "0"
+    * Last command output stripped "is" "0"
