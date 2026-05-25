@@ -1,0 +1,19 @@
+# Patch workflow-controller-configmap with workflow retention defaults.
+# ServerSideApply (configured in testing-lab-infra Application) merges only
+# the keys defined here — Helm-owned keys are left intact.
+#
+# workflowDefaults: sets TTL for all workflows that don't specify their own.
+# 7 days for success, 30 days for failure — lets agents answer
+# "did the last 10 runs pass?" without a separate archive database.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: argo
+data:
+  workflowDefaults: |
+    spec:
+      ttlStrategy:
+        secondsAfterCompletion: 604800
+        secondsAfterSuccess: 604800
+        secondsAfterFailure: 2592000
