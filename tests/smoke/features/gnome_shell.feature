@@ -95,6 +95,70 @@ Feature: GNOME Shell smoke tests
     * Close date menu via Shell.Eval
     * Date menu panel is closed via Shell.Eval
 
+  # ── App launch from overview (#65) ──────────────────────────────────────
+
+  @activities @app_launch
+  Scenario: Overview search launches Files
+    * GNOME Shell is accessible via AT-SPI
+    * Open Activities overview via Shell.Eval
+    * Overview is open
+    * Set overview search text to "Files" via Shell.Eval
+    * Overview search bar contains "Files"
+    * Launch first overview search result via Shell.Eval
+    * Application "org.gnome.Nautilus" is open in AT-SPI
+    * Close application "org.gnome.Nautilus" via Shell.Eval
+
+  @activities @app_launch
+  Scenario: Overview search launches Settings
+    * GNOME Shell is accessible via AT-SPI
+    * Open Activities overview via Shell.Eval
+    * Overview is open
+    * Set overview search text to "Settings" via Shell.Eval
+    * Overview search bar contains "Settings"
+    * Launch first overview search result via Shell.Eval
+    * Application "org.gnome.Settings" is open in AT-SPI
+    * Close application "org.gnome.Settings" via Shell.Eval
+
+  @activities @app_launch @files_navigation
+  Scenario: Overview search opens Files sidebar locations
+    * GNOME Shell is accessible via AT-SPI
+    * Open Activities overview via Shell.Eval
+    * Overview is open
+    * Set overview search text to "Files" via Shell.Eval
+    * Overview search bar contains "Files"
+    * Launch first overview search result via Shell.Eval
+    * Application "org.gnome.Nautilus" is open in AT-SPI
+    * Files sidebar contains "Home"
+    * Close application "org.gnome.Nautilus" via Shell.Eval
+
+  @activities @app_launch @settings_navigation
+  Scenario: Overview search opens Settings About and Appearance panels
+    * GNOME Shell is accessible via AT-SPI
+    * Open Activities overview via Shell.Eval
+    * Overview is open
+    * Set overview search text to "Settings" via Shell.Eval
+    * Overview search bar contains "Settings"
+    * Launch first overview search result via Shell.Eval
+    * Application "org.gnome.Settings" is open in AT-SPI
+    * Open Settings panel "About"
+    * Settings panel "About" shows "Operating System"
+    * Open Settings panel "Appearance"
+    * Settings panel "Appearance" shows "Style"
+    * Close application "org.gnome.Settings" via Shell.Eval
+
+  # ── Quick Settings state change (#90) ───────────────────────────────────
+
+  @quick_settings @state_change
+  Scenario: Quick Settings dark style toggle changes desktop theme
+    * GNOME Shell is accessible via AT-SPI
+    * Open Quick Settings via Shell.Eval
+    * Quick Settings panel is open via Shell.Eval
+    * Toggle dark style via Shell.Eval
+    * Dark style setting changed
+    * Toggle dark style via Shell.Eval
+    * Close Quick Settings via Shell.Eval
+    * Quick Settings panel is closed via Shell.Eval
+
   # ── Regressions ───────────────────────────────────────────────────────────
 
   @regression @bluefin_4612

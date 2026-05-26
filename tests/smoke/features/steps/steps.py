@@ -20,7 +20,14 @@ from time import sleep
 
 from behave import step
 from dogtail import tree
+from dogtail.rawinput import pressKey
 from qecore.common_steps import *  # noqa: F401,F403
+
+
+_APP_ID_ALIASES = {
+    "org.gnome.Nautilus": ("org.gnome.nautilus", "nautilus", "files"),
+    "org.gnome.Settings": ("org.gnome.settings", "gnome-control-center", "settings"),
+}
 
 
 @step("Dump panel children to log")
@@ -350,3 +357,167 @@ def overview_search_bar_contains(context, text) -> None:
     assert entries, f"Search bar text entry not found"
     entry = entries[0]
     assert text in entry.text, f"Search bar text '{entry.text}' does not contain '{text}'"
+
+
+# ── App launch helpers (#65, #87, #88) ───────────────────────────────────
+
+
+def _app_aliases(app_id: str) -> tuple[str, ...]:
+    aliases = {app_id.lower(), app_id.split(".")[-1].lower()}
+    aliases.update(_APP_ID_ALIASES.get(app_id, ()))
+    return tuple(sorted(aliases))
+
+
+def _wait_for_application_node(app_id: str, attempts: int = 10, delay: float = 1.0):
+    aliases = _app_aliases(app_id)
+    last_seen = []
+    for _ in range(attempts):
+        apps = tree.root.findChildren(
+            lambda n: n.roleName == "application"
+            and any(alias in (n.name or "").lower() for alias in aliases)
+        )
+        if apps:
+            return apps[0]
+        last_seen = [(n.name, n.roleName) for n in tree.root.children[:15]]
+        sleep(delay)
+    raise AssertionError(
+        f"Application {app_id!r} not found in AT-SPI tree. Top-level nodes: {last_seen}"
+    )
+
+
+def _click_node_or_ancestor(node) -> None:
+    current = node
+    for _ in range(5):
+        if current is None:
+            break
+        if hasattr(current, "click"):
+            try:
+                current.click()
+                return
+            except Exception:  # noqa: BLE001
+                pass
+        current = getattr(current, "parent", None)
+    raise AssertionError(f"Unable to click node or ancestor for {getattr(node, 'name', None)!r}")
+
+
+@step("Launch first overview search result via Shell.Eval")
+def launch_first_search_result(context) -> None:
+    """Launch the selected overview result with the focused Return keypress."""
+    pressKey("Return")
+    sleep(2)
+
+
+@step('Application "{app_id}" is open in AT-SPI')
+def app_is_open_in_atspi(context, app_id) -> None:
+    context.current_application = _wait_for_application_node(app_id)
+
+
+@step('Close application "{app_id}" via Shell.Eval')
+def close_app_via_shell_eval(context, app_id) -> None:
+    import json
+
+    aliases = json.dumps(list(_app_aliases(app_id)))
+    _shell_eval(
+        "const aliases = %s;"
+        "for (const actor of global.get_window_actors()) {"
+        "  const win = actor.get_meta_window();"
+        "  const fields = ["
+        "    win.get_wm_class(),"
+        "    win.get_title(),"
+        "    typeof win.get_gtk_application_id === 'function' ? win.get_gtk_application_id() : ''"
+        "  ].filter(Boolean).map(value => value.toLowerCase());"
+        "  if (aliases.some(alias => fields.some(value => value.includes(alias)))) {"
+        "    win.delete(global.get_current_time());"
+        "  }"
+        "}"
+        % aliases
+    )
+    for _ in range(8):
+        apps = tree.root.findChildren(
+            lambda n: n.roleName == "application"
+            and any(alias in (n.name or "").lower() for alias in _app_aliases(app_id))
+        )
+        if not apps:
+            if getattr(context, "current_application", None) is not None:
+                context.current_application = None
+            return
+        sleep(0.5)
+    raise AssertionError(f"Application {app_id!r} is still open after close request")
+
+
+@step('Files sidebar contains "{item}"')
+def files_sidebar_contains(context, item) -> None:
+    app = getattr(context, "current_application", None) or _wait_for_application_node("org.gnome.Nautilus")
+    matches = app.findChildren(
+        lambda n: (n.name or "").strip() == item
+        and n.roleName in {"label", "push button", "list item", "table cell", "icon"}
+    )
+    assert matches, f"Files sidebar item {item!r} not found"
+
+
+@step('Open Settings panel "{panel_name}"')
+def open_settings_panel(context, panel_name) -> None:
+    app = getattr(context, "current_application", None) or _wait_for_application_node("org.gnome.Settings")
+    candidates = app.findChildren(
+        lambda n: (n.name or "").strip() == panel_name
+        and n.roleName in {"label", "push button", "list item", "table cell", "row header"}
+    )
+    assert candidates, f"Settings panel {panel_name!r} not found"
+    _click_node_or_ancestor(candidates[0])
+    sleep(1)
+
+
+@step('Settings panel "{panel_name}" shows "{text}"')
+def settings_panel_shows_text(context, panel_name, text) -> None:
+    app = getattr(context, "current_application", None) or _wait_for_application_node("org.gnome.Settings")
+    matches = app.findChildren(
+        lambda n: text in (n.name or "")
+        and n.roleName in {"label", "heading", "page tab", "push button", "text", "static"}
+    )
+    assert matches, f"Settings panel {panel_name!r} does not show {text!r}"
+
+
+# ── Quick Settings state change (#90) ────────────────────────────────────
+
+
+def _desktop_color_scheme() -> str:
+    import subprocess
+
+    result = subprocess.run(
+        ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr.strip() or result.stdout.strip() or "gsettings get failed")
+    return result.stdout.strip().strip("'")
+
+
+@step("Toggle dark style via Shell.Eval")
+def toggle_dark_style(context) -> None:
+    current = _desktop_color_scheme()
+    if not hasattr(context, "_color_scheme_initial"):
+        context._color_scheme_initial = current
+    context._color_scheme_previous = current
+    new_value = _shell_eval_inner(
+        "const Gio = imports.gi.Gio;"
+        "let settings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });"
+        "let next = settings.get_string('color-scheme') === 'prefer-dark' ? 'default' : 'prefer-dark';"
+        "settings.set_string('color-scheme', next);"
+        "settings.get_string('color-scheme');"
+    )
+    sleep(1)
+    context._color_scheme_current = _desktop_color_scheme()
+    assert context._color_scheme_current == new_value, (
+        f"Expected color-scheme {new_value!r}, got {context._color_scheme_current!r}"
+    )
+
+
+@step("Dark style setting changed")
+def dark_style_setting_changed(context) -> None:
+    previous = getattr(context, "_color_scheme_previous", None)
+    current = getattr(context, "_color_scheme_current", None)
+    assert previous is not None, "dark style toggle was not called"
+    assert current is not None, "dark style state was not recorded"
+    assert current != previous, f"Dark style did not change: still {current!r}"

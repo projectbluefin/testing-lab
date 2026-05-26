@@ -59,3 +59,13 @@ def no_flatpak_missing_runtime_error(context, flatpak_id) -> None:
     assert result.returncode != 0 or result.stdout.strip() == "", (
         f"Flatpak runtime-missing error found for {flatpak_id}:\n{result.stdout}"
     )
+
+
+@step('Last command output contains "{text}"')
+def last_command_output_contains(context, text) -> None:
+    output = (
+        getattr(context, "command_stdout", "")
+        or getattr(context, "last_command_output", "")
+        or getattr(context, "last_run_output", "")
+    )
+    assert text in output, f"Expected {text!r} in output:\n{output[:500]}"
