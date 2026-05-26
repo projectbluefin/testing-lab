@@ -39,6 +39,11 @@ spec:
           - name: behave-tags
             # optional: "--tags @smoke" or "--tags @regression"
             value: ""
+          - name: branch
+            # git ref (branch or commit SHA) the runner clones for test code
+            # and step defs. Defaults to main; set per-run to test a PR branch
+            # without merging — e.g. `-p branch=fix/test-reliability-and-podgc`
+            value: "main"
       # 60-minute ceiling: SSH wait (10min) + dnf install (10min) + test run (30min)
       activeDeadlineSeconds: 3600
       # hostNetwork: KubeVirt masquerade only routes from the host network namespace
@@ -55,15 +60,28 @@ spec:
       initContainers:
         - name: git-sync
           image: quay.io/fedora/fedora:latest
+          env:
+            - name: BRANCH
+              value: "{{inputs.parameters.branch}}"
           command: [bash, -c]
           args:
             - |
               for attempt in 1 2 3; do
                 dnf install -y --quiet git 2>&1 | tail -2
-                if git clone --depth 1 --branch main \
+                # --branch accepts both branch names and tags; for commit SHAs
+                # we fall back to clone + checkout.
+                if git clone --depth 1 --branch "${BRANCH}" \
                     https://github.com/castrojo/testing-lab \
                     /workspace/bluefin-test-suite 2>&1; then
-                  echo "Synced testing-lab (attempt ${attempt})"
+                  echo "Synced testing-lab @ ${BRANCH} (attempt ${attempt})"
+                  exit 0
+                fi
+                # Commit-SHA fallback: full clone + checkout
+                rm -rf /workspace/bluefin-test-suite
+                if git clone https://github.com/castrojo/testing-lab \
+                    /workspace/bluefin-test-suite 2>&1 && \
+                   git -C /workspace/bluefin-test-suite checkout "${BRANCH}" 2>&1; then
+                  echo "Synced testing-lab @ ${BRANCH} via SHA fallback (attempt ${attempt})"
                   exit 0
                 fi
                 echo "Attempt ${attempt} failed, retrying in 15s..."

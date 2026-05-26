@@ -23,6 +23,10 @@ spec:
         value: "bluefin-test-ssh-key"
       - name: issue-title
         value: "titan smoke run"
+      # git ref the test runner clones. Default `main`; override to test a PR
+      # branch against persistent titan VMs without merging.
+      - name: branch
+        value: "main"
 
   serviceAccountName: argo
   entrypoint: run-smoke
@@ -68,6 +72,8 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
                 - name: issue-title
                   value: "{{workflow.parameters.issue-title}} - titan-bluefin"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
 
           - name: smoke-lts
             templateRef:
@@ -85,6 +91,8 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
                 - name: issue-title
                   value: "{{workflow.parameters.issue-title}} - titan-lts"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
 
     - name: preflight
       inputs:

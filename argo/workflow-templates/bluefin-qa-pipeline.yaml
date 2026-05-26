@@ -30,6 +30,10 @@ spec:
         value: "bluefin"
       - name: ssh-key-secret
         value: "bluefin-test-ssh-key"
+      # git ref the test runner clones (test code + step defs). Default `main`;
+      # override to test a PR branch end-to-end without merging.
+      - name: branch
+        value: "main"
 
   # ── pipeline DAG ─────────────────────────────────────────────────────────────
   templates:
@@ -80,6 +84,8 @@ spec:
                   value: "{{workflow.parameters.variant}}"
                 - name: ssh-key-secret
                   value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
 
           # 3b. Phase 2 — developer tools (sequential after smoke)
           - name: run-developer
@@ -98,6 +104,8 @@ spec:
                   value: "{{workflow.parameters.variant}}"
                 - name: ssh-key-secret
                   value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
 
           # 3c. Phase 3 — software management (sequential, only if in suites list)
           - name: run-software
@@ -116,6 +124,8 @@ spec:
                   value: "{{workflow.parameters.variant}}"
                 - name: ssh-key-secret
                   value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
 
     # ── onExit handler: stop VM → wait VMI gone → delete hostDisk ──────────────
     - name: teardown
