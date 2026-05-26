@@ -18,16 +18,23 @@ spec:
           - name: image-tag
             value: "latest"
       steps:
+        # `check` outputs "missing" | "stale" | "exists".
+        #   missing — no disk.raw on disk; build path runs
+        #   stale   — disk.raw exists but the remote image digest differs from
+        #             the stored marker (issue #1); build path runs to refresh
+        #   exists  — disk.raw and digest match the remote; build path skipped
         - - name: check
             template: bib-disk-check
             arguments:
               parameters:
+                - name: image
+                  value: "{{inputs.parameters.image}}"
                 - name: image-tag
                   value: "{{inputs.parameters.image-tag}}"
 
         - - name: pull-image
             template: bib-img-pull
-            when: "{{steps.check.outputs.result}} == missing"
+            when: "{{steps.check.outputs.result}} != exists"
             arguments:
               parameters:
                 - name: image
@@ -35,7 +42,7 @@ spec:
 
         - - name: build
             template: bib-img-build
-            when: "{{steps.check.outputs.result}} == missing"
+            when: "{{steps.check.outputs.result}} != exists"
             arguments:
               parameters:
                 - name: image
@@ -45,16 +52,22 @@ spec:
 
         - - name: configure
             template: bib-disk-configure
-            when: "{{steps.check.outputs.result}} == missing"
+            when: "{{steps.check.outputs.result}} != exists"
             arguments:
               parameters:
+                - name: image
+                  value: "{{inputs.parameters.image}}"
                 - name: image-tag
                   value: "{{inputs.parameters.image-tag}}"
 
-    # Check if golden disk already exists on hostPath
+    # Freshness check: missing | stale | exists.
+    # Compares stored remote-digest marker against `skopeo inspect` of the
+    # current image. Missing marker is treated as `stale` to force a rebuild
+    # and record a digest for future runs.
     - name: bib-disk-check
       inputs:
         parameters:
+          - name: image
           - name: image-tag
       nodeSelector:
         kubernetes.io/hostname: ghost
@@ -78,11 +91,44 @@ spec:
           - name: golden
             mountPath: /var/tmp/bluefin-golden
         source: |
+          set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
-          if [[ -f "/var/tmp/bluefin-golden/${TAG}/disk.raw" ]]; then
+          IMAGE="{{inputs.parameters.image}}"
+          GOLDEN_DIR="/var/tmp/bluefin-golden/${TAG}"
+          DISK="${GOLDEN_DIR}/disk.raw"
+          MARKER="${GOLDEN_DIR}/source-digest"
+
+          if [[ ! -f "${DISK}" ]]; then
+            echo -n "missing"
+            exit 0
+          fi
+
+          # Install skopeo (the fedora base image doesn't ship it). Fail open
+          # to `exists` if skopeo can't be installed — never want a network
+          # blip to trigger an unwanted rebuild.
+          if ! command -v skopeo &>/dev/null; then
+            dnf install -y --quiet skopeo >/dev/null 2>&1 || {
+              echo "skopeo install failed; treating disk as fresh" >&2
+              echo -n "exists"
+              exit 0
+            }
+          fi
+
+          REMOTE=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${IMAGE}" 2>/dev/null || true)
+          if [[ -z "${REMOTE}" ]]; then
+            echo "skopeo inspect failed for ${IMAGE}; treating disk as fresh" >&2
+            echo -n "exists"
+            exit 0
+          fi
+
+          STORED=""
+          [[ -f "${MARKER}" ]] && STORED=$(cat "${MARKER}")
+
+          if [[ "${REMOTE}" == "${STORED}" ]]; then
             echo -n "exists"
           else
-            echo -n "missing"
+            echo "Disk stale: stored=${STORED:-<none>} remote=${REMOTE}" >&2
+            echo -n "stale"
           fi
 
     - name: bib-img-pull
@@ -178,6 +224,7 @@ spec:
     - name: bib-disk-configure
       inputs:
         parameters:
+          - name: image
           - name: image-tag
       nodeSelector:
         kubernetes.io/hostname: ghost
@@ -192,6 +239,11 @@ spec:
           hostPath:
             path: /var/tmp/bluefin-golden
             type: DirectoryOrCreate
+        # Needed for `podman image inspect` to read the digest of the image
+        # bib-img-pull just fetched — see source-digest marker below.
+        - name: containers-storage
+          hostPath:
+            path: /var/lib/containers/storage
       container:
         image: quay.io/podman/stable:latest
         securityContext:
@@ -217,6 +269,8 @@ spec:
             mountPath: /var/tmp/bib-output
           - name: golden
             mountPath: /var/tmp/bluefin-golden
+          - name: containers-storage
+            mountPath: /var/lib/containers/storage
         command: [bash, -c]
         args:
           - |
@@ -306,5 +360,17 @@ spec:
             mv "${DISK}" "${GOLDEN_DIR}/disk.raw"
             rmdir "/var/tmp/bib-output/${TAG}/image" 2>/dev/null || true
             rmdir "/var/tmp/bib-output/${TAG}" 2>/dev/null || true
+
+            # Record the source image digest so bib-disk-check can detect when
+            # the golden disk falls behind upstream — see issue #1.
+            # `podman image inspect` works because bib-img-pull just ran.
+            DIGEST=$(podman image inspect --format '{{.Digest}}' "{{inputs.parameters.image}}" 2>/dev/null || true)
+            if [[ -n "${DIGEST}" ]]; then
+              printf '%s' "${DIGEST}" > "${GOLDEN_DIR}/source-digest"
+              echo "Recorded source digest: ${DIGEST}"
+            else
+              echo "WARNING: could not record source digest for {{inputs.parameters.image}}" >&2
+            fi
+
             echo "=== Golden disk ready: ${GOLDEN_DIR}/disk.raw ==="
             ls -lh "${GOLDEN_DIR}/disk.raw"
