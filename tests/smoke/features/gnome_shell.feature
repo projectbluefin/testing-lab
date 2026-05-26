@@ -20,7 +20,7 @@ Feature: GNOME Shell smoke tests
   @top_bar
   Scenario: Activities toggle button is visible in panel
     * GNOME Shell is accessible via AT-SPI
-    * Item "Activities" "toggle button" is "showing" in "gnome-shell"
+    * Activities toggle is visible in top bar
 
   @top_bar
   Scenario: Clock toggle button is visible in panel

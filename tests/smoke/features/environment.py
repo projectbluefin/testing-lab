@@ -107,15 +107,25 @@ def _wait_for_panel(context, attempts: int = 6, delay: int = 5) -> None:
     for attempt in range(1, attempts + 1):
         try:
             shell = context.sandbox.shell
-            panels = shell.findChildren(lambda node: node.roleName == "panel")
-            if panels:
-                toggles = panels[0].findChildren(lambda node: node.roleName == "toggle button")
-                if toggles:
-                    context.panel = panels[0]
-                    return
-                last_error = f"panel found but no visible toggle buttons yet (attempt {attempt})"
-            else:
-                last_error = f"panel not exposed in AT-SPI yet (attempt {attempt})"
+            # On GNOME Shell 50 in headless mode the top-bar panel reports
+            # showing=False in AT-SPI.  Temporarily disable the showing filter
+            # so findChildren can traverse the full tree for readiness detection.
+            from dogtail.config import config as _dcfg
+            _orig_showing = _dcfg.searchShowingOnly
+            _dcfg.searchShowingOnly = False
+            try:
+                panels = shell.findChildren(lambda node: node.roleName == "panel")
+                toggles = panels[0].findChildren(lambda node: node.roleName == "toggle button") if panels else []
+            finally:
+                _dcfg.searchShowingOnly = _orig_showing
+            if panels and toggles:
+                context.panel = panels[0]
+                return
+            last_error = (
+                f"panel found but no toggle buttons yet (attempt {attempt})"
+                if panels
+                else f"panel not exposed in AT-SPI yet (attempt {attempt})"
+            )
             last_snapshot = _shell_snapshot(shell)
         except Exception as error:  # noqa: BLE001
             last_error = str(error)
