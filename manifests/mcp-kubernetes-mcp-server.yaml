@@ -6,8 +6,8 @@
 # with `skopeo inspect docker://ghcr.io/containers/kubernetes-mcp-server:latest`
 # and update the @sha256 before merging).
 #
-# Reachable at http://192.168.1.102:32801/sse from the local network.
-# Register with: `claude mcp add --transport sse k8s http://192.168.1.102:32801/sse`
+# Reachable at http://192.168.1.102:32767/sse from the local network.
+# Register with: `claude mcp add --transport sse k8s http://192.168.1.102:32767/sse`
 ---
 apiVersion: v1
 kind: Namespace
@@ -133,5 +133,5 @@ spec:
     - name: http
       port: 8080
       targetPort: 8080
-      nodePort: 32801
+      nodePort: 32767
       protocol: TCP

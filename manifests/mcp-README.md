@@ -5,7 +5,7 @@ without SSH to ghost and without a local kubeconfig.
 
 | Server | URL | Backing project |
 |---|---|---|
-| `k8s` | http://192.168.1.102:32801/sse | [containers/kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server) |
+| `k8s` | http://192.168.1.102:32767/sse | [containers/kubernetes-mcp-server](https://github.com/containers/kubernetes-mcp-server) |
 
 Argo Workflows is driven through the same server — its ClusterRole grants
 `get/list/watch/create/delete` on `argoproj.io` `Workflows`, `WorkflowTemplates`,
@@ -14,7 +14,7 @@ and `CronWorkflows`. No separate Argo MCP server is needed.
 ## Register with Claude Code
 
 ```sh
-claude mcp add --transport sse k8s http://192.168.1.102:32801/sse
+claude mcp add --transport sse k8s http://192.168.1.102:32767/sse
 claude mcp list  # `k8s` should report ✓ Connected
 ```
 
