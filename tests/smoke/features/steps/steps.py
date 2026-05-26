@@ -339,7 +339,8 @@ def xdg_settings_default_browser_ready(context) -> None:
     # Method 4: check whether any browser .desktop is installed on the system
     result = subprocess.run(
         ["bash", "-c",
-         "grep -rl 'x-scheme-handler/http' /usr/share/applications/ 2>/dev/null | head -1"],
+         "grep -rl 'x-scheme-handler/http' /usr/share/applications/ 2>/dev/null"
+         " | grep '\\.desktop$' | head -1"],
         capture_output=True, text=True, timeout=5,
     )
     desktop_path = result.stdout.strip()
