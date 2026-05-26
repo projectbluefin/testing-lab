@@ -35,8 +35,8 @@ spec:
           interfaces:
             - name: default
               masquerade: {}
-          machine:
-            type: q35
+        machine:
+          type: q35
       networks:
         - name: default
           pod: {}
