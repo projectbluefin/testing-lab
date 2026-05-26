@@ -25,7 +25,7 @@ spec:
   workflowSpec:
     serviceAccountName: argo
     podGC:
-      strategy: OnWorkflowCompletion
+      strategy: OnWorkflowSuccess
     ttlStrategy:
       secondsAfterCompletion: 86400
     workflowTemplateRef:

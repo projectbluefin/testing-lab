@@ -114,8 +114,8 @@ spec:
 
           REMOTE=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
           if [[ -z "${REMOTE}" ]]; then
-            echo "skopeo inspect failed for ${IMAGE_REF}; treating disk as fresh" >&2
-            echo -n "exists"
+            echo "skopeo inspect failed for ${IMAGE_REF}; treating as stale to force rebuild" >&2
+            echo -n "stale"
             exit 0
           fi
 
