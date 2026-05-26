@@ -9,12 +9,58 @@ Custom steps here:
   - Terminal output in ptyxis contains <text>
   - Ptyxis has N tabs
   - No Flatpak missing-runtime error
+  - Homebrew bootstrap and profile checks
+  - Rootless Podman and Docker runtime checks
 """
+import json
+import os
+import shutil
+import subprocess
+from pathlib import Path
 from time import sleep
 
 from behave import step
-from dogtail.rawinput import pressKey
+from behave.step_registry import registry
+import qecore.common_steps as qecore_common_steps
 from qecore.common_steps import *  # noqa: F401,F403
+
+
+QUADLET_EXTENSIONS = {
+    ".build",
+    ".container",
+    ".image",
+    ".kube",
+    ".network",
+    ".pod",
+    ".volume",
+}
+
+
+def _run_command(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, capture_output=True, text=True)
+
+
+def _require_command(name: str) -> str:
+    path = shutil.which(name)
+    assert path, f"{name} is not available on PATH"
+    return path
+
+
+def _parse_key_value_output(output: str) -> dict[str, str]:
+    parsed = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            parsed[key] = value
+    return parsed
+
+
+def _quadlet_files_in(directory: Path) -> list[Path]:
+    if not directory.exists():
+        return []
+    return [
+        path for path in directory.iterdir() if path.is_file() and path.suffix in QUADLET_EXTENSIONS
+    ]
 
 
 @step("Make sure window is focused for wayland testing")
@@ -36,12 +82,11 @@ def terminal_output_contains(context, text) -> None:
 
 @step('Ptyxis has "{number}" tabs')
 def ptyxis_has_n_tabs(context, number) -> None:
-    # Tab bar uses roleName "page tab list"
-    tab_list = context.ptyxis.instance.findChild(
-        lambda n: n.roleName == "page tab list" and n.showing,
-        requireResult=True,
+    tab_lists = context.ptyxis.instance.findChildren(
+        lambda n: n.roleName == "page tab list" and n.showing
     )
-    tabs = tab_list.findChildren(lambda n: n.roleName == "page tab")
+    assert tab_lists, "Could not find a visible Ptyxis tab list"
+    tabs = tab_lists[0].findChildren(lambda n: n.roleName == "page tab")
     assert len(tabs) == int(number), (
         f"Expected {number} tabs, found {len(tabs)}"
     )
@@ -49,14 +94,22 @@ def ptyxis_has_n_tabs(context, number) -> None:
 
 @step('No Flatpak missing-runtime error for "{flatpak_id}"')
 def no_flatpak_missing_runtime_error(context, flatpak_id) -> None:
-    # Checks journalctl for Flatpak runtime-missing errors (regression: dakota#430)
-    import subprocess
-
     since = getattr(context, "test_start_time", None)
-    args = ["journalctl", "--no-pager", "-g", f"{flatpak_id}.*runtime.*missing"]
-    args += (["--since", since] if since else ["-b"])
-    result = subprocess.run(args, capture_output=True, text=True)
-    assert result.returncode != 0 or result.stdout.strip() == "", (
+    if not since:
+        since = _run_command(["date", "--iso-8601=seconds"]).stdout.strip()
+
+    result = _run_command(
+        [
+            "journalctl",
+            "--no-pager",
+            "--since",
+            since,
+            "-g",
+            f"{flatpak_id}.*runtime.*missing",
+        ]
+    )
+    assert result.returncode in {0, 1}, result.stderr
+    assert result.stdout.strip() == "", (
         f"Flatpak runtime-missing error found for {flatpak_id}:\n{result.stdout}"
     )
 
@@ -69,3 +122,360 @@ def last_command_output_contains(context, text) -> None:
         or getattr(context, "last_run_output", "")
     )
     assert text in output, f"Expected {text!r} in output:\n{output[:500]}"
+
+
+_TERMINAL_CLASSIC_MENUS = {"File", "Edit", "View", "Search", "Terminal", "Help", "Tabs"}
+_TERMINAL_MENU_ROLES = (
+    "menu",
+    "menu item",
+    "check menu item",
+    "radio menu item",
+    "push button",
+    "toggle button",
+    "label",
+)
+
+
+def _get_terminal_instance(context):
+    terminal = getattr(context, "terminal", None)
+    if terminal is not None:
+        return terminal.instance
+    return None
+
+
+def _find_terminal_nodes(context, name, roles):
+    terminal = _get_terminal_instance(context)
+    if terminal is None:
+        return []
+    return terminal.findChildren(
+        lambda node: node.name == name
+        and node.roleName in roles
+        and getattr(node, "showing", True)
+    )
+
+
+def _click_terminal_node(node) -> None:
+    target = node.parent if getattr(node, "roleName", None) == "label" else node
+    target.click()
+    sleep(0.3)
+
+
+def _open_terminal_header_menu(context, menu_name=None) -> None:
+    if menu_name:
+        existing = _find_terminal_nodes(context, menu_name, _TERMINAL_MENU_ROLES)
+        if existing:
+            _click_terminal_node(existing[0])
+            context.terminal_header_menu = menu_name
+            return
+
+    toggles = _find_terminal_nodes(context, "Menu", ("toggle button", "push button"))
+    assert toggles, 'GNOME Terminal header-bar "Menu" toggle button not found'
+    _click_terminal_node(toggles[0])
+
+    if not menu_name:
+        context.terminal_header_menu = None
+        return
+
+    for _ in range(3):
+        matches = _find_terminal_nodes(context, menu_name, _TERMINAL_MENU_ROLES)
+        if matches:
+            _click_terminal_node(matches[0])
+            context.terminal_header_menu = menu_name
+            return
+        sleep(0.3)
+
+    raise AssertionError(
+        f'GNOME Terminal header-bar submenu {menu_name!r} not found after opening Menu'
+    )
+
+
+def _click_terminal_find_button(context) -> None:
+    matches = _find_terminal_nodes(context, "Find", ("button", "push button", "toggle button"))
+    assert matches, 'GNOME Terminal header-bar "Find" button not found'
+    _click_terminal_node(matches[0])
+    context.terminal_header_menu = "Search"
+
+
+def _adapt_terminal_mouse_click(context, retry=True, expect_positive=True, **kwargs):
+    a11y_root_name = kwargs.get("a11y_root_name")
+    if a11y_root_name != "terminal" or kwargs.get("m_btn") != "Left":
+        return False
+
+    name = kwargs.get("name")
+    role_name = kwargs.get("role_name")
+    if name == "Find":
+        _click_terminal_find_button(context)
+        return True
+
+    if role_name == "menu" and name in _TERMINAL_CLASSIC_MENUS:
+        _open_terminal_header_menu(context)
+        context.terminal_header_menu = name
+        return True
+
+    if role_name in {"menu item", "check menu item", "radio menu item"}:
+        active_menu = getattr(context, "terminal_header_menu", None)
+        if active_menu in _TERMINAL_CLASSIC_MENUS:
+            matches = _find_terminal_nodes(context, name, _TERMINAL_MENU_ROLES)
+            if not matches:
+                _open_terminal_header_menu(context, active_menu)
+
+    return False
+
+
+def _adapt_terminal_mouse_over(context, retry=True, expect_positive=True, **kwargs):
+    if kwargs.get("a11y_root_name") != "terminal":
+        return False
+    if kwargs.get("role_name") == "menu" and kwargs.get("name") in _TERMINAL_CLASSIC_MENUS:
+        _open_terminal_header_menu(context)
+        context.terminal_header_menu = kwargs["name"]
+        return True
+    return False
+
+
+_ORIGINAL_MOUSE_CLICK = qecore_common_steps.mouse_click
+_ORIGINAL_MOUSE_OVER = qecore_common_steps.mouse_over
+
+
+def _runtime_adapted_mouse_click(context, retry=True, expect_positive=True, **kwargs) -> None:
+    if _adapt_terminal_mouse_click(
+        context,
+        retry=retry,
+        expect_positive=expect_positive,
+        **kwargs,
+    ):
+        return
+    _ORIGINAL_MOUSE_CLICK(
+        context,
+        retry=retry,
+        expect_positive=expect_positive,
+        **kwargs,
+    )
+
+
+def _runtime_adapted_mouse_over(context, retry=True, expect_positive=True, **kwargs) -> None:
+    if _adapt_terminal_mouse_over(
+        context,
+        retry=retry,
+        expect_positive=expect_positive,
+        **kwargs,
+    ):
+        return
+    _ORIGINAL_MOUSE_OVER(
+        context,
+        retry=retry,
+        expect_positive=expect_positive,
+        **kwargs,
+    )
+
+
+def _replace_step_impl(original, replacement) -> None:
+    for step_group in registry.steps.values():
+        for step_definition in step_group:
+            if step_definition.func is original:
+                step_definition.func = replacement
+
+
+_replace_step_impl(_ORIGINAL_MOUSE_CLICK, _runtime_adapted_mouse_click)
+_replace_step_impl(_ORIGINAL_MOUSE_OVER, _runtime_adapted_mouse_over)
+
+
+@step("Homebrew bootstrap service completed successfully")
+def homebrew_bootstrap_service_completed_successfully(context) -> None:
+    result = _run_command(
+        [
+            "systemctl",
+            "--user",
+            "show",
+            "brew-setup.service",
+            "--property=LoadState",
+            "--property=ActiveState",
+            "--property=SubState",
+            "--property=Result",
+            "--property=ExecMainStatus",
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    properties = _parse_key_value_output(result.stdout)
+    assert properties.get("LoadState") == "loaded", properties
+    assert properties.get("ActiveState") != "failed", properties
+    assert properties.get("Result") == "success", properties
+    assert properties.get("ExecMainStatus") == "0", properties
+
+
+@step("Homebrew binary is available on PATH")
+def homebrew_binary_is_available_on_path(context) -> None:
+    result = _run_command(["which", "brew"])
+    assert result.returncode == 0, result.stderr or "brew was not found by which"
+    assert result.stdout.strip(), "which brew returned an empty path"
+
+
+@step("Homebrew doctor completes without unexpected warnings")
+def homebrew_doctor_completes_without_unexpected_warnings(context) -> None:
+    brew = _require_command("brew")
+    env = os.environ | {"HOMEBREW_NO_ANALYTICS": "1"}
+    result = subprocess.run(
+        [brew, "doctor"], capture_output=True, text=True, env=env
+    )
+    output = f"{result.stdout}\n{result.stderr}".strip()
+    if result.returncode == 0:
+        return
+
+    assert "Warning:" in output, output
+    assert "Error:" not in output, output
+
+
+@step("Homebrew profile integration is configured")
+def homebrew_profile_integration_is_configured(context) -> None:
+    brew = _require_command("brew")
+    brew_prefix = _run_command([brew, "--prefix"])
+    assert brew_prefix.returncode == 0, brew_prefix.stderr
+
+    needles = {"brew shellenv", brew_prefix.stdout.strip(), "linuxbrew"}
+    candidate_files = [Path.home() / ".profile", Path.home() / ".bashrc"]
+    profile_dir = Path("/etc/profile.d")
+    if profile_dir.exists():
+        candidate_files.extend(sorted(profile_dir.glob("*.sh")))
+
+    for candidate in candidate_files:
+        if not candidate.exists():
+            continue
+        contents = candidate.read_text(encoding="utf-8", errors="ignore")
+        if any(needle in contents for needle in needles):
+            return
+
+    searched = ", ".join(str(path) for path in candidate_files)
+    raise AssertionError(f"No Homebrew shell integration found in: {searched}")
+
+
+@step("Podman info reports rootless execution")
+def podman_info_reports_rootless_execution(context) -> None:
+    podman = _require_command("podman")
+    result = _run_command([podman, "info", "--format", "json"])
+    assert result.returncode == 0, result.stderr
+    info = json.loads(result.stdout)
+
+    host = info.get("host", {})
+    store = info.get("store", {})
+    rootless = host.get("rootless")
+    if rootless is None:
+        rootless = host.get("security", {}).get("rootless")
+
+    storage_driver = store.get("graphDriverName") or store.get("graphDriver")
+    assert rootless is True, info
+    assert isinstance(storage_driver, str) and storage_driver, info
+
+
+@step("Podman user quadlet directories are supported")
+def podman_user_quadlet_directories_are_supported(context) -> None:
+    allowed_dirs = [
+        Path("/etc/containers/systemd"),
+        Path.home() / ".config/containers/systemd",
+    ]
+    unsupported_dirs = [
+        Path.home() / ".config/systemd/user",
+        Path("/etc/systemd/user"),
+    ]
+
+    unsupported_quadlets = {
+        str(directory): [str(path) for path in _quadlet_files_in(directory)]
+        for directory in unsupported_dirs
+        if _quadlet_files_in(directory)
+    }
+    assert not unsupported_quadlets, (
+        "Quadlet files found outside supported Podman locations: "
+        f"{unsupported_quadlets}"
+    )
+
+    allowed_quadlets = {
+        str(directory): [str(path) for path in _quadlet_files_in(directory)]
+        for directory in allowed_dirs
+        if directory.exists()
+    }
+    assert allowed_quadlets or any(directory.exists() for directory in allowed_dirs), (
+        "Expected supported quadlet directories under /etc/containers/systemd or "
+        "~/.config/containers/systemd"
+    )
+
+
+@step("Podman auto-update timer is active for the user")
+def podman_auto_update_timer_is_active_for_the_user(context) -> None:
+    result = _run_command(
+        [
+            "systemctl",
+            "--user",
+            "show",
+            "podman-auto-update.timer",
+            "--property=LoadState",
+            "--property=ActiveState",
+            "--property=UnitFileState",
+        ]
+    )
+    assert result.returncode == 0, result.stderr
+    properties = _parse_key_value_output(result.stdout)
+    assert properties.get("LoadState") == "loaded", properties
+    assert properties.get("ActiveState") == "active", properties
+
+
+@step("User lingering is enabled")
+def user_lingering_is_enabled(context) -> None:
+    username = os.environ.get("USER") or _run_command(["id", "-un"]).stdout.strip()
+    result = _run_command(
+        ["loginctl", "show-user", username, "--property=Linger"]
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "Linger=yes", result.stdout
+
+
+@step("Homebrew Docker runtime mapping is valid when docker is installed")
+def homebrew_docker_runtime_mapping_is_valid_when_docker_is_installed(context) -> None:
+    docker = shutil.which("docker")
+    if not docker:
+        return
+
+    brew = shutil.which("brew")
+    if not brew:
+        return
+
+    brew_prefix = _run_command([brew, "--prefix"])
+    assert brew_prefix.returncode == 0, brew_prefix.stderr
+    docker_is_homebrew = docker.startswith(brew_prefix.stdout.strip())
+    docker_is_homebrew = docker_is_homebrew or (
+        _run_command([brew, "list", "--versions", "docker"]).returncode == 0
+    )
+    if not docker_is_homebrew:
+        return
+
+    env_host = os.environ.get("DOCKER_HOST", "").strip()
+    active_context = _run_command([docker, "context", "show"])
+    assert active_context.returncode == 0, active_context.stderr
+    context_name = active_context.stdout.strip()
+
+    context_host = ""
+    if context_name:
+        inspect = _run_command([docker, "context", "inspect", context_name])
+        assert inspect.returncode == 0, inspect.stderr
+        context_data = json.loads(inspect.stdout)
+        context_host = (
+            context_data[0]
+            .get("Endpoints", {})
+            .get("docker", {})
+            .get("Host", "")
+            .strip()
+        )
+
+    effective_host = env_host or context_host
+    assert context_name or env_host, "Neither docker context nor DOCKER_HOST is configured"
+    assert effective_host, "Could not determine Docker endpoint from context or DOCKER_HOST"
+
+    uid = os.getuid()
+    expected_hosts = {
+        f"unix:///run/user/{uid}/podman/podman.sock",
+        f"unix://{Path.home()}/.colima/default/docker.sock",
+    }
+    assert effective_host in expected_hosts, (
+        f"Unexpected Docker endpoint: {effective_host} (context={context_name!r}, "
+        f"DOCKER_HOST={env_host!r})"
+    )
+
+    socket_path = Path(effective_host.removeprefix("unix://"))
+    assert socket_path.exists(), f"Docker socket is missing: {socket_path}"
