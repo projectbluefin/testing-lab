@@ -626,9 +626,19 @@ def files_sidebar_contains(context, item) -> None:
 
 @step('Open Settings panel "{panel_name}"')
 def open_settings_panel(context, panel_name) -> None:
-    # Activate the existing gnome-control-center instance and navigate to the
-    # panel by running `gnome-control-center <panel_id>`.  GtkApplication single-
-    # instance routing ensures this activates (not re-launches) the running app.
+    app = getattr(context, "current_application", None) or _wait_for_application_node("org.gnome.Settings")
+    # The sidebar labels (Network, Appearance, System…) are always in the AT-SPI
+    # tree as ('label', 'PanelName').  Click the first matching one and let
+    # _click_node_or_ancestor traverse to the clickable parent row.
+    sidebar_entries = app.findChildren(
+        lambda n: (n.name or "").strip() == panel_name and n.roleName == "label"
+    )
+    if sidebar_entries:
+        _click_node_or_ancestor(sidebar_entries[0])
+        sleep(1.5)
+        return
+    # Fallback for sub-panels not in the top-level sidebar (e.g. "About" under System).
+    # Use subprocess activation — works on cold launch because Settings starts on About.
     panel_id = panel_name.lower().replace(" ", "-")
     _shell_eval(
         "const p = new Gio.Subprocess({"
