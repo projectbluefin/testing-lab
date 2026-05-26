@@ -1,8 +1,12 @@
 # bluefin-test-suite
 
-A cloud-native QA pipeline for [Project Bluefin](https://projectbluefin.io) desktops.
+A cloud-native QA pipeline for [Project Bluefin](https://projectbluefin.io) desktops. 
 
-Runs inside Kubernetes on [ghost](https://github.com/castrojo/utah), driven by **Argo Workflows**, booting Bluefin as a **KubeVirt hostDisk VM** (golden disk + btrfs reflink), and executing GUI tests via **behave + qecore + Dogtail (AT-SPI)** — no ISO installer, no pixel matching.
+Runs inside Kubernetes on [ghost](https://github.com/castrojo/utah), driven by **Argo Workflows**, booting Bluefin as a **KubeVirt hostDisk VM** (golden disk + btrfs reflink), and executing GUI tests via **behave + qecore + Dogtail (AT-SPI)** — no ISO installer, no pixel matching. Full automated testing of GNOME, Bluefin, etc. 
+
+- gitops driven cluster with argo, no need to "run the cluster", you just rev.
+- Can run on any machine or multiple machines
+- Tests both bootc images and coreos/flatcar images
 
 ---
 
