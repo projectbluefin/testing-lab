@@ -1,4 +1,3 @@
-import re
 import subprocess
 import sys
 import time
@@ -6,7 +5,6 @@ import time
 from dogtail import tree as dtree
 
 
-time_re = re.compile(r"\d{1,2}:\d{2}|clock", re.IGNORECASE)
 last_err = "unknown"
 
 for attempt in range(1, 31):
@@ -43,13 +41,16 @@ for attempt in range(1, 31):
             time.sleep(2)
             continue
 
+        # On GNOME Shell 50 the clock button has an empty AT-SPI name.
+        # Readiness: panel exists + Shell.Eval confirms Main.panel is live.
+        # Require 'Activities' or 'Show Apps' to confirm panel is populated.
         toggles = panels[0].findChildren(lambda n: n.roleName == "toggle button")
-        toggle_names = [t.name for t in toggles]
-        if any(name and time_re.search(name) for name in toggle_names):
-            print(f"GNOME Shell ready (attempt {attempt}): {toggle_names}", flush=True)
+        named = [t.name for t in toggles if t.name]
+        if any(n in ("Activities", "Show Apps") for n in named):
+            print(f"GNOME Shell ready (attempt {attempt}): {named}", flush=True)
             sys.exit(0)
 
-        last_err = f"panel toggles not ready yet: {toggle_names}"
+        last_err = f"panel not yet populated (toggles: {[t.name for t in toggles]})"
         print(f"Readiness attempt {attempt}: {last_err}", flush=True)
     except Exception as exc:  # noqa: BLE001
         last_err = str(exc)
