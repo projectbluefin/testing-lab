@@ -634,9 +634,16 @@ def files_sidebar_contains(context, item) -> None:
 @step('Open Settings panel "{panel_name}"')
 def open_settings_panel(context, panel_name) -> None:
     import json
+    import subprocess as _subprocess
 
-    panel_id = panel_name.lower().replace(" ", "-")
+    # GNOME 46+ panel ID mapping (positional arg names changed between GCC versions)
+    _PANEL_MAP = {
+        "about": "system",        # GNOME 46+: About/OS info lives in the System panel
+        "appearance": "background",  # GNOME 46+: Style/color-scheme is in Background panel
+    }
+    panel_id = _PANEL_MAP.get(panel_name.lower(), panel_name.lower().replace(" ", "-"))
     gcc_aliases = json.dumps(["gnome-control-center", "org.gnome.settings", "settings"])
+
     # Quit the running GCC instance: a running app ignores the panel argument
     # on re-activation, so a fresh cold-start launch is the only reliable way
     # to land on the requested panel.
@@ -650,8 +657,8 @@ def open_settings_panel(context, panel_name) -> None:
         "  }"
         "});"
     )
-    # Wait for GCC to fully vanish from AT-SPI before relaunching.
-    for _ in range(10):
+    # Wait for GCC windows to vanish from AT-SPI before relaunching.
+    for _ in range(20):
         apps = tree.root.findChildren(
             lambda n: n.roleName == "application"
             and any(alias in (n.name or "").lower() for alias in _app_aliases("org.gnome.Settings"))
@@ -662,31 +669,16 @@ def open_settings_panel(context, panel_name) -> None:
         if not has_windows:
             break
         sleep(0.5)
-    sleep(0.5)  # small grace period after process exits
+    # Allow time for the GApplication D-Bus name to be released before
+    # the new instance tries to register as the primary instance.
+    sleep(2)
 
-    # Capture the valid panel list for diagnostics and ID verification.
-    panel_list_raw = _shell_eval_inner(
-        "try {"
-        "  const p2 = new Gio.Subprocess({"
-        "    argv: ['gnome-control-center', '--list-panels'],"
-        "    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE"
-        "  });"
-        "  p2.init(null);"
-        "  const [, out] = p2.communicate_utf8(null, null);"
-        "  (out || 'empty').trim().split('\\n').join(',');"
-        "} catch(e) { 'list-err:' + e.message; }"
-    )
-    print(f"[open_settings_panel] GCC panel list: {panel_list_raw}")
-
-    _shell_eval(
-        "const p = new Gio.Subprocess({"
-        f"  argv: ['gnome-control-center', '--panel', '{panel_id}'],"
-        "  flags: Gio.SubprocessFlags.NONE"
-        "});"
-        "p.init(null);"
-    )
-    sleep(3)
-    context.current_application = _wait_for_application_node("org.gnome.Settings")
+    # Launch via Python subprocess (not Shell.Eval / Gio.Subprocess) so that
+    # the new process inherits the test runner's full session environment
+    # (WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS, AT_SPI_BUS_ADDRESS) and
+    # registers properly with the AT-SPI registry.
+    _subprocess.Popen(["gnome-control-center", panel_id])
+    context.current_application = _wait_for_application_node("org.gnome.Settings", attempts=20)
 
 
 @step('Settings panel "{panel_name}" shows "{text}"')
