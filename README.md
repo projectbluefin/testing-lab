@@ -6,6 +6,14 @@ Runs inside Kubernetes on [ghost](https://github.com/castrojo/utah), driven by *
 
 ---
 
+## Documentation map
+
+- See [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) for the canonical command reference.
+- See [AGENTS.md](AGENTS.md) for repo policy, scope rules, and architecture tables.
+- See [docs/lab-operations.md](docs/lab-operations.md) for long-form operational procedures.
+- See [docs/dogtail-testing.md](docs/dogtail-testing.md) for GUI test authoring and debugging.
+- See [RUNBOOK.md](RUNBOOK.md) for timeless architecture and failure-mode context.
+
 ## Architecture
 
 ```
@@ -18,7 +26,7 @@ GitHub webhook / just run-tests
         │                           /var/tmp/bluefin-golden/<tag>/disk.raw
         │
         ├─ provision-bluefin-vm ──► btrfs reflink (~24ms) + KubeVirt VM
-        │                           namespace: bluefin-test
+        │                           namespace: bluefin-test / bluefin-lts-test
         │
         ├─ run-gnome-tests ────────► runner pod (Fedora + qecore-headless)
         │                           git-sync → SSH → VM
@@ -32,69 +40,41 @@ GitHub webhook / just run-tests
 | Phase | Suite | Runs on |
 |---|---|---|
 | 1 — Golden Path smoke | `smoke` | Every PR |
-| 2 — Developer tooling | `developer` | Every merge |
-| 3 — Software management | `software` | Nightly |
-
-## Quick start
-
-```bash
-# Run smoke tests against latest Bluefin
-just run-tests
-
-# Run the full matrix (latest + lts)
-just run-tests-matrix
-
-# Apply WorkflowTemplates to the cluster
-just apply-templates
-
-# Watch logs
-just logs
-```
+| 2 — Developer tooling | `developer` | Merge / targeted validation |
+| 3 — Software management | `software` | Targeted validation |
+| 4 — Atomic OS contract | `system` | Titan fast-path validation |
+| 5 — Flatcar substrate | `flatcar` | Dedicated Flatcar workflow |
 
 ## Repository layout
 
 ```
 bluefin-test-suite/
-├── Justfile                          # all commands live here
-├── plans/
-│   ├── main.fmf                      # fmf root metadata
-│   └── flatcar.fmf                   # tmt plans for Flatcar tests only
+├── Justfile                          # operator entrypoints
 ├── tests/
 │   ├── smoke/features/               # Phase 1: GNOME Shell, Activities, extensions
 │   ├── developer/                    # Phase 2: terminal, brew, podman, micro
 │   ├── software/                     # Phase 3: GNOME Software, Flatpak
-│   └── flatcar/                      # Flatcar OS tests (tmt)
-└── argo/
-    ├── bluefin-smoke-test.yaml       # single-image workflow
-    ├── bluefin-test-matrix.yaml      # multi-channel matrix workflow
-    └── workflow-templates/
-        ├── bib-build-and-push.yaml   # golden disk build (BIB)
-        ├── provision-bluefin-vm.yaml # reflink clone + KubeVirt VM
-        ├── run-gnome-tests.yaml      # behave + qecore-headless SSH runner
-        └── teardown-bluefin-vm.yaml  # VM + hostDisk cleanup (onExit)
-```
-
-## Prerequisites
-
-- k3s + KubeVirt running on ghost (`192.168.1.102`)
-- Argo Workflows installed in `argo` namespace
-- `bluefin-test` and `bluefin-lts-test` namespaces exist
-- Secret `bluefin-test-ssh-key` in `argo` namespace with an `id_ed25519` key
-
-### Create the SSH secret
-
-```bash
-ssh-keygen -t ed25519 -f /tmp/bluefin-test-key -N ""
-kubectl create secret generic bluefin-test-ssh-key \
-    --from-file=id_ed25519=/tmp/bluefin-test-key \
-    --from-file=id_ed25519.pub=/tmp/bluefin-test-key.pub \
-    -n argo
+│   ├── system/                       # Atomic OS contract checks
+│   └── flatcar/                      # Flatcar OS tests
+├── argo/
+│   ├── bluefin-smoke-test.yaml       # single-image workflow
+│   ├── bluefin-test-matrix.yaml      # latest + lts workflow
+│   ├── flatcar-smoke-test.yaml       # Flatcar workflow
+│   └── workflow-templates/           # GitOps-managed WorkflowTemplates
+├── manifests/                        # GitOps-managed cluster resources and CronWorkflows
+├── AGENTS.md                         # policy + architecture tables
+├── RUNBOOK.md                        # timeless architecture + failure modes
+└── docs/
+    ├── agent-cheatsheet.md           # canonical commands
+    ├── lab-operations.md             # long-form procedures
+    ├── dogtail-testing.md            # GUI test authoring guide
+    └── vanguard-report-template.md   # PR evidence template
 ```
 
 ## Writing new tests
 
-1. Add a `.feature` file under `tests/<suite>/features/`
-2. Add step definitions to `tests/<suite>/features/steps/steps.py`
-3. Use `context.sandbox.shell` (qecore) for gnome-shell AT-SPI access
-4. Use `Shell.Eval` for panel interactions not exposed in AT-SPI (clock, system menu)
-5. Each scenario must be independent — no shared state between scenarios
+1. Add a `.feature` file under `tests/<suite>/features/`.
+2. Add step definitions to `tests/<suite>/features/steps/steps.py`.
+3. Start GUI scenarios with `* GNOME Shell is accessible via AT-SPI`.
+4. Use `Shell.Eval` for top-bar interactions that GNOME Shell does not expose reliably via AT-SPI.
+5. See [docs/dogtail-testing.md](docs/dogtail-testing.md) for dogtail/qecore patterns, runner behavior, and debugging recipes.
