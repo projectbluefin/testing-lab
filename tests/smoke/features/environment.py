@@ -73,6 +73,29 @@ def _write_atspi_tree(shell) -> None:
         handle.write(_shell_snapshot(shell))
 
 
+def _ensure_unsafe_mode(stage: str, attempts: int = 5, delay: int = 2) -> None:
+    last_error = "unknown"
+
+    for attempt in range(1, attempts + 1):
+        try:
+            inner = _shell_eval_inner(
+                "global.context.unsafe_mode = true; "
+                "global.context.unsafe_mode === true ? 'true' : 'false'"
+            )
+            if inner == "true":
+                return
+            last_error = f"unsafe_mode inner result was {inner!r} at {stage} attempt {attempt}"
+        except Exception as error:  # noqa: BLE001
+            last_error = f"{stage} attempt {attempt}: {error}"
+
+        if attempt < attempts:
+            time.sleep(delay)
+
+    raise RuntimeError(
+        f"unsafe_mode activation failed during {stage} after {attempts} attempts: {last_error}"
+    )
+
+
 def _wait_for_panel(context, attempts: int = 6, delay: int = 5) -> None:
     last_snapshot = "unavailable"
     last_error = "unknown"
@@ -113,10 +136,9 @@ def before_all(context) -> None:
     # nodes — removes need for redundant `.showing` predicates in step code.
     dogtail_config.searchShowingOnly = True
     try:
-        if _shell_eval_inner("global.context.unsafe_mode === true ? 'true' : 'false'") != "true":
-            raise RuntimeError("unsafe_mode was not enabled by run-gnome-tests readiness checks.")
+        _ensure_unsafe_mode("before_all pre-sandbox")
     except Exception as error:  # noqa: BLE001
-        raise RuntimeError(f"unsafe_mode verification failed: {error}") from error
+        raise RuntimeError(f"unsafe_mode activation failed before sandbox setup: {error}") from error
 
     # Initialize sandbox
     try:
@@ -126,6 +148,7 @@ def before_all(context) -> None:
     except Exception as error:
         raise RuntimeError(f"before_all sandbox setup failed: {error}") from error
 
+    _ensure_unsafe_mode("before_all post-sandbox")
     _wait_for_panel(context)
 
 
