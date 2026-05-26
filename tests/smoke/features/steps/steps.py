@@ -523,16 +523,24 @@ def _app_aliases(app_id: str) -> tuple[str, ...]:
 
 
 def _wait_for_application_node(app_id: str, attempts: int = 10, delay: float = 1.0):
+    from dogtail.config import config as _dcfg
     aliases = _app_aliases(app_id)
     last_seen = []
     for _ in range(attempts):
-        apps = tree.root.findChildren(
-            lambda n: n.roleName == "application"
-            and any(alias in (n.name or "").lower() for alias in aliases)
-        )
+        # Launched Flatpak apps report showing=False in AT-SPI on headless
+        # sessions (no physical monitor).  Search without the showing filter.
+        orig = _dcfg.searchShowingOnly
+        _dcfg.searchShowingOnly = False
+        try:
+            apps = tree.root.findChildren(
+                lambda n: n.roleName == "application"
+                and any(alias in (n.name or "").lower() for alias in aliases)
+            )
+            last_seen = [(n.name, n.roleName) for n in tree.root.children[:15]]
+        finally:
+            _dcfg.searchShowingOnly = orig
         if apps:
             return apps[0]
-        last_seen = [(n.name, n.roleName) for n in tree.root.children[:15]]
         sleep(delay)
     raise AssertionError(
         f"Application {app_id!r} not found in AT-SPI tree. Top-level nodes: {last_seen}"
