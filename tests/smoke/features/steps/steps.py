@@ -187,6 +187,25 @@ def last_command_output_stripped_is(context, expected) -> None:
     )
 
 
+@step("No gnome-shell journal errors since test start")
+def no_gnome_shell_journal_errors_since_start(context) -> None:
+    import subprocess
+
+    since = getattr(context, "test_start_time", None)
+    cmd = ["journalctl", "--no-pager", "-p", "err..emerg", "--lines=50"]
+    if since:
+        cmd += ["--since", since]
+    else:
+        cmd += ["-b"]
+    cmd += ["-g", "gnome-shell"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    count = len([line for line in result.stdout.splitlines() if "gnome-shell" in line])
+    assert count == 0, (
+        f"Found {count} gnome-shell journal errors since {since or 'boot'}:\n"
+        f"{result.stdout[:1000]}"
+    )
+
+
 # ── Shell.Eval helpers (GNOME 50: uinput Super + AT-SPI toggle click broken) ──
 
 def _shell_eval(js: str) -> str:

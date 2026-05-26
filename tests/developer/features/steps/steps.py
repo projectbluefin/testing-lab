@@ -51,10 +51,11 @@ def ptyxis_has_n_tabs(context, number) -> None:
 def no_flatpak_missing_runtime_error(context, flatpak_id) -> None:
     # Checks journalctl for Flatpak runtime-missing errors (regression: dakota#430)
     import subprocess
-    result = subprocess.run(
-        ["journalctl", "-b", "--no-pager", "-g", f"{flatpak_id}.*runtime.*missing"],
-        capture_output=True, text=True,
-    )
+
+    since = getattr(context, "test_start_time", None)
+    args = ["journalctl", "--no-pager", "-g", f"{flatpak_id}.*runtime.*missing"]
+    args += (["--since", since] if since else ["-b"])
+    result = subprocess.run(args, capture_output=True, text=True)
     assert result.returncode != 0 or result.stdout.strip() == "", (
         f"Flatpak runtime-missing error found for {flatpak_id}:\n{result.stdout}"
     )

@@ -140,6 +140,44 @@ run-titan-system:
       --parameter suite=system \
       -n {{ argo_ns }} --wait --log
 
+# Run developer suite tests on persistent titan VMs.
+run-titan-developer:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
+        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
+    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
+        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
+    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
+    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
+    echo "titan-bluefin: ${IP_LATEST}"
+    echo "titan-lts:     ${IP_LTS}"
+    argo submit --from workflowtemplate/bluefin-titan-smoke \
+        -p vm-ip-latest="${IP_LATEST}" \
+        -p vm-ip-lts="${IP_LTS}" \
+        -p suite=developer \
+        -n {{ argo_ns }} \
+        --watch
+
+# Run software suite tests on persistent titan VMs.
+run-titan-software:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
+        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
+    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
+        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
+    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
+    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
+    echo "titan-bluefin: ${IP_LATEST}"
+    echo "titan-lts:     ${IP_LTS}"
+    argo submit --from workflowtemplate/bluefin-titan-smoke \
+        -p vm-ip-latest="${IP_LATEST}" \
+        -p vm-ip-lts="${IP_LTS}" \
+        -p suite=software \
+        -n {{ argo_ns }} \
+        --watch
+
 # Run Flatcar smoke tests
 run-flatcar-smoke:
     argo submit argo/flatcar-smoke-test.yaml \
@@ -184,7 +222,7 @@ teardown:
 # Lint all Argo YAML manifests
 lint:
     @for f in argo/*.yaml argo/workflow-templates/*.yaml; do \
-        echo "Linting $$f..."; \
-        argo lint $$f || exit 1; \
+        echo "Linting $f..."; \
+        argo lint "$f" || exit 1; \
     done
     @echo "✓ All manifests valid"

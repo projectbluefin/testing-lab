@@ -7,6 +7,8 @@ AT-SPI app names confirmed in tests/developer/conftest.py:
 
 Pattern: modehnal/GNOMETerminalAutomation features/environment.py
 """
+import os
+import subprocess
 import sys
 import traceback
 
@@ -32,6 +34,16 @@ def before_all(context) -> None:
         context.podman_desktop = context.sandbox.get_flatpak(
             flatpak_id="io.podman_desktop.PodmanDesktop",
         )
+
+        # Read test start time written by workflow before behave started (issue #6)
+        _start_time_file = "/tmp/results/test-start-time.txt"
+        if os.path.exists(_start_time_file):
+            with open(_start_time_file) as _f:
+                context.test_start_time = _f.read().strip()
+        else:
+            context.test_start_time = subprocess.run(
+                ["date", "--iso-8601=seconds"], capture_output=True, text=True
+            ).stdout.strip()
     except Exception as error:
         print(f"Environment error: before_all: {error}")
         context.failed_setup = traceback.format_exc()

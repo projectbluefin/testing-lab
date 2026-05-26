@@ -10,6 +10,7 @@ qecore-headless (invoked by the Argo runner) handles:
   - gnome-ponytail-daemon activation
   - AT-SPI bus bridge
 """
+import os
 import re
 import subprocess
 import sys
@@ -145,6 +146,15 @@ def before_all(context) -> None:
         context.sandbox.attach_faf = False
         context.sandbox.production = False
         context.shell_ready = False
+        # Read test start time written by workflow before behave started (issue #6)
+        _start_time_file = "/tmp/results/test-start-time.txt"
+        if os.path.exists(_start_time_file):
+            with open(_start_time_file) as _f:
+                context.test_start_time = _f.read().strip()
+        else:
+            context.test_start_time = subprocess.run(
+                ["date", "--iso-8601=seconds"], capture_output=True, text=True
+            ).stdout.strip()
     except Exception as error:
         raise RuntimeError(f"before_all sandbox setup failed: {error}") from error
 

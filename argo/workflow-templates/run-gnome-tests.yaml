@@ -218,6 +218,10 @@ spec:
               TAGS_ARG="${BEHAVE_TAGS}"
             fi
 
+            # Record test start time for journalctl --since filtering (issue #6)
+            echo "Recording test start time..." >&2
+            ${SSH} "date --iso-8601=seconds > /tmp/results/test-start-time.txt" || true
+
             BEHAVE_RC=0
             ${SSH} "
               export PATH=\$HOME/.local/bin:\$PATH
