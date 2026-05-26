@@ -141,9 +141,18 @@ spec:
             echo "ERROR: systemd state '${STATE}' on ${LABEL}" >&2
             exit 1
           fi
+
+          echo "Reclaiming disk space on ${LABEL}..." >&2
+          ${SSH} "journalctl --vacuum-size=100M 2>/dev/null || true" || true
+          ${SSH} "sudo dnf clean all 2>/dev/null || true" || true
+          ${SSH} "podman image prune -f 2>/dev/null || true" || true
+          ${SSH} "sudo flatpak uninstall --unused -y 2>/dev/null || true" || true
+          echo "Disk reclaim complete." >&2
+
+          # Reclaim runs before enforcing the 2GB free-space gate.
           FREE=$(${SSH} "df -BG / | awk 'NR==2{print \$4}' | tr -d G")
           if [[ "${FREE}" -lt 2 ]]; then
-            echo "ERROR: only ${FREE}GB free on ${LABEL} root — need ≥ 2GB" >&2
+            echo "ERROR: only ${FREE}GB free on ${LABEL} root after reclaim — need ≥ 2GB" >&2
             exit 1
           fi
-          echo "Preflight passed: ${LABEL} systemd=${STATE}, disk=${FREE}GB free" >&2
+          echo "Preflight passed: ${LABEL} systemd=${STATE}, disk=${FREE}GB free after reclaim" >&2
