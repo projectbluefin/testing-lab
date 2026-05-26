@@ -24,7 +24,7 @@ Feature: Flatcar boot smoke tests
 
   @flatcar @containerd
   Scenario: containerd socket is reachable
-    * Run SSH command: "ctr version"
+    * Run SSH command: "sudo ctr version"
     * SSH command return code is "0"
 
   @flatcar @network
