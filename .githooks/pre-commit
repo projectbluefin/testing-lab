@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-commit lint. Activate per-clone with:
+#   git config core.hooksPath .githooks
+#
+# Checks:
+#   1. `argo lint` on argo/ (if argo CLI is available)
+#   2. No plain `kind: Secret` in manifests/ — use kubectl-managed secrets
+#      or a SealedSecret. Per SECURITY.md, mutable `:latest` image tags are
+#      ACCEPTED; we do not lint for digest-pinning.
+set -e
+
+# Limit checks to staged changes touching argo/ or manifests/
+CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(argo|manifests)/.+\.ya?ml$' || true)
+[ -z "$CHANGED" ] && exit 0
+
+if command -v argo >/dev/null 2>&1; then
+    argo lint --offline argo/workflow-templates/ 1>&2
+else
+    echo "pre-commit: argo CLI not found — skipping argo lint" 1>&2
+fi
+
+if grep -rE '^kind:[[:space:]]*Secret([[:space:]]|$)' manifests/ 2>/dev/null; then
+    echo "pre-commit error: plain k8s Secret committed in manifests/." 1>&2
+    echo "Use kubectl-managed secrets or a SealedSecret instead." 1>&2
+    exit 1
+fi
+
+exit 0
