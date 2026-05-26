@@ -17,3 +17,8 @@ data:
         secondsAfterCompletion: 604800
         secondsAfterSuccess: 604800
         secondsAfterFailure: 2592000
+      # podGC.OnWorkflowSuccess: succeeded pods deleted immediately on workflow
+      # success; on failure, pods persist for the TTL window above so `argo
+      # logs` can fetch them. Bounded pod count → predictable scheduler load.
+      podGC:
+        strategy: OnWorkflowSuccess
