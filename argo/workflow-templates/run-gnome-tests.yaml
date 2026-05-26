@@ -223,16 +223,21 @@ spec:
                 > /tmp/run-suite.sh && chmod +x /tmp/run-suite.sh"
               ${SSH} "
                 export PATH=\$HOME/.local/bin:\$PATH
-                # Stop any lingering qecore-headless wrapper from a prior run.
-                # Write PIDs to a temp file then use xargs so the PID is always
-                # a numeric literal when passed to kill — avoids variable-kill.
-                # Do NOT touch gnome-session; only the headless launcher itself.
-                pgrep -f qecore_headless 2>/dev/null > /tmp/_hl_pids.txt || true
-                if [[ -s /tmp/_hl_pids.txt ]]; then
-                  xargs -a /tmp/_hl_pids.txt -r kill 2>/dev/null || true
-                  sleep 2
-                fi
-                rm -f /tmp/_hl_pids.txt /tmp/headless* /tmp/qecore* /tmp/.headless* 2>/dev/null || true
+                # Stop any lingering qecore-headless process from a prior run.
+                # IMPORTANT: pgrep -f matches CMDLINE strings, and because this
+                # entire heredoc is passed as a bash -c argument, any pgrep pattern
+                # that appears in the heredoc would self-match and kill the current
+                # shell (causing SSH exit 255).
+                # Instead: inspect /proc/*/exe symlinks. The running bash process
+                # has exe=/usr/bin/bash — only actual qecore-headless processes have
+                # a qecore binary as their exe. No self-match possible.
+                for _pid in \$(ls -la /proc/[0-9]*/exe 2>/dev/null \
+                               | awk '/qecore/{match(\$0, /\\/proc\\/([0-9]+)\\//, m); print m[1]}'); do
+                  kill \"\$_pid\" 2>/dev/null || true
+                done
+                unset _pid
+                sleep 2
+                rm -f /tmp/headless* /tmp/qecore* /tmp/.headless* 2>/dev/null || true
                 \$HOME/.local/bin/qecore-headless \
                   --session-type wayland \
                   --session-desktop gnome \
