@@ -42,9 +42,6 @@ spec:
         kubernetes.io/hostname: ghost
       outputs:
         artifacts:
-          - name: behave-html-report
-            path: /tmp/results/report.html
-            optional: true
           - name: behave-json-results
             path: /tmp/results/results.json
             optional: true
@@ -71,20 +68,20 @@ spec:
           - name: ssh-key
             mountPath: /etc/ssh/test-key
             readOnly: true
-          - name: tests
-            mountPath: /tests
-            readOnly: true
         command: [bash, -c]
         args:
           - |
             set -euo pipefail
             mkdir -p /tmp/results
 
-            # Install runtime deps (minimal Fedora image lacks python3 and ssh client)
-            dnf install -y -q python3 python3-pip openssh-clients 2>&1 | tail -3
+            # Install runtime deps (minimal Fedora image lacks python3, git, and ssh client)
+            dnf install -y -q python3 python3-pip openssh-clients git 2>&1 | tail -3
 
             # Install behave in runner pod (no qecore needed — no GNOME desktop)
             python3 -m pip install --quiet behave 2>&1 | tail -3
+
+            # Clone tests fresh from git — matches run-gnome-tests pattern, always current
+            git clone --depth 1 https://github.com/castrojo/testing-lab /workspace/testing-lab 2>&1 | tail -3
 
             # Wait for Flatcar SSH (up to 5 minutes — faster boot than Bluefin)
             SSH_OPTS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
@@ -96,13 +93,14 @@ spec:
 
             # Run tests from runner pod; steps SSH into VM using FLATCAR_VM_IP env var
             TAGS_ARG="${BEHAVE_TAGS:-}"
-            cd /tests/flatcar/features
+            cd /workspace/testing-lab/tests/flatcar/features
 
+            BEHAVE_RC=0
             behave . \
               --format json.pretty \
               --outfile /tmp/results/results.json \
               --no-capture \
-              ${TAGS_ARG}
+              ${TAGS_ARG} || BEHAVE_RC=$?
 
             python3 -c "
             import json
@@ -114,14 +112,9 @@ spec:
             except Exception:
                 print('results.json not found')
             "
+            exit ${BEHAVE_RC}
       volumes:
         - name: ssh-key
           secret:
             secretName: "{{inputs.parameters.ssh-key-secret}}"
             defaultMode: 0400
-        - name: tests
-          hostPath:
-            # /var/tmp is accessible by the kubelet; sync from src with:
-            #   cp -r ~/src/bluefin-test-suite/tests /var/tmp/bluefin-tests
-            path: /var/tmp/bluefin-tests
-            type: Directory
