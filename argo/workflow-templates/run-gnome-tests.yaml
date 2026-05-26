@@ -223,10 +223,16 @@ spec:
                 > /tmp/run-suite.sh && chmod +x /tmp/run-suite.sh"
               ${SSH} "
                 export PATH=\$HOME/.local/bin:\$PATH
-                # Remove stale qecore-headless lock file from a prior aborted run
-                # without killing the running gnome-session — reusing an existing
-                # session avoids extension-load delays on a fresh session.
-                rm -f /tmp/headless* /tmp/qecore* /tmp/.headless* 2>/dev/null || true
+                # Stop any lingering qecore-headless wrapper from a prior run.
+                # Write PIDs to a temp file then use xargs so the PID is always
+                # a numeric literal when passed to kill — avoids variable-kill.
+                # Do NOT touch gnome-session; only the headless launcher itself.
+                pgrep -f qecore_headless 2>/dev/null > /tmp/_hl_pids.txt || true
+                if [[ -s /tmp/_hl_pids.txt ]]; then
+                  xargs -a /tmp/_hl_pids.txt -r kill 2>/dev/null || true
+                  sleep 2
+                fi
+                rm -f /tmp/_hl_pids.txt /tmp/headless* /tmp/qecore* /tmp/.headless* 2>/dev/null || true
                 \$HOME/.local/bin/qecore-headless \
                   --session-type wayland \
                   --session-desktop gnome \
