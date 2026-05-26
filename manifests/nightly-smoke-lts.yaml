@@ -11,34 +11,36 @@ metadata:
   labels:
     app.kubernetes.io/part-of: testing-lab
 spec:
-  schedule: "30 2 * * *"
+  schedules:
+    - "30 2 * * *"
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
-  serviceAccountName: argo
-  podGC:
-    strategy: OnWorkflowCompletion
-  ttlStrategy:
-    secondsAfterCompletion: 86400
   workflowMetadata:
     labels:
       app.kubernetes.io/part-of: bluefin-test-suite
       bluefin.io/trigger: nightly
       bluefin.io/suite: smoke
       bluefin.io/variant: lts
-  workflowTemplateRef:
-    name: bluefin-qa-pipeline
-  arguments:
-    parameters:
-      - name: image
-        value: "ghcr.io/ublue-os/bluefin:lts"
-      - name: image-tag
-        value: "lts"
-      - name: namespace
-        value: "bluefin-lts-test"
-      - name: suites
-        value: "smoke"
-      - name: variant
-        value: "lts"
-      - name: ssh-key-secret
-        value: "bluefin-test-ssh-key"
+  workflowSpec:
+    serviceAccountName: argo
+    podGC:
+      strategy: OnWorkflowCompletion
+    ttlStrategy:
+      secondsAfterCompletion: 86400
+    workflowTemplateRef:
+      name: bluefin-qa-pipeline
+    arguments:
+      parameters:
+        - name: image
+          value: "ghcr.io/ublue-os/bluefin:lts"
+        - name: image-tag
+          value: "lts"
+        - name: namespace
+          value: "bluefin-lts-test"
+        - name: suites
+          value: "smoke"
+        - name: variant
+          value: "lts"
+        - name: ssh-key-secret
+          value: "bluefin-test-ssh-key"

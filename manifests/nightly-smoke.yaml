@@ -1,6 +1,12 @@
 # CronWorkflow: runs bluefin smoke suite nightly at 02:00 UTC against latest.
 # References bluefin-qa-pipeline WorkflowTemplate — no DAG duplication.
 # Runs are retained for 24 hours (ttlStrategy) then cleaned up.
+#
+# Schema note: CronWorkflow has CronWorkflow-specific fields at .spec
+# (schedule, timezone, concurrencyPolicy, startingDeadlineSeconds,
+# workflowMetadata) and wraps the Workflow's own spec under
+# .spec.workflowSpec — serviceAccountName, podGC, ttlStrategy,
+# arguments, workflowTemplateRef, templates, entrypoint all live there.
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:
@@ -9,33 +15,35 @@ metadata:
   labels:
     app.kubernetes.io/part-of: testing-lab
 spec:
-  schedule: "0 2 * * *"
+  schedules:
+    - "0 2 * * *"
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
-  serviceAccountName: argo
-  podGC:
-    strategy: OnWorkflowCompletion
-  ttlStrategy:
-    secondsAfterCompletion: 86400
   workflowMetadata:
     labels:
       app.kubernetes.io/part-of: bluefin-test-suite
       bluefin.io/trigger: nightly
       bluefin.io/suite: smoke
-  workflowTemplateRef:
-    name: bluefin-qa-pipeline
-  arguments:
-    parameters:
-      - name: image
-        value: "ghcr.io/ublue-os/bluefin:latest"
-      - name: image-tag
-        value: "latest"
-      - name: namespace
-        value: "bluefin-test"
-      - name: suites
-        value: "smoke"
-      - name: variant
-        value: "latest"
-      - name: ssh-key-secret
-        value: "bluefin-test-ssh-key"
+  workflowSpec:
+    serviceAccountName: argo
+    podGC:
+      strategy: OnWorkflowCompletion
+    ttlStrategy:
+      secondsAfterCompletion: 86400
+    workflowTemplateRef:
+      name: bluefin-qa-pipeline
+    arguments:
+      parameters:
+        - name: image
+          value: "ghcr.io/ublue-os/bluefin:latest"
+        - name: image-tag
+          value: "latest"
+        - name: namespace
+          value: "bluefin-test"
+        - name: suites
+          value: "smoke"
+        - name: variant
+          value: "latest"
+        - name: ssh-key-secret
+          value: "bluefin-test-ssh-key"

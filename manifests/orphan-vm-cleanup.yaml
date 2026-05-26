@@ -10,44 +10,53 @@ metadata:
   labels:
     app.kubernetes.io/part-of: testing-lab
 spec:
-  schedule: "0 */2 * * *"
+  schedules:
+    - "0 */2 * * *"
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
-  serviceAccountName: argo
-  entrypoint: cleanup
-  podGC:
-    strategy: OnWorkflowCompletion
-  ttlStrategy:
-    secondsAfterCompletion: 3600
-  templates:
-    - name: cleanup
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
-        command: [bash]
-        source: |
-          set -euo pipefail
-          NAMESPACES="bluefin-test bluefin-lts-test flatcar-test"
-          # Delete VMs older than 3 hours — use kubectl with age filter
-          # The argo-workflow label links a VM to its parent workflow
-          for NS in ${NAMESPACES}; do
-            echo "Checking namespace: ${NS}" >&2
-            while IFS= read -r VM; do
-              [[ -z "${VM}" ]] && continue
-              WF_LABEL=$(kubectl get vm "${VM}" -n "${NS}" \
-                -o jsonpath='{.metadata.labels.argo-workflow}' 2>/dev/null || true)
-              if [[ -n "${WF_LABEL}" ]]; then
-                if kubectl get workflow "${WF_LABEL}" -n argo &>/dev/null; then
-                  echo "SKIP ${NS}/${VM}: workflow ${WF_LABEL} still active" >&2
-                  continue
+  workflowSpec:
+    serviceAccountName: argo
+    entrypoint: cleanup
+    podGC:
+      strategy: OnWorkflowCompletion
+    ttlStrategy:
+      secondsAfterCompletion: 3600
+    templates:
+      - name: cleanup
+        nodeSelector:
+          kubernetes.io/hostname: ghost
+        script:
+          image: cgr.dev/chainguard/kubectl:latest-dev
+          command: [bash]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          source: |
+            set -euo pipefail
+            NAMESPACES="bluefin-test bluefin-lts-test flatcar-test"
+            # Delete VMs older than 3 hours — use kubectl with age filter
+            # The argo-workflow label links a VM to its parent workflow
+            for NS in ${NAMESPACES}; do
+              echo "Checking namespace: ${NS}" >&2
+              while IFS= read -r VM; do
+                [[ -z "${VM}" ]] && continue
+                WF_LABEL=$(kubectl get vm "${VM}" -n "${NS}" \
+                  -o jsonpath='{.metadata.labels.argo-workflow}' 2>/dev/null || true)
+                if [[ -n "${WF_LABEL}" ]]; then
+                  if kubectl get workflow "${WF_LABEL}" -n argo &>/dev/null; then
+                    echo "SKIP ${NS}/${VM}: workflow ${WF_LABEL} still active" >&2
+                    continue
+                  fi
                 fi
-              fi
-              echo "DELETE orphan: ${NS}/${VM}" >&2
-              kubectl delete vm "${VM}" -n "${NS}" --wait=false 2>&1 || true
-            done < <(kubectl get vm -n "${NS}" \
-              -o jsonpath='{range .items[?(@.metadata.creationTimestamp)]}{.metadata.name}{"\n"}{end}' \
-              2>/dev/null || true)
-          done
-          echo "Orphan cleanup complete." >&2
+                echo "DELETE orphan: ${NS}/${VM}" >&2
+                kubectl delete vm "${VM}" -n "${NS}" --wait=false 2>&1 || true
+              done < <(kubectl get vm -n "${NS}" \
+                -o jsonpath='{range .items[?(@.metadata.creationTimestamp)]}{.metadata.name}{"\n"}{end}' \
+                2>/dev/null || true)
+            done
+            echo "Orphan cleanup complete." >&2
