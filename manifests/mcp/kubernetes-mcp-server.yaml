@@ -1,0 +1,137 @@
+# In-cluster kubernetes-mcp-server (containers/kubernetes-mcp-server).
+# Exposes the MCP protocol over HTTP+SSE so Claude Code (and other agents)
+# can drive the cluster without a local kubeconfig.
+#
+# Image: ghcr.io/containers/kubernetes-mcp-server (digest pinned below — verify
+# with `skopeo inspect docker://ghcr.io/containers/kubernetes-mcp-server:latest`
+# and update the @sha256 before merging).
+#
+# Reachable at http://192.168.1.102:32801/sse from the local network.
+# Register with: `claude mcp add --transport sse k8s http://192.168.1.102:32801/sse`
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubernetes-mcp-server
+  namespace: mcp
+---
+# Scoped read+limited-write. Avoids cluster-admin — MCP-driven agents shouldn't
+# be able to delete namespaces or rewrite RBAC. Tighten further once usage
+# patterns are clear (see ADR 0001 — controller-acceptance rule).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubernetes-mcp-server
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/exec
+      - services
+      - configmaps
+      - secrets
+      - namespaces
+      - nodes
+      - events
+      - persistentvolumeclaims
+    verbs: [get, list, watch]
+  - apiGroups: ["apps"]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: ["batch"]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: ["argoproj.io"]
+    resources: [workflows, workflowtemplates, cronworkflows]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: ["kubevirt.io"]
+    resources: [virtualmachines, virtualmachineinstances]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-mcp-server
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-mcp-server
+    namespace: mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubernetes-mcp-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubernetes-mcp-server
+  namespace: mcp
+  labels:
+    app.kubernetes.io/name: kubernetes-mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubernetes-mcp-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubernetes-mcp-server
+    spec:
+      serviceAccountName: kubernetes-mcp-server
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: server
+          # Pinned via `skopeo inspect docker://ghcr.io/containers/kubernetes-mcp-server:latest`
+          # on 2026-05-25 — see ADR 0001 (no `:latest` in manifests/).
+          image: ghcr.io/containers/kubernetes-mcp-server@sha256:b8a2c9353da6ffadd1bd720e89469a3e783df9ef15f19c6867449e040df0335e
+          imagePullPolicy: IfNotPresent
+          args:
+            # Starts the server in Streamable HTTP (path /mcp) + SSE (path /sse)
+            # mode. Clients reach it via the NodePort below.
+            - --port=8080
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-mcp-server
+  namespace: mcp
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: kubernetes-mcp-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 32801
+      protocol: TCP
