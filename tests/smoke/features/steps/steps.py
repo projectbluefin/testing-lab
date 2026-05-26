@@ -633,20 +633,24 @@ def files_sidebar_contains(context, item) -> None:
 
 @step('Open Settings panel "{panel_name}"')
 def open_settings_panel(context, panel_name) -> None:
-    app = getattr(context, "current_application", None) or _wait_for_application_node("org.gnome.Settings")
-    # The sidebar labels (Network, Appearance, System…) are always in the AT-SPI
-    # tree as ('label', 'PanelName').  Click the first matching one and let
-    # _click_node_or_ancestor traverse to the clickable parent row.
-    sidebar_entries = app.findChildren(
-        lambda n: (n.name or "").strip() == panel_name and n.roleName == "label"
-    )
-    if sidebar_entries:
-        _click_node_or_ancestor(sidebar_entries[0])
-        sleep(1.5)
-        return
-    # Fallback for sub-panels not in the top-level sidebar (e.g. "About" under System).
-    # Use subprocess activation — works on cold launch because Settings starts on About.
+    import json
+
     panel_id = panel_name.lower().replace(" ", "-")
+    gcc_aliases = json.dumps(["gnome-control-center", "org.gnome.settings", "settings"])
+    # Quit the running GCC instance: a running app ignores the panel argument
+    # on re-activation, so a fresh cold-start launch is the only reliable way
+    # to land on the requested panel.
+    _shell_eval(
+        f"const _aliases = {gcc_aliases};"
+        "Shell.AppSystem.get_default().get_running().forEach(app => {"
+        "  const id = (app.get_id() || '').toLowerCase();"
+        "  const name = (app.get_name() || '').toLowerCase();"
+        "  if (_aliases.some(a => id.includes(a) || name.includes(a))) {"
+        "    app.request_quit();"
+        "  }"
+        "});"
+    )
+    sleep(1)
     _shell_eval(
         "const p = new Gio.Subprocess({"
         f"  argv: ['gnome-control-center', '{panel_id}'],"
@@ -654,7 +658,8 @@ def open_settings_panel(context, panel_name) -> None:
         "});"
         "p.init(null);"
     )
-    sleep(2)
+    sleep(3)
+    context.current_application = _wait_for_application_node("org.gnome.Settings")
 
 
 @step('Settings panel "{panel_name}" shows "{text}"')
