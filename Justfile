@@ -128,6 +128,18 @@ run-titan-smoke:
         -n {{ argo_ns }} \
         --watch
 
+# Run system (atomic OS contract) tests on persistent titan VMs (fast path).
+run-titan-system:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    LATEST_IP=$(kubectl get vmi titan-bluefin -n bluefin-test -o jsonpath='{.status.interfaces[0].ipAddress}')
+    LTS_IP=$(kubectl get vmi titan-lts -n bluefin-lts-test -o jsonpath='{.status.interfaces[0].ipAddress}')
+    argo submit --from workflowtemplate/bluefin-titan-smoke \
+      --parameter vm-ip-latest="${LATEST_IP}" \
+      --parameter vm-ip-lts="${LTS_IP}" \
+      --parameter suite=system \
+      -n {{ argo_ns }} --wait --log
+
 # Run Flatcar smoke tests
 run-flatcar-smoke:
     argo submit argo/flatcar-smoke-test.yaml \

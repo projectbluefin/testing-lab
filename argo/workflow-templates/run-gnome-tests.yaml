@@ -25,7 +25,7 @@ spec:
         parameters:
           - name: vm-ip
           - name: suite
-            # smoke | developer | software
+            # smoke | developer | software | system
             value: "smoke"
           - name: variant
             # latest | lts  (gts does not exist)
@@ -151,26 +151,35 @@ spec:
             echo "SSH ready." >&2
 
             # ── Install test dependencies inside the VM ──────────────────────
-            # Skip if already installed — titan VMs are persistent and retain installs
-            # across runs. uinput setup always runs: modprobe/chmod are idempotent and
-            # needed because the device node resets on every ostree unlock cycle.
+            # Titan VMs are persistent, so skip install when dependencies are already present.
+            # GUI suites need qecore/dogtail/ponytail; the system suite only needs behave.
             ${SSH} "
               set -euo pipefail
-              if python3 -c 'import qecore, behave, dogtail' 2>/dev/null && \
-                 rpm -q gnome-ponytail-daemon python3-gnome-ponytail-daemon &>/dev/null && \
-                 [[ -x \"\$HOME/.local/bin/qecore-headless\" ]]; then
-                echo 'Test dependencies already installed, skipping.' >&2
+              if [[ "${SUITE}" == "system" ]]; then
+                if python3 -c 'import behave' 2>/dev/null; then
+                  echo 'System-suite dependencies already installed, skipping.' >&2
+                else
+                  echo 'Installing system-suite dependencies...' >&2
+                  pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
+                  python3 -m pip install --quiet --user behave 2>&1 | tail -3
+                fi
               else
-                echo 'Installing test dependencies...' >&2
-                sudo ostree admin unlock 2>/dev/null || true
-                sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail -3
-                pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
-                python3 -m pip install --quiet --user qecore behave dogtail python-uinput 2>&1 | tail -3
-                for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \"\$f\" /usr/local/bin/\$(basename \"\$f\") 2>/dev/null; done
+                if python3 -c 'import qecore, behave, dogtail' 2>/dev/null && \
+                   rpm -q gnome-ponytail-daemon python3-gnome-ponytail-daemon &>/dev/null && \
+                   [[ -x \"\$HOME/.local/bin/qecore-headless\" ]]; then
+                  echo 'Test dependencies already installed, skipping.' >&2
+                else
+                  echo 'Installing test dependencies...' >&2
+                  sudo ostree admin unlock 2>/dev/null || true
+                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail -3
+                  pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
+                  python3 -m pip install --quiet --user qecore behave dogtail python-uinput 2>&1 | tail -3
+                  for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \"\$f\" /usr/local/bin/\$(basename \"\$f\") 2>/dev/null; done
+                fi
+                sudo modprobe uinput 2>/dev/null || true
+                sudo chmod 0666 /dev/uinput 2>/dev/null || true
+                sudo chcon -t uinput_device_t /dev/uinput 2>/dev/null || true
               fi
-              sudo modprobe uinput 2>/dev/null || true
-              sudo chmod 0666 /dev/uinput 2>/dev/null || true
-              sudo chcon -t uinput_device_t /dev/uinput 2>/dev/null || true
             "
             echo "Dependencies ready." >&2
 
@@ -179,46 +188,48 @@ spec:
             ${SSH} "mkdir -p /tmp/bluefin-tests /tmp/results"
             ${SCP} /workspace/bluefin-test-suite/tests/${SUITE} ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/
 
-            echo "Polling for GNOME Shell AT-SPI readiness..." >&2
-            ${SSH} "bash -c '
-              for i in \$(seq 1 30); do
-                RESULT=\$(gdbus call --session \\
-                  --dest org.gnome.Shell \\
-                  --object-path /org/gnome/Shell \\
-                  --method org.gnome.Shell.Eval \\
-                  \"global.context.unsafe_mode = true; Main.panel ? \\\"ready\\\" : \\\"not-ready\\\"\" 2>/dev/null || true)
-                if echo \"\$RESULT\" | grep -q ready; then
-                  echo \"GNOME Shell ready at attempt \$i\" >&2
-                  break
-                fi
-                echo \"Waiting for GNOME Shell (attempt \$i/30)...\" >&2
-                sleep 3
-              done
-            '"
+            if [[ "${SUITE}" != "system" ]]; then
+              WAIT_FOR_SHELL=/workspace/bluefin-test-suite/tests/shared/wait_for_shell.py
+              ${SCP} "${WAIT_FOR_SHELL}" ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/${SUITE}/wait_for_shell.py
 
-            # ── Run tests via qecore-headless ────────────────────────────────
-            # qecore-headless takes the full behave invocation as a single string.
-            # It sets up DBUS_SESSION_BUS_ADDRESS, WAYLAND_DISPLAY, XDG_RUNTIME_DIR,
-            # and activates gnome-ponytail-daemon before handing off to behave.
-            echo "Running: qecore-headless 'behave /tmp/bluefin-tests/${SUITE}/features/ ...'" >&2
+              echo "Polling for GNOME Shell AT-SPI readiness..." >&2
+              ${SSH} "bash -c '
+                for i in \$(seq 1 30); do
+                  RESULT=\$(gdbus call --session \\
+                    --dest org.gnome.Shell \\
+                    --object-path /org/gnome/Shell \\
+                    --method org.gnome.Shell.Eval \\
+                    \"global.context.unsafe_mode = true; Main.panel ? \\\"ready\\\" : \\\"not-ready\\\"\" 2>/dev/null || true)
+                  if echo \"\$RESULT\" | grep -q ready; then
+                    echo \"GNOME Shell ready at attempt \$i\" >&2
+                    break
+                  fi
+                  echo \"Waiting for GNOME Shell (attempt \$i/30)...\" >&2
+                  sleep 3
+                done
+              '"
+            fi
+
+            # ── Run tests ────────────────────────────────────────────────────
+            # GUI suites use qecore-headless; the system suite runs behave directly.
+            echo "Running behave suite..." >&2
             TAGS_ARG=""
             if [[ -n "${BEHAVE_TAGS}" ]]; then
               TAGS_ARG="${BEHAVE_TAGS}"
             fi
 
-            # PATH must include ~/.local/bin for user-installed qecore-headless.
-            # $BEHAVE_BIN is expanded by the remote shell so qecore-headless
-            # receives an absolute path — subprocess.Popen(shell=False) won't
-            # expand variables inside the command string it receives.
-            # Save behave exit code so we can always SCP results before exiting.
             BEHAVE_RC=0
             ${SSH} "
               export PATH=\$HOME/.local/bin:\$PATH
               BEHAVE_BIN=\$(which behave)
-              \$HOME/.local/bin/qecore-headless \
-                --session-type wayland \
-                --session-desktop gnome \
-                \"\$BEHAVE_BIN /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}\"
+              if [[ "${SUITE}" == "system" ]]; then
+                \"\$BEHAVE_BIN\" /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}
+              else
+                \$HOME/.local/bin/qecore-headless \
+                  --session-type wayland \
+                  --session-desktop gnome \
+                  \"bash -lc 'python3 /tmp/bluefin-tests/${SUITE}/wait_for_shell.py && exec \"\$BEHAVE_BIN\" /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}'\"
+              fi
             " || BEHAVE_RC=$?
 
             # ── Collect results ──────────────────────────────────────────────
