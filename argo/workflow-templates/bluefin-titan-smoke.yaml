@@ -150,13 +150,14 @@ spec:
           ${SSH} "sudo rm -rf /tmp/bluefin-tests /tmp/results 2>/dev/null || true" || true
           ${SSH} "sudo rm -rf /var/log/audit/audit.log.* 2>/dev/null || true" || true
           ${SSH} "sudo find /var/cache -type f -delete 2>/dev/null || true" || true
-          ${SSH} "df -h / 2>/dev/null || true" || true
+          ${SSH} "df -h /var 2>/dev/null || true" || true
           echo "Disk reclaim complete." >&2
 
-          # Reclaim runs before enforcing the 2GB free-space gate.
-          FREE=$(${SSH} "df -BG / | awk 'NR==2{print \$4}' | tr -d G")
+          # Bluefin uses composefs for / (read-only by design, always 0 free).
+          # Check /var which holds all writable state.
+          FREE=$(${SSH} "df -BG /var | awk 'NR==2{print \$4}' | tr -d G")
           if [[ "${FREE}" -lt 2 ]]; then
-            echo "ERROR: only ${FREE}GB free on ${LABEL} root after reclaim — need ≥ 2GB" >&2
+            echo "ERROR: only ${FREE}GB free on ${LABEL} /var after reclaim — need ≥ 2GB" >&2
             exit 1
           fi
-          echo "Preflight passed: ${LABEL} systemd=${STATE}, disk=${FREE}GB free after reclaim" >&2
+          echo "Preflight passed: ${LABEL} systemd=${STATE}, /var=${FREE}GB free after reclaim" >&2
