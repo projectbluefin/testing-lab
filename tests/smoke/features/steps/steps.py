@@ -617,11 +617,16 @@ def files_sidebar_contains(context, item) -> None:
 
 @step('Open Settings panel "{panel_name}"')
 def open_settings_panel(context, panel_name) -> None:
-    # Navigate directly via settings:// URI — reliable on gnome-control-center 46+
-    # where panels like "About" are nested under "System" and not top-level sidebar items.
+    # Activate the existing gnome-control-center instance and navigate to the
+    # panel by running `gnome-control-center <panel_id>`.  GtkApplication single-
+    # instance routing ensures this activates (not re-launches) the running app.
     panel_id = panel_name.lower().replace(" ", "-")
     _shell_eval(
-        f"Gio.AppInfo.launch_default_for_uri('settings://{panel_id}', null);"
+        "const p = new Gio.Subprocess({"
+        f"  argv: ['gnome-control-center', '{panel_id}'],"
+        "  flags: Gio.SubprocessFlags.NONE"
+        "});"
+        "p.init(null);"
     )
     sleep(2)
 
