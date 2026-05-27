@@ -246,7 +246,10 @@ from qecore.common_steps import *  # noqa: F401,F403  — keep, registers common
 
 @step('Panel is present in AT-SPI tree')
 def panel_is_present(context) -> None:
-    shell = context.sandbox.shell          # qecore's retrying gnome-shell handle
+    # Use tree.root.application() for a live AT-SPI query — NOT context.sandbox.shell
+    # (qecore caches sandbox.shell after the first lookup; the cached node never detects
+    # a crashed or restarted shell).
+    shell = root.application("gnome-shell")
     panels = shell.findChildren(lambda n: n.roleName == "panel")
     if not panels:
         children = [(c.roleName, c.name) for c in shell.children[:15]]
@@ -720,3 +723,136 @@ shape for new suites.
 ## Historical Lessons
 
 Date-stamped debugging history lives in [docs/archive/iteration-notes.md](archive/iteration-notes.md).
+
+---
+
+### 2026-05-26 — Headless session management and GNOME 50 extension assertions
+
+**qecore-headless is a long-running process, not a one-shot runner.**
+After the test suite finishes, `qecore-headless` keeps running to manage the GNOME session.
+The next run will hit "Attempting to start another instance / Exiting the duplicate" unless the
+prior process is explicitly stopped first. Lock file removal alone is insufficient — the process
+must be terminated.
+
+**Do NOT use `pgrep -f` inside an SSH heredoc to find the headless process.**
+`pgrep -f <pattern>` searches full process cmdlines. When a heredoc is passed as `bash -c '...'`,
+the bash process's cmdline *is* the entire heredoc. Any pattern matching text in the heredoc
+(including the binary path `qecore-headless`) will self-match and `xargs kill` will kill the
+current shell, causing SSH to exit with code 255 (connection reset by remote).
+
+**Use `/proc/*/exe` inspection instead:**
+```bash
+for _pid in $(ls -la /proc/[0-9]*/exe 2>/dev/null \
+               | awk '/qecore/{match($0, /\/proc\/([0-9]+)\//, m); print m[1]}'); do
+  kill "$_pid" 2>/dev/null || true
+done
+```
+This checks the executable file, not the cmdline. The running bash process has exe=`/usr/bin/bash`,
+so only actual qecore-headless binaries match. No self-match possible.
+
+**AT-SPI stale objects persist across consecutive headless runs.**
+When gnome-session survives after the headless process is killed (which it does — killing
+qecore-headless does not restart gnome-session), the AT-SPI accessible object tree retains
+nodes from the previous test run. These cause `atspi_error: object does not exist` failures.
+
+Mitigations applied:
+1. In `before_scenario`, call `Main.overview.hide()` via Shell.Eval to force-close the Overview
+   and evict its stale search-result nodes before each scenario.
+2. In any step that traverses the AT-SPI tree (especially overview search), catch
+   `"does not exist"` / `"atspi_error"` exceptions and retry (up to ~6×, 2 s delay).
+
+**Headless sessions have no monitor output — test extension *state*, not visual actors.**
+`qecore-headless` sessions run without a physical or virtual display. Extensions that depend on
+a monitor to create visual actors (Dash to Dock dock actors, App Indicators panel statusArea
+actors) will never create those actors. Assertions that check dock actor count or panel children
+will always fail.
+
+Correct assertion pattern for headless extension coverage:
+```python
+# Check extension is active (state == 1 == ENABLED), not that it rendered
+ext_state = _shell_eval_json(
+    "JSON.stringify((() => {"
+    "const ext = Main.extensionManager.lookup('dash-to-dock@micxgx.gmail.com');"
+    "return {installed: !!ext, state: ext ? ext.state : -1, hasStateObj: !!ext?.stateObj};"
+    "})())"
+)
+assert ext_state["state"] == 1 and ext_state["hasStateObj"]
+# Only check visual actors conditionally when we know a display is present
+if ext_state.get("dockCount", 0) > 0:
+    assert ext_state["visible"]
+```
+
+**ArgoCD does not auto-sync fast enough for rapid iteration.**
+The default polling interval can leave the cluster 5+ minutes behind. After pushing a
+WorkflowTemplate change, always force a refresh:
+```bash
+kubectl annotate application testing-lab -n argocd argocd.argoproj.io/refresh=normal --overwrite
+```
+Then verify `kubectl get application testing-lab -n argocd -o jsonpath='{.status.sync.revision}'`
+matches your commit SHA before submitting a workflow.
+
+**Fresh titan disks have no default browser configured.**
+`xdg-settings get default-web-browser`, `xdg-mime query default x-scheme-handler/http`, and
+GIO all return empty on a titan VM that has never had a user-interactive browser session.
+Flatpak Firefox is not pre-deployed to `/var/lib/flatpak/exports/share/applications/` on the
+base disk. Do not write scenarios that depend on a configured default browser unless the titan
+disk setup explicitly configures one.
+
+---
+
+### 2026-05-26 — qecore caching traps and step duration as a quality signal
+
+**`context.sandbox.shell` is cached by qecore — never use it as a liveness check.**
+`qecore.TestSandbox` stores the gnome-shell AT-SPI node as a Python instance attribute after
+the first successful `findApplication("gnome-shell")` call (done inside `before_scenario` via
+`_wait_for_panel`). Every subsequent access to `context.sandbox.shell` is an O(1) Python
+attribute lookup — no AT-SPI query, no bus round-trip, ~0 µs. A step that calls only
+`context.sandbox.shell` and asserts `is not None` will trivially pass even if gnome-shell
+has crashed, because the cached dead node is not None.
+
+**Use `tree.root.application("gnome-shell")` for live checks:**
+```python
+# WRONG — cached, ~0s, does not detect crashed shell
+shell = context.sandbox.shell
+assert shell is not None
+
+# CORRECT — live AT-SPI query, ~3ms, detects crashed/restarted shell
+shell = tree.root.application("gnome-shell")
+assert shell is not None
+assert shell.children  # also verify the node has visible children
+```
+
+**`_enabled_extensions(context)` cache is also a trap.**
+The pattern `if getattr(context, "_enabled_extensions", None): return ...` makes the first
+`Extension "..." is enabled` step real and all subsequent ones instant no-ops. Remove the
+cache and call `gnome-extensions list --enabled` on every step — each invocation costs ~130ms
+and catches extension state changes mid-run.
+
+**Behave JSON step duration `0.000s` is a quality signal — investigate every occurrence.**
+When `behave --format json.pretty` reports duration `0.0` (rounded from sub-millisecond) on
+a step that should be doing I/O (AT-SPI, subprocess, D-Bus), that step is almost certainly
+hitting a cached object or a pure Python comparison. Audit these immediately:
+- Zero-duration AT-SPI step → likely `context.sandbox.shell` cache
+- Zero-duration assertion step → likely reading a Python variable set by the prior step
+- Zero-duration `gnome-extensions` step → likely a context-level cache
+
+After the 2026-05-26 fix (commit `70f51a8`), the smoke suite went from **31 zero-duration
+active steps → 1** (the one remaining is `Last command output stripped` which reads a Python
+string and is legitimately instantaneous).
+
+**Loki is not ingesting pod logs — capture behave JSON during the run.**
+As of 2026-05-26, the Loki instance at `http://192.168.1.102:30100` has no label data and
+returns zero streams for all queries. The per-scenario behave JSON (written to stderr inside
+the workflow pod) is lost when pods are cleaned up by `podGC`. To capture it:
+```bash
+# Wait until pod is in Running state, THEN attach
+kubectl logs -n argo <pod> -c main --follow > /tmp/smoke-output.log 2>&1 &
+argo wait <workflow> -n argo
+```
+Attach logs only after the pod transitions to `Running` — attaching during `PodInitializing`
+causes `kubectl logs` to time out during the init container phase.
+
+**The upstream Red Hat GNOME test suite used throughout this repo is:**
+`https://github.com/modehnal/GNOMETerminalAutomation` — by Michal Odehnal (Red Hat DesktopQE).
+Step patterns, `environment.py` shape, and Wayland focus-window handling are all ported from
+this repo. It is the canonical reference for how qecore+behave+dogtail suites are structured.
