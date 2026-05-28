@@ -9,6 +9,7 @@ metadata:
 spec:
   entrypoint: pipeline
   onExit: cleanup
+  serviceAccountName: argo
   arguments:
     parameters:
       - name: auth-mode

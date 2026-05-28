@@ -16,6 +16,7 @@ metadata:
     bluefin.io/issue: "#117"
 spec:
   entrypoint: patch-otel
+  serviceAccountName: argo
   arguments:
     parameters:
       - name: unit
