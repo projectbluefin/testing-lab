@@ -277,6 +277,11 @@ run-homelab-access:
     argo submit --from workflowtemplate/homelab-access-probe \
       -n {{ argo_ns }} --wait --log
 
+# Run first PVC/local-path restore drill (#60 #74 #84)
+run-homelab-restore:
+    argo submit --from workflowtemplate/homelab-restore-drill \
+      -n {{ argo_ns }} --wait --log
+
 # ── Ghost maintenance ─────────────────────────────────────────────────────────
 
 # Patch ghost OTel collector config to remove noisy process scraper (#117)

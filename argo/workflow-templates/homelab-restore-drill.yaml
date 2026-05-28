@@ -1,0 +1,152 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: homelab-restore-drill
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: homelab-restore-drill
+    app.kubernetes.io/part-of: bluefin-test-suite
+  annotations:
+    bluefin.io/description: |
+      First PVC/local-path-backed restore drill. Seeds deterministic state to a
+      PVC-mounted workload, captures a backup tarball, deletes and recreates the
+      PVC+deployment to simulate data loss, then restores from the backup and
+      verifies the recovered state matches the original checksum.
+    bluefin.io/issues: "#60, #74, #84"
+spec:
+  entrypoint: pipeline
+  onExit: cleanup
+  arguments:
+    parameters:
+      - name: branch
+        value: "main"
+
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          - name: create-namespace
+            template: create-namespace
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-restore-{{workflow.uid}}"
+          - name: deploy-fixture
+            dependencies: [create-namespace]
+            template: deploy-fixture
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-restore-{{workflow.uid}}"
+          - name: run-tests
+            dependencies: [deploy-fixture]
+            templateRef:
+              name: run-incluster-tests
+              template: run-pytest
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-restore-{{workflow.uid}}"
+                - name: suite-path
+                  value: "homelab_backup/test_restore_drill.py"
+                - name: lane
+                  value: "homelab-restore"
+                - name: app-label
+                  value: "app=homelab-restore"
+                - name: service-name
+                  value: "homelab-restore"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    - name: create-namespace
+      inputs:
+        parameters:
+          - name: namespace
+      resource:
+        action: create
+        manifest: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{inputs.parameters.namespace}}"
+            labels:
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: homelab-restore
+
+    - name: deploy-fixture
+      inputs:
+        parameters:
+          - name: namespace
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="{{inputs.parameters.namespace}}"
+          kubectl apply -n "${NS}" -f - <<EOF
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: homelab-restore-data
+            labels:
+              app: homelab-restore
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: homelab-restore
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: homelab-restore
+            labels:
+              app: homelab-restore
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: homelab-restore
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: homelab-restore
+            template:
+              metadata:
+                labels:
+                  app: homelab-restore
+                  app.kubernetes.io/part-of: bluefin-test-suite
+                  bluefin.io/lane: homelab-restore
+              spec:
+                nodeSelector:
+                  kubernetes.io/hostname: ghost
+                containers:
+                  - name: fedora
+                    image: quay.io/fedora/fedora:latest
+                    command:
+                      - bash
+                      - -lc
+                      - |
+                        mkdir -p /data
+                        sleep infinity
+                    volumeMounts:
+                      - name: data
+                        mountPath: /data
+                volumes:
+                  - name: data
+                    persistentVolumeClaim:
+                      claimName: homelab-restore-data
+          EOF
+          kubectl rollout status deployment/homelab-restore -n "${NS}" --timeout=300s >&2
+
+    - name: cleanup
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="homelab-restore-{{workflow.uid}}"
+          kubectl delete namespace "${NS}" --ignore-not-found=true >&2 || true
+          timeout 180 bash -c "until ! kubectl get namespace \"${NS}\" >/dev/null 2>&1; do sleep 5; done" >&2 || true
+          echo "cleanup-complete"

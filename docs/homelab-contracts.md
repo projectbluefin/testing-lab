@@ -161,13 +161,39 @@ client hardware) so evidence is always VM-scoped and cluster-managed.
 
 ---
 
-## 5. Known Blockers and Deferred Work
+## 5. Local Hostname and Routing Contract (#73)
+
+### First representative contract
+
+The lab validates the following hostname/routing pattern for exposed in-cluster services:
+
+| Layer | Contract | Evidence |
+|---|---|---|
+| **Cluster DNS** | `<service>.<namespace>.svc.cluster.local` resolves from within the cluster | `getent hosts` in test pod (`access-dns.txt`) |
+| **TLS handshake** | Service on port 8443 completes TLS with a valid certificate | `openssl s_client` output with `Protocol version` (`access-openssl.txt`) |
+| **SNI routing** | `Host: <hostname>` header routes to the correct backend | `curl -H "Host: <hostname>"` returns `access-ok` (`access-curl.txt`) |
+
+### Separation of concerns
+- **Service discovery** (this contract): cluster DNS + in-cluster reachability.
+- **TLS issuance**: tracked separately; current test uses a self-signed cert in the fixture.
+- **Auth-gating**: deferred to service-catalog auth-gating lane (#61).
+- **External/LAN reachability**: `bluespeed.local` reverse proxy patterns are
+  tracked under bluespeed; this repo validates only in-cluster service access.
+
+### Non-goals
+- Validating ingress controllers or NodePort exposure from outside the cluster.
+- Testing ACME/Let's Encrypt certificate rotation.
+- Any LAN hostname that requires mDNS or split-horizon DNS on the workstation.
+
+---
+
+## 6. Known Blockers and Deferred Work
 
 | Issue | Status | Dependency |
 |---|---|---|
 | #62 RWX / shared-storage | ❌ blocked | NFS CSI or Longhorn installation on ghost |
 | #63 GPU transcoding lane | ❌ deferred | GPU passthrough KubeVirt feature gate |
 | #61 auth-gated service UI | ❌ deferred | service-catalog baseline lane first |
-| #60 first restore drill | ⏳ ready | #62 not required for single-pod RWO restore |
-| #84 PVC restore drill with backup artifact | ⏳ ready | #62 not required |
+| #60 first restore drill | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
+| #84 PVC restore drill with backup artifact | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | Media service lane | ❌ deferred | #62 (shared mount) + #63 (GPU) |

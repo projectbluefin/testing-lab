@@ -62,6 +62,7 @@ contract.
 | `homelab-substrate` | `tests/homelab_substrate/` | k3s scheduling, in-cluster HTTP reachability, pod lifecycle | `just run-homelab-substrate` |
 | `homelab-storage` | `tests/homelab_storage/` | `local-path` PVC lifecycle, data persists across restart, storage observability artifacts | `just run-homelab-storage` |
 | `homelab-access-probe` | `tests/homelab_access/` | Cluster-DNS resolution, TLS handshake, SNI-based routing | `just run-homelab-access` |
+| `homelab-restore-drill` | `tests/homelab_backup/` | Full backup→wipe→restore→verify cycle on a `local-path` PVC; checksum-verified sentinel recovery | `just run-homelab-restore` |
 
 ### Storage observability artifacts
 
