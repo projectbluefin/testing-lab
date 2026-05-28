@@ -2,7 +2,7 @@
 # Orchestrates test execution via SSH into KubeVirt VMs.
 # Dogtail/AT-SPI runs inside the VM — this container only needs tmt + SSH.
 
-FROM python:3.12-slim
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
 
 LABEL org.opencontainers.image.description="tmt SSH runner for Bluefin desktop QA"
 
