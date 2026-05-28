@@ -78,7 +78,7 @@ spec:
             python3 -m pip install --quiet behave 2>&1 | tail -3
 
             # Clone tests fresh from git — matches run-gnome-tests pattern, always current
-            git clone --depth 1 https://github.com/castrojo/testing-lab /workspace/testing-lab 2>&1 | tail -3
+            git clone --depth 1 https://github.com/projectbluefin/testing-lab /workspace/testing-lab 2>&1 | tail -3
 
             # Wait for Flatcar SSH (up to 5 minutes — faster boot than Bluefin)
             SSH_OPTS="-i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"

@@ -75,13 +75,13 @@ spec:
                 # --branch accepts branch names and tags; for commit SHAs we
                 # fall back to a full clone + checkout.
                 if git clone --depth 1 --branch "${BRANCH}" \
-                    https://github.com/castrojo/testing-lab \
+                    https://github.com/projectbluefin/testing-lab \
                     /workspace/bluefin-test-suite 2>&1; then
                   echo "Synced testing-lab @ ${BRANCH} (attempt ${attempt})"
                   exit 0
                 fi
                 rm -rf /workspace/bluefin-test-suite
-                if git clone https://github.com/castrojo/testing-lab \
+                if git clone https://github.com/projectbluefin/testing-lab \
                     /workspace/bluefin-test-suite 2>&1 && \
                    git -C /workspace/bluefin-test-suite checkout "${BRANCH}" 2>&1; then
                   echo "Synced testing-lab @ ${BRANCH} via SHA fallback (attempt ${attempt})"

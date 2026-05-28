@@ -1,0 +1,228 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ghost-otel-patch
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: ghost-maintenance
+    app.kubernetes.io/part-of: bluefin-test-suite
+  annotations:
+    bluefin.io/description: |
+      Patches the OTel collector config on ghost to remove the noisy hostmetrics
+      process scraper. Runs as the 'jorge' user (UID 1000) inside a pod scheduled
+      on ghost; no workstation SSH required. After patching the config, the
+      otelcol-agent.service user unit is restarted via the user's DBUS socket.
+      The pre-patch config backup path is printed to the workflow log.
+    bluefin.io/issue: "#117"
+spec:
+  entrypoint: patch-otel
+  arguments:
+    parameters:
+      - name: unit
+        value: otelcol-agent.service
+
+  volumes:
+    # jorge's home — config file lives here
+    - name: user-home
+      hostPath:
+        path: /var/home/jorge
+        type: Directory
+    # jorge's systemd user runtime dir — DBUS socket lives here
+    - name: user-run
+      hostPath:
+        path: /run/user/1000
+        type: Directory
+    # host /etc/passwd + /etc/group so 'runuser' resolves 'jorge'
+    - name: host-passwd
+      hostPath:
+        path: /etc/passwd
+        type: File
+    - name: host-group
+      hostPath:
+        path: /etc/group
+        type: File
+
+  templates:
+    - name: patch-otel
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: ghost-otel-patch
+      script:
+        image: registry.fedoraproject.org/fedora:latest
+        command: [bash, -c]
+        # Run as root so we can use runuser to switch to jorge (UID 1000).
+        # runuser -l jorge does not start a login shell subprocess; it just
+        # executes the command with jorge's UID/GID and dbus env vars.
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+        env:
+          - name: JORGE_HOME
+            value: /var/home/jorge
+          - name: JORGE_RUN
+            value: /run/user/1000
+          - name: OTELCOL_USER_UNIT
+            value: "{{workflow.parameters.unit}}"
+        volumeMounts:
+          - name: user-home
+            mountPath: /var/home/jorge
+          - name: user-run
+            mountPath: /run/user/1000
+          - name: host-passwd
+            mountPath: /etc/passwd
+            readOnly: true
+          - name: host-group
+            mountPath: /etc/group
+            readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        source: |
+          set -euo pipefail
+
+          UNIT="${OTELCOL_USER_UNIT}"
+
+          # ── Locate otelcol config ──────────────────────────────────────────
+          find_config() {
+            for candidate in \
+              "${JORGE_HOME}/.config/otelcol-agent/config.yaml" \
+              "${JORGE_HOME}/.config/otelcol-agent/config.yml" \
+              "${JORGE_HOME}/.config/otelcol/config.yaml" \
+              "${JORGE_HOME}/.otelcol-agent.yaml"; do
+              if [[ -f "$candidate" ]]; then
+                printf '%s\n' "$candidate"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          CONFIG=$(find_config) || {
+            echo "ERROR: could not find otelcol config for unit ${UNIT}" >&2
+            echo "Checked locations under ${JORGE_HOME}/.config/" >&2
+            ls -la "${JORGE_HOME}/.config/" 2>/dev/null >&2 || true
+            exit 1
+          }
+          echo "Found config: ${CONFIG}"
+
+          # ── Idempotency check ─────────────────────────────────────────────
+          if grep -q "process scraper disabled" "${CONFIG}" 2>/dev/null; then
+            echo "Config already patched (process scraper disabled comment found)."
+            echo "Skipping backup and re-patch."
+            echo "--- Current config ---"
+            cat "${CONFIG}"
+            exit 0
+          fi
+
+          # ── Backup ────────────────────────────────────────────────────────
+          BACKUP="${CONFIG}.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+          cp -- "${CONFIG}" "${BACKUP}"
+          echo "Backup: ${BACKUP}"
+
+          # ── Patch: remove process: scraper block ─────────────────────────
+          python3 - "${CONFIG}" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          lines = path.read_text().splitlines(keepends=True)
+          out = []
+          in_scrapers = False
+          scrapers_indent = -1
+          skip_process = False
+          process_indent = -1
+          found = False
+          changed = False
+          inserted_comment = False
+
+          key_re = re.compile(r"^(?P<indent>\s*)(?P<key>[A-Za-z0-9_-]+):(?:\s*(?:#.*)?)?$")
+          process_re = re.compile(r"^(?P<indent>\s*)process:\s*(?:.*)?$")
+
+          for line in lines:
+              stripped = line.strip()
+              indent = len(line) - len(line.lstrip(" "))
+
+              if skip_process:
+                  if stripped and not stripped.startswith("#") and indent <= process_indent:
+                      skip_process = False
+                  else:
+                      changed = True
+                      continue
+
+              if stripped and not stripped.startswith("#"):
+                  match = key_re.match(line.rstrip("\n"))
+                  if in_scrapers and indent <= scrapers_indent and not (
+                      match and match.group("key") == "scrapers"
+                  ):
+                      in_scrapers = False
+                      scrapers_indent = -1
+                  if match and match.group("key") == "scrapers":
+                      in_scrapers = True
+                      scrapers_indent = len(match.group("indent"))
+
+              if in_scrapers:
+                  match = process_re.match(line.rstrip("\n"))
+                  if match and len(match.group("indent")) > scrapers_indent:
+                      found = True
+                      changed = True
+                      process_indent = len(match.group("indent"))
+                      skip_process = True
+                      if not inserted_comment:
+                          out.append(
+                              f'{match.group("indent")}# process scraper disabled:'
+                              " user-service collector cannot read root-owned PIDs"
+                              " without journal spam\n"
+                          )
+                          inserted_comment = True
+                      continue
+
+              out.append(line)
+
+          if not found:
+              raise SystemExit(
+                  "ERROR: no hostmetrics scrapers.process entry found; config left unchanged"
+              )
+          if not changed:
+              raise SystemExit("ERROR: no changes made")
+
+          path.write_text("".join(out))
+          print(f"Patched {path}")
+          PY
+
+          echo "--- Config after patch ---"
+          cat "${CONFIG}"
+
+          # ── Restart user service via DBUS ─────────────────────────────────
+          # runuser switches to jorge's UID so the socket /run/user/1000/bus
+          # accepts the connection.
+          RESTART_OK=false
+          if runuser -u jorge -- env \
+              HOME="${JORGE_HOME}" \
+              XDG_RUNTIME_DIR="${JORGE_RUN}" \
+              DBUS_SESSION_BUS_ADDRESS="unix:path=${JORGE_RUN}/bus" \
+              systemctl --user restart "${UNIT}" 2>/dev/null; then
+            sleep 3
+            STATUS=$(runuser -u jorge -- env \
+              HOME="${JORGE_HOME}" \
+              XDG_RUNTIME_DIR="${JORGE_RUN}" \
+              DBUS_SESSION_BUS_ADDRESS="unix:path=${JORGE_RUN}/bus" \
+              systemctl --user is-active "${UNIT}" 2>/dev/null || echo "unknown")
+            echo "Service status after restart: ${STATUS}"
+            RESTART_OK=true
+          fi
+
+          if [[ "${RESTART_OK}" == "false" ]]; then
+            echo ""
+            echo "⚠  Service restart via DBUS was not available in this container context."
+            echo "   Config has been patched. To apply:"
+            echo "   → Run 'systemctl --user restart ${UNIT}' as jorge on ghost."
+            echo "   Backup is at: ${BACKUP}"
+          fi

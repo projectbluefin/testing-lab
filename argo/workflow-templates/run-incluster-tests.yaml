@@ -41,13 +41,13 @@ spec:
               for attempt in 1 2 3; do
                 rm -rf /workspace/testing-lab
                 if git clone --depth 1 --branch "${BRANCH}" \
-                    https://github.com/castrojo/testing-lab \
+                    https://github.com/projectbluefin/testing-lab \
                     /workspace/testing-lab 2>&1; then
                   echo "Synced testing-lab @ ${BRANCH} (attempt ${attempt})"
                   exit 0
                 fi
                 rm -rf /workspace/testing-lab
-                if git clone https://github.com/castrojo/testing-lab /workspace/testing-lab 2>&1 && \
+                if git clone https://github.com/projectbluefin/testing-lab /workspace/testing-lab 2>&1 && \
                    git -C /workspace/testing-lab checkout "${BRANCH}" 2>&1; then
                   echo "Synced testing-lab @ ${BRANCH} via SHA fallback (attempt ${attempt})"
                   exit 0

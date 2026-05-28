@@ -277,6 +277,13 @@ run-homelab-access:
     argo submit --from workflowtemplate/homelab-access-probe \
       -n {{ argo_ns }} --wait --log
 
+# ── Ghost maintenance ─────────────────────────────────────────────────────────
+
+# Patch ghost OTel collector config to remove noisy process scraper (#117)
+run-otel-patch:
+    argo submit --from workflowtemplate/ghost-otel-patch \
+      -n {{ argo_ns }} --wait --log
+
 # ── Dakota BST builds ────────────────────────────────────────────────────────
 
 # Validate dakota element graph (bst show, no build — fast)
