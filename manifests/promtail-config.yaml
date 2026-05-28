@@ -45,8 +45,8 @@ data:
             target_label: step
           - source_labels: [__meta_kubernetes_pod_container_name]
             target_label: container
-          - replacement: /var/log/pods/*$1/*/*.log
-            source_labels: [__meta_kubernetes_pod_uid]
+          - replacement: /var/log/pods/*$1/*.log
+            source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
             target_label: __path__
             regex: (.*)
             separator: /
