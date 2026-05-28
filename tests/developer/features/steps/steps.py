@@ -5,7 +5,7 @@ common_steps covers: Start/Close application, Item found/not found,
 Key combo, Press key, Type text, Run and save command output.
 
 Custom steps here:
-  - Make sure window is focused for wayland testing (port from GNOMETerminalAutomation)
+  - Make sure window is focused for wayland testing
   - Terminal output in ptyxis contains <text>
   - Ptyxis has N tabs
   - No Flatpak missing-runtime error
@@ -20,8 +20,6 @@ from pathlib import Path
 from time import sleep
 
 from behave import step
-from behave.step_registry import registry
-import qecore.common_steps as qecore_common_steps
 from qecore.common_steps import *  # noqa: F401,F403
 
 
@@ -122,161 +120,6 @@ def last_command_output_contains(context, text) -> None:
         or getattr(context, "last_run_output", "")
     )
     assert text in output, f"Expected {text!r} in output:\n{output[:500]}"
-
-
-_TERMINAL_CLASSIC_MENUS = {"File", "Edit", "View", "Search", "Terminal", "Help", "Tabs"}
-_TERMINAL_MENU_ROLES = (
-    "menu",
-    "menu item",
-    "check menu item",
-    "radio menu item",
-    "push button",
-    "toggle button",
-    "label",
-)
-
-
-def _get_terminal_instance(context):
-    terminal = getattr(context, "terminal", None)
-    if terminal is not None:
-        return terminal.instance
-    return None
-
-
-def _find_terminal_nodes(context, name, roles):
-    terminal = _get_terminal_instance(context)
-    if terminal is None:
-        return []
-    return terminal.findChildren(
-        lambda node: node.name == name
-        and node.roleName in roles
-        and getattr(node, "showing", True)
-    )
-
-
-def _click_terminal_node(node) -> None:
-    target = node.parent if getattr(node, "roleName", None) == "label" else node
-    target.click()
-    sleep(0.3)
-
-
-def _open_terminal_header_menu(context, menu_name=None) -> None:
-    if menu_name:
-        existing = _find_terminal_nodes(context, menu_name, _TERMINAL_MENU_ROLES)
-        if existing:
-            _click_terminal_node(existing[0])
-            context.terminal_header_menu = menu_name
-            return
-
-    toggles = _find_terminal_nodes(context, "Menu", ("toggle button", "push button"))
-    assert toggles, 'GNOME Terminal header-bar "Menu" toggle button not found'
-    _click_terminal_node(toggles[0])
-
-    if not menu_name:
-        context.terminal_header_menu = None
-        return
-
-    for _ in range(3):
-        matches = _find_terminal_nodes(context, menu_name, _TERMINAL_MENU_ROLES)
-        if matches:
-            _click_terminal_node(matches[0])
-            context.terminal_header_menu = menu_name
-            return
-        sleep(0.3)
-
-    raise AssertionError(
-        f'GNOME Terminal header-bar submenu {menu_name!r} not found after opening Menu'
-    )
-
-
-def _click_terminal_find_button(context) -> None:
-    matches = _find_terminal_nodes(context, "Find", ("button", "push button", "toggle button"))
-    assert matches, 'GNOME Terminal header-bar "Find" button not found'
-    _click_terminal_node(matches[0])
-    context.terminal_header_menu = "Search"
-
-
-def _adapt_terminal_mouse_click(context, retry=True, expect_positive=True, **kwargs):
-    a11y_root_name = kwargs.get("a11y_root_name")
-    if a11y_root_name != "terminal" or kwargs.get("m_btn") != "Left":
-        return False
-
-    name = kwargs.get("name")
-    role_name = kwargs.get("role_name")
-    if name == "Find":
-        _click_terminal_find_button(context)
-        return True
-
-    if role_name == "menu" and name in _TERMINAL_CLASSIC_MENUS:
-        _open_terminal_header_menu(context)
-        context.terminal_header_menu = name
-        return True
-
-    if role_name in {"menu item", "check menu item", "radio menu item"}:
-        active_menu = getattr(context, "terminal_header_menu", None)
-        if active_menu in _TERMINAL_CLASSIC_MENUS:
-            matches = _find_terminal_nodes(context, name, _TERMINAL_MENU_ROLES)
-            if not matches:
-                _open_terminal_header_menu(context, active_menu)
-
-    return False
-
-
-def _adapt_terminal_mouse_over(context, retry=True, expect_positive=True, **kwargs):
-    if kwargs.get("a11y_root_name") != "terminal":
-        return False
-    if kwargs.get("role_name") == "menu" and kwargs.get("name") in _TERMINAL_CLASSIC_MENUS:
-        _open_terminal_header_menu(context)
-        context.terminal_header_menu = kwargs["name"]
-        return True
-    return False
-
-
-_ORIGINAL_MOUSE_CLICK = qecore_common_steps.mouse_click
-_ORIGINAL_MOUSE_OVER = qecore_common_steps.mouse_over
-
-
-def _runtime_adapted_mouse_click(context, retry=True, expect_positive=True, **kwargs) -> None:
-    if _adapt_terminal_mouse_click(
-        context,
-        retry=retry,
-        expect_positive=expect_positive,
-        **kwargs,
-    ):
-        return
-    _ORIGINAL_MOUSE_CLICK(
-        context,
-        retry=retry,
-        expect_positive=expect_positive,
-        **kwargs,
-    )
-
-
-def _runtime_adapted_mouse_over(context, retry=True, expect_positive=True, **kwargs) -> None:
-    if _adapt_terminal_mouse_over(
-        context,
-        retry=retry,
-        expect_positive=expect_positive,
-        **kwargs,
-    ):
-        return
-    _ORIGINAL_MOUSE_OVER(
-        context,
-        retry=retry,
-        expect_positive=expect_positive,
-        **kwargs,
-    )
-
-
-def _replace_step_impl(original, replacement) -> None:
-    for step_group in registry.steps.values():
-        for step_definition in step_group:
-            if step_definition.func is original:
-                step_definition.func = replacement
-
-
-_replace_step_impl(_ORIGINAL_MOUSE_CLICK, _runtime_adapted_mouse_click)
-_replace_step_impl(_ORIGINAL_MOUSE_OVER, _runtime_adapted_mouse_over)
 
 
 @step("Homebrew bootstrap service completed successfully")
