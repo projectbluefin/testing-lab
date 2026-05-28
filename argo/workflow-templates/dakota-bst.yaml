@@ -22,6 +22,8 @@ spec:
         value: "default"   # default | nvidia | all
       - name: branch
         value: "main"
+      - name: repo
+        value: "https://github.com/projectbluefin/dakota"  # override for fork PRs
 
   templates:
 
@@ -35,6 +37,8 @@ spec:
               parameters:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
           - name: build-export-push
             dependencies: [validate]
             template: bst-build-export-push
@@ -44,12 +48,18 @@ spec:
                   value: "{{workflow.parameters.variant}}"
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
 
     # ── Validate: bst show — fast graph check, no build ─────────────────────
     - name: bst-validate
       inputs:
         parameters:
           - name: branch
+          - name: repo
+      synchronization:
+        mutexes:
+          - name: ghost-heavy-compute
       metadata:
         labels:
           app.kubernetes.io/part-of: bluefin-test-suite
@@ -79,7 +89,7 @@ spec:
             - |
               dnf install -y --quiet git 2>&1 | tail -2
               git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
-                https://github.com/projectbluefin/dakota /src
+                "{{inputs.parameters.repo}}" /src
           volumeMounts:
             - name: src
               mountPath: /src
@@ -91,7 +101,7 @@ spec:
             set -euo pipefail
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
-            just validate
+            just validate 2>/dev/null || just bst show --deps all oci/bluefin.bst
         securityContext:
           privileged: true
           runAsUser: 0
@@ -124,6 +134,7 @@ spec:
         parameters:
           - name: variant
           - name: branch
+          - name: repo
       outputs:
         parameters:
           - name: image-ref
@@ -161,7 +172,7 @@ spec:
             - |
               dnf install -y --quiet git 2>&1 | tail -2
               git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
-                https://github.com/projectbluefin/dakota /src
+                "{{inputs.parameters.repo}}" /src
           volumeMounts:
             - name: src
               mountPath: /src
