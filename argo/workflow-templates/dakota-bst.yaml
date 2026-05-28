@@ -1,0 +1,177 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dakota-bst
+  namespace: argo
+  annotations:
+    description: |
+      Drives dakota BuildStream builds on ghost via the existing `just` recipes.
+      Mounts jorge's BST cache (/var/home/jorge/.cache/buildstream) for warm builds.
+      Ghost's hardware is used; k8s controls scheduling and reports outcomes.
+  labels:
+    app.kubernetes.io/component: dakota-bst
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  entrypoint: pipeline
+  arguments:
+    parameters:
+      - name: variant
+        value: "default"   # default | nvidia | all
+      - name: branch
+        value: "main"
+
+  templates:
+
+    # ── Pipeline: validate → build ──────────────────────────────────────────
+    - name: pipeline
+      dag:
+        tasks:
+          - name: validate
+            template: bst-validate
+            arguments:
+              parameters:
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+          - name: build
+            dependencies: [validate]
+            template: bst-build
+            arguments:
+              parameters:
+                - name: variant
+                  value: "{{workflow.parameters.variant}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    # ── Validate: bst show — fast graph check, no build ─────────────────────
+    - name: bst-validate
+      inputs:
+        parameters:
+          - name: branch
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: dakota-bst-validate
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 1800
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: containers-storage
+          hostPath:
+            path: /var/lib/containers/storage
+        - name: bst-cache
+          hostPath:
+            path: /var/home/jorge/.cache/buildstream
+            type: DirectoryOrCreate
+        - name: src
+          emptyDir: {}
+      initContainers:
+        - name: git-clone
+          image: quay.io/fedora/fedora:latest
+          command: [bash, -c]
+          args:
+            - |
+              dnf install -y --quiet git 2>&1 | tail -2
+              git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
+                https://github.com/projectbluefin/dakota /src
+          volumeMounts:
+            - name: src
+              mountPath: /src
+      container:
+        image: quay.io/podman/stable:latest
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            dnf install -y --quiet just 2>&1 | tail -2
+            cd /src
+            just validate
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        volumeMounts:
+          - name: dev
+            mountPath: /dev
+          - name: containers-storage
+            mountPath: /var/lib/containers/storage
+          - name: bst-cache
+            mountPath: /root/.cache/buildstream
+          - name: src
+            mountPath: /src
+
+    # ── Build: bst build + lint ─────────────────────────────────────────────
+    - name: bst-build
+      inputs:
+        parameters:
+          - name: variant
+          - name: branch
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: dakota-bst-build
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 21600
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: containers-storage
+          hostPath:
+            path: /var/lib/containers/storage
+        - name: bst-cache
+          hostPath:
+            path: /var/home/jorge/.cache/buildstream
+            type: DirectoryOrCreate
+        - name: src
+          emptyDir: {}
+      initContainers:
+        - name: git-clone
+          image: quay.io/fedora/fedora:latest
+          command: [bash, -c]
+          args:
+            - |
+              dnf install -y --quiet git 2>&1 | tail -2
+              git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
+                https://github.com/projectbluefin/dakota /src
+          volumeMounts:
+            - name: src
+              mountPath: /src
+      container:
+        image: quay.io/podman/stable:latest
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            dnf install -y --quiet just 2>&1 | tail -2
+            cd /src
+            just build "{{inputs.parameters.variant}}"
+            just lint
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "8"
+            memory: 16Gi
+          limits:
+            cpu: "16"
+            memory: 32Gi
+        volumeMounts:
+          - name: dev
+            mountPath: /dev
+          - name: containers-storage
+            mountPath: /var/lib/containers/storage
+          - name: bst-cache
+            mountPath: /root/.cache/buildstream
+          - name: src
+            mountPath: /src

@@ -265,6 +265,23 @@ run-homelab-access:
     argo submit --from workflowtemplate/homelab-access-probe \
       -n {{ argo_ns }} --wait --log
 
+# ── Dakota BST builds ────────────────────────────────────────────────────────
+
+# Validate dakota element graph (bst show, no build — fast)
+run-dakota-validate branch="main":
+    argo submit --from workflowtemplate/dakota-bst \
+      -p variant=default \
+      -p branch={{ branch }} \
+      --entrypoint bst-validate \
+      -n {{ argo_ns }} --watch
+
+# Build a dakota variant (default | nvidia | all) and lint the result
+run-dakota-build variant="default" branch="main":
+    argo submit --from workflowtemplate/dakota-bst \
+      -p variant={{ variant }} \
+      -p branch={{ branch }} \
+      -n {{ argo_ns }} --watch
+
 # ── Validation ───────────────────────────────────────────────────────────────
 
 # Lint all Argo YAML manifests
