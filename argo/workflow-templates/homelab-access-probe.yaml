@@ -27,14 +27,14 @@ spec:
                 - name: namespace
                   value: "homelab-access-{{workflow.uid}}"
           - name: create-secrets
-            dependencies: [create-namespace]
+            depends: "create-namespace.Succeeded"
             template: create-secrets
             arguments:
               parameters:
                 - name: namespace
                   value: "homelab-access-{{workflow.uid}}"
           - name: deploy-fixture
-            dependencies: [create-secrets]
+            depends: "create-secrets.Succeeded"
             template: deploy-fixture
             arguments:
               parameters:
@@ -43,7 +43,7 @@ spec:
                 - name: auth-mode
                   value: "{{workflow.parameters.auth-mode}}"
           - name: run-access-tests
-            dependencies: [deploy-fixture]
+            depends: "deploy-fixture.Succeeded"
             when: "'{{workflow.parameters.auth-mode}}' == 'false'"
             templateRef:
               name: run-incluster-tests
@@ -63,7 +63,7 @@ spec:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
           - name: run-auth-tests
-            dependencies: [deploy-fixture]
+            depends: "deploy-fixture.Succeeded"
             when: "'{{workflow.parameters.auth-mode}}' == 'true'"
             templateRef:
               name: run-incluster-tests

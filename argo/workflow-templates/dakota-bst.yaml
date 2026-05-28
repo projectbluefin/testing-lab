@@ -40,7 +40,7 @@ spec:
                 - name: repo
                   value: "{{workflow.parameters.repo}}"
           - name: build-export-push
-            dependencies: [validate]
+            depends: "validate.Succeeded"
             template: bst-build-export-push
             arguments:
               parameters:

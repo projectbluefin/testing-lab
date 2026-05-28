@@ -25,14 +25,14 @@ spec:
                 - name: namespace
                   value: "homelab-storage-{{workflow.uid}}"
           - name: deploy-fixture
-            dependencies: [create-namespace]
+            depends: "create-namespace.Succeeded"
             template: deploy-fixture
             arguments:
               parameters:
                 - name: namespace
                   value: "homelab-storage-{{workflow.uid}}"
           - name: run-tests
-            dependencies: [deploy-fixture]
+            depends: "deploy-fixture.Succeeded"
             templateRef:
               name: run-incluster-tests
               template: run-pytest

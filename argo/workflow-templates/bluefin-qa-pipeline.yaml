@@ -55,7 +55,7 @@ spec:
 
           # 2. btrfs reflink clone + KubeVirt VM boot → vm-ip
           - name: provision
-            dependencies: [ensure-disk]
+            depends: "ensure-disk.Succeeded"
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
@@ -70,7 +70,7 @@ spec:
 
           # 3a. Phase 1 — smoke (behave + qecore, every PR)
           - name: run-smoke
-            dependencies: [provision]
+            depends: "provision.Succeeded"
             when: "'{{workflow.parameters.suites}}' contains 'smoke'"
             templateRef:
               name: run-gnome-tests
@@ -90,7 +90,7 @@ spec:
 
           # 3b. Phase 2 — developer tools (sequential after smoke)
           - name: run-developer
-            dependencies: [run-smoke]
+            depends: "run-smoke.Succeeded"
             when: "'{{workflow.parameters.suites}}' contains 'developer'"
             templateRef:
               name: run-gnome-tests
@@ -110,7 +110,7 @@ spec:
 
           # 3c. Phase 3 — software management (sequential, only if in suites list)
           - name: run-software
-            dependencies: [run-developer]
+            depends: "run-developer.Succeeded"
             when: "'{{workflow.parameters.suites}}' contains 'software'"
             templateRef:
               name: run-gnome-tests

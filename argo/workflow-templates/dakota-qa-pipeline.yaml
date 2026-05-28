@@ -65,7 +65,7 @@ spec:
 
           # 2. BST build → OCI export → push to cluster zot
           - name: bst-build-export-push
-            dependencies: [bst-validate]
+            depends: "bst-validate.Succeeded"
             templateRef:
               name: dakota-bst
               template: bst-build-export-push
@@ -78,7 +78,7 @@ spec:
 
           # 3. BIB golden disk from zot image (skipped if current)
           - name: ensure-disk
-            dependencies: [bst-build-export-push]
+            depends: "bst-build-export-push.Succeeded"
             templateRef:
               name: bib-build-and-push
               template: ensure-disk
@@ -93,7 +93,7 @@ spec:
 
           # 4. btrfs reflink clone + KubeVirt VM boot
           - name: provision
-            dependencies: [ensure-disk]
+            depends: "ensure-disk.Succeeded"
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
@@ -112,7 +112,7 @@ spec:
 
           # 5. Run smoke test suite against the provisioned Dakota VM
           - name: run-smoke
-            dependencies: [provision]
+            depends: "provision.Succeeded"
             when: "'{{workflow.parameters.suites}}' contains 'smoke'"
             templateRef:
               name: run-gnome-tests

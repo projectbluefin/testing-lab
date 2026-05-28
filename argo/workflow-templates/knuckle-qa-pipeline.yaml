@@ -43,7 +43,7 @@ spec:
                   value: "{{workflow.parameters.branch}}"
 
           - name: build-installer
-            dependencies: [clone-source]
+            depends: "clone-source.Succeeded"
             template: build-installer
             arguments:
               parameters:
@@ -55,7 +55,7 @@ spec:
                   value: "knuckle-test-{{workflow.uid}}"
 
           - name: provision-target-vm
-            dependencies: [build-installer]
+            depends: "build-installer.Succeeded"
             template: provision-target-vm
             arguments:
               parameters:
@@ -67,7 +67,7 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
 
           - name: boot-installer
-            dependencies: [provision-target-vm]
+            depends: "provision-target-vm.Succeeded"
             template: boot-installer
             arguments:
               parameters:
@@ -79,7 +79,7 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
 
           - name: wait-install-complete
-            dependencies: [boot-installer]
+            depends: "boot-installer.Succeeded"
             template: wait-install-complete
             arguments:
               parameters:
@@ -91,7 +91,7 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
 
           - name: transition-to-installed
-            dependencies: [wait-install-complete]
+            depends: "wait-install-complete.Succeeded"
             template: transition-to-installed
             arguments:
               parameters:
@@ -101,7 +101,7 @@ spec:
                   value: "{{workflow.parameters.namespace}}"
 
           - name: discover-ip
-            dependencies: [transition-to-installed]
+            depends: "transition-to-installed.Succeeded"
             template: discover-installed-ip
             arguments:
               parameters:
@@ -113,7 +113,7 @@ spec:
                   value: "{{workflow.parameters.ssh-key-secret}}"
 
           - name: run-smoke-tests
-            dependencies: [discover-ip]
+            depends: "discover-ip.Succeeded"
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
@@ -765,7 +765,7 @@ spec:
                   value: "/var/tmp/knuckle-test"
 
           - name: cleanup-installer-artifacts
-            dependencies: [teardown-vm]
+            depends: "teardown-vm.Succeeded"
             template: cleanup-installer-artifacts
             arguments:
               parameters:
