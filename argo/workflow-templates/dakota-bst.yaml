@@ -6,7 +6,7 @@ metadata:
   annotations:
     description: |
       Drives dakota BuildStream builds on ghost via the existing `just` recipes.
-      Mounts jorge's BST cache (/var/home/jorge/.cache/buildstream) for warm builds.
+      BST cache on striped storage (/var/mnt/ghost-data/bst-cache). Never cleared — production CAS.
       Ghost's hardware is used; k8s controls scheduling and reports outcomes.
   labels:
     app.kubernetes.io/component: dakota-bst
@@ -63,7 +63,7 @@ spec:
             path: /var/lib/containers/storage
         - name: bst-cache
           hostPath:
-            path: /var/home/jorge/.cache/buildstream
+            path: /var/mnt/ghost-data/bst-cache
             type: DirectoryOrCreate
         - name: src
           emptyDir: {}
@@ -88,6 +88,9 @@ spec:
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
             just validate
+        env:
+          - name: BST_CACHE_DIR
+            value: /root/.cache/buildstream
         securityContext:
           privileged: true
           runAsUser: 0
@@ -130,7 +133,7 @@ spec:
             path: /var/lib/containers/storage
         - name: bst-cache
           hostPath:
-            path: /var/home/jorge/.cache/buildstream
+            path: /var/mnt/ghost-data/bst-cache
             type: DirectoryOrCreate
         - name: src
           emptyDir: {}
@@ -156,6 +159,9 @@ spec:
             cd /src
             just build "{{inputs.parameters.variant}}"
             just lint
+        env:
+          - name: BST_CACHE_DIR
+            value: /root/.cache/buildstream
         securityContext:
           privileged: true
           runAsUser: 0
