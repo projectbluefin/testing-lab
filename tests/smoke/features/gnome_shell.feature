@@ -161,9 +161,10 @@ Feature: GNOME Shell smoke tests
 
   # ── Default browser (#107) ───────────────────────────────────────────────
   # Requires: Firefox Flatpak installed at system scope on titan VMs.
-  # Run setup-titan-fixtures workflow once to satisfy this precondition.
+  # Run `just setup-titan-fixtures` once to satisfy this precondition,
+  # then promote by removing @wip.
 
-  @browser @default_browser @regression
+  @browser @default_browser @wip
   Scenario: xdg-settings reports a default browser
     * xdg-settings default browser is ready
     * Last command output stripped contains ".desktop"

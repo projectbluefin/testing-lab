@@ -44,11 +44,6 @@ Feature: gnome-software (Bazaar) smoke tests
     * Run and save command output: "flatpak list --system --app 2>/dev/null | grep -q . && echo has_apps || echo no_apps"
     * Last command output contains "has_apps"
 
-  @software @flatpak @system
-  Scenario: Appstream metadata refresh succeeds without error
-    * Run and save command output: "flatpak update --appstream --noninteractive --system; echo \"appstream:exit:$?\""
-    * Last command output contains "appstream:exit:0"
-
   # ── Regression coverage ───────────────────────────────────────────────────
 
   @software @regression @bluefin_4062

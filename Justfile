@@ -110,6 +110,13 @@ run-tests-matrix:
         -n {{ argo_ns }} \
         --watch
 
+# One-time: write SSH banner on ghost warning agents to use the K8s MCP.
+# Runs as a WorkflowTemplate (not a manifest Job) to avoid ArgoCD reconcile loops.
+setup-ghost-ssh-banner:
+    argo submit --from workflowtemplate/setup-ghost-ssh-banner \
+        -n {{ argo_ns }} \
+        --wait --log
+
 # One-time fixture setup for titan VMs: installs Firefox Flatpak and sets default browser.
 # Run this before smoke tests that cover xdg-settings (#107).
 setup-titan-fixtures:

@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: setup-ghost-ssh-banner
+  namespace: argo
+  annotations:
+    description: |
+      One-shot: writes /etc/issue.net and sshd_config.d/00-agent-banner.conf
+      on the ghost host then reloads sshd.  Run manually once — do NOT place
+      this in manifests/ (a reconciled GitOps Job would loop forever).
+      Usage: argo submit --from workflowtemplate/setup-ghost-ssh-banner -n argo --wait
+spec:
+  serviceAccountName: argo
+  entrypoint: write-banner
+  ttlStrategy:
+    secondsAfterCompletion: 3600
+
+  templates:
+    - name: write-banner
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 120
+      podSpecPatch: |
+        hostPID: true
+        securityContext:
+          runAsUser: 0
+      volumes:
+        - name: host-etc
+          hostPath:
+            path: /etc
+            type: Directory
+      script:
+        image: quay.io/fedora/fedora:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: host-etc
+            mountPath: /host/etc
+        command: [bash]
+        source: |
+          set -euo pipefail
+
+          cat > /host/etc/issue.net << 'BANNER'
+          ╔══════════════════════════════════════════════════════════════════════╗
+          ║  ⚠  STOP — DO NOT USE THIS SSH SESSION FOR CLUSTER OPERATIONS  ⚠   ║
+          ║                                                                      ║
+          ║  ALL cluster operations MUST use the Kubernetes MCP server or API.  ║
+          ║  Never run kubectl, argo, or scripts from this shell.               ║
+          ║                                                                      ║
+          ║  Agents: load docs/agent-cheatsheet.md and AGENTS.md first.         ║
+          ╚══════════════════════════════════════════════════════════════════════╝
+          BANNER
+
+          mkdir -p /host/etc/ssh/sshd_config.d
+          printf 'Banner /etc/issue.net\n' \
+            > /host/etc/ssh/sshd_config.d/00-agent-banner.conf
+
+          # Reload sshd in the host mount namespace so the new drop-in is read.
+          # nsenter into PID 1's mount namespace gives us the host systemd socket.
+          nsenter --target 1 --mount -- \
+            /usr/bin/systemctl reload-or-restart sshd.service
+
+          echo "SSH banner installed and sshd reloaded."

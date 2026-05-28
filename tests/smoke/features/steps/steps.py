@@ -953,13 +953,18 @@ def date_menu_shows_notification(context, title, body) -> None:
 
 @step("xdg-settings default browser is ready")
 def xdg_settings_default_browser_ready(context) -> None:
-    """Verify a default browser is registered via xdg-settings or MIME fallbacks.
+    """Assert that xdg-settings get default-web-browser returns a .desktop entry.
 
-    Checks four increasingly broad methods so the step succeeds as long as
-    *any* browser .desktop is discoverable — regardless of whether a user-level
-    default has been explicitly configured.
+    Only passes if xdg-settings (method 1) or xdg-mime (method 2) returns a
+    value — both query the MIME database directly.  Falling back silently to
+    "there is some browser .desktop somewhere" would make this scenario a false
+    positive that passes even when no default is configured, which is exactly
+    the broken state we are trying to catch.
+
+    Precondition: run `just setup-titan-fixtures` once on each titan VM so that
+    Firefox is installed at system scope and /etc/xdg/mimeapps.list is written.
     """
-    # Method 1: xdg-settings (standard; may be empty if no user default set)
+    # Method 1: xdg-settings (reads MIME DB + user/system mimeapps.list)
     for _ in range(5):
         result = subprocess.run(
             ["xdg-settings", "get", "default-web-browser"],
@@ -985,43 +990,9 @@ def xdg_settings_default_browser_ready(context) -> None:
         print(f"xdg-mime default http handler: {output!r}", flush=True)
         return
 
-    # Method 3: GIO via Shell.Eval (session-level default via GNOME runtime)
-    gio_data = _shell_eval_json(
-        "JSON.stringify((() => {"
-        "try {"
-        "const app = Gio.AppInfo.get_default_for_type('x-scheme-handler/http', false);"
-        "return {id: app ? app.get_id() : null, name: app ? app.get_name() : null};"
-        "} catch(e) { return {id: null, name: null, error: e.message}; }"
-        "})())"
-    )
-    if gio_data.get("id"):
-        output = gio_data["id"]
-        context.command_stdout = output
-        context.last_command_output = output
-        print(f"GIO default browser: {output!r} ({gio_data.get('name')})", flush=True)
-        return
-
-    # Method 4: find any browser .desktop that handles http (covers Flatpak installs)
-    result = subprocess.run(
-        ["bash", "-c",
-         "grep -rl 'x-scheme-handler/http'"
-         " /usr/share/applications/"
-         " /var/lib/flatpak/exports/share/applications/"
-         " \"${XDG_DATA_HOME:-$HOME/.local/share}/applications/\""
-         " 2>/dev/null"
-         " | grep '\\.desktop$' | head -1"],
-        capture_output=True, text=True, timeout=5,
-    )
-    desktop_path = result.stdout.strip()
-    if desktop_path:
-        output = desktop_path.split("/")[-1]
-        context.command_stdout = output
-        context.last_command_output = output
-        print(f"Found browser .desktop (no default set): {output!r}", flush=True)
-        return
-
     raise AssertionError(
-        "No default web browser registered. "
-        "xdg-settings, xdg-mime, GIO, and application directories all returned empty. "
-        "Run the setup-titan-fixtures workflow to install Firefox Flatpak."
+        "xdg-settings and xdg-mime both returned empty — no default web browser "
+        "is configured in the MIME database. "
+        "Run `just setup-titan-fixtures` to install Firefox and write "
+        "/etc/xdg/mimeapps.list on titan VMs before promoting this scenario."
     )
