@@ -1,0 +1,62 @@
+# Job: write a one-time SSH banner on ghost warning agents to use the K8s API.
+# Runs once (restartPolicy: OnFailure) on the ghost node via hostPID + privileged.
+# Writes /etc/issue.net and a sshd_config.d drop-in, then reloads sshd.
+# ArgoCD applies this once; re-run by deleting the Job if the banner drifts.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ghost-ssh-banner
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      restartPolicy: OnFailure
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: write-banner
+          image: alpine:3.20
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-etc
+              mountPath: /host/etc
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command: [sh, -c]
+          args:
+            - |
+              set -eu
+              cat > /host/etc/issue.net << 'BANNER'
+              ╔══════════════════════════════════════════════════════════════════════╗
+              ║  ⚠  STOP — DO NOT USE THIS SSH SESSION FOR CLUSTER OPERATIONS  ⚠   ║
+              ║                                                                      ║
+              ║  ALL cluster operations MUST use the Kubernetes MCP server or API.  ║
+              ║  Never run kubectl, argo, or scripts from this shell.               ║
+              ║                                                                      ║
+              ║  Agents: load docs/agent-cheatsheet.md and AGENTS.md first.         ║
+              ╚══════════════════════════════════════════════════════════════════════╝
+              BANNER
+              mkdir -p /host/etc/ssh/sshd_config.d
+              printf 'Banner /etc/issue.net\n' > /host/etc/ssh/sshd_config.d/00-agent-banner.conf
+              nsenter --target 1 --mount -- systemctl reload-or-restart sshd
+              echo "SSH banner installed and sshd reloaded."
+      volumes:
+        - name: host-etc
+          hostPath:
+            path: /etc
+            type: Directory
