@@ -284,9 +284,17 @@ run-dakota-build variant="default" branch="main":
 
 # ── Validation ───────────────────────────────────────────────────────────────
 
-# Lint all Argo YAML manifests
+# Lint all Argo YAML manifests.
+# WorkflowTemplates are linted together (--offline) so cross-file templateRef
+# references (e.g. dakota-qa-pipeline → dakota-bst) resolve without needing
+# the Argo server to have the new templates already synced.
+# Standalone Workflow files (argo/*.yaml) reference server-side templates and
+# are linted individually against the live server.
 lint:
-    @for f in argo/*.yaml argo/workflow-templates/*.yaml; do \
+    @echo "Linting argo/workflow-templates/ (offline, cross-file refs)..."
+    @argo lint --offline argo/workflow-templates/
+    @echo "✔ workflow-templates: no linting errors found!"
+    @for f in argo/*.yaml; do \
         echo "Linting $f..."; \
         argo lint "$f" || exit 1; \
     done

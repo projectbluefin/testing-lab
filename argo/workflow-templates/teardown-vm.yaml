@@ -12,6 +12,9 @@ spec:
           - name: vm-name
           - name: namespace
             value: "bluefin-test"
+          # Must match the test-root used in provision-vm to locate the disk.
+          - name: test-root
+            value: "/var/tmp/bluefin-test"
       steps:
         - - name: delete-vm
             template: delete-vm
@@ -27,6 +30,8 @@ spec:
               parameters:
                 - name: vm-name
                   value: "{{inputs.parameters.vm-name}}"
+                - name: test-root
+                  value: "{{inputs.parameters.test-root}}"
 
     - name: delete-vm
       inputs:
@@ -46,12 +51,14 @@ spec:
       inputs:
         parameters:
           - name: vm-name
+          - name: test-root
+            value: "/var/tmp/bluefin-test"
       nodeSelector:
         kubernetes.io/hostname: ghost
       volumes:
         - name: test-disks
           hostPath:
-            path: /var/tmp/bluefin-test
+            path: "{{inputs.parameters.test-root}}"
       script:
         image: cgr.dev/chainguard/bash:latest
         securityContext:
@@ -66,8 +73,8 @@ spec:
             memory: 128Mi
         volumeMounts:
           - name: test-disks
-            mountPath: /var/tmp/bluefin-test
+            mountPath: "{{inputs.parameters.test-root}}"
         source: |
-          DISK="/var/tmp/bluefin-test/{{inputs.parameters.vm-name}}.raw"
+          DISK="{{inputs.parameters.test-root}}/{{inputs.parameters.vm-name}}.raw"
           rm -f "${DISK}"
           echo "Cleaned: ${DISK}"

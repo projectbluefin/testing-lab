@@ -1,0 +1,148 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dakota-qa-pipeline
+  namespace: argo
+  annotations:
+    description: |
+      End-to-end Dakota QA pipeline: BST validate → BST build+export+push →
+      BIB golden disk → ephemeral KubeVirt VM → behave/dogtail test suite.
+
+      Flow:
+        1. bst-validate      — fast element graph check (no build)
+        2. bst-build-export-push — BST build, export to containers-storage,
+                               push to 192.168.1.102:5000/dakota:<tag>
+        3. ensure-disk       — BIB builds a raw disk.raw from the zot image
+                               (skipped if golden disk is fresh)
+        4. provision         — btrfs reflink clone + KubeVirt VM boot
+        5. run-tests         — behave/dogtail smoke suite
+        6. teardown (onExit) — VM delete + hostDisk cleanup
+
+      All heavy build steps (BST, BIB) are serialised by the ghost-heavy-compute
+      mutex so concurrent pipelines queue rather than race on ghost storage.
+  labels:
+    app.kubernetes.io/component: qa-pipeline
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  serviceAccountName: argo
+
+  entrypoint: pipeline
+
+  # Cleanup VM + hostDisk on any exit (success, failure, timeout)
+  onExit: teardown
+
+  arguments:
+    parameters:
+      - name: branch
+        value: "main"
+      - name: variant
+        value: "default"   # default | nvidia
+      - name: namespace
+        value: "bluefin-test"
+      # Comma-separated test suite names matching tests/ subdirectories
+      - name: suites
+        value: "smoke"
+      - name: ssh-key-secret
+        value: "bluefin-test-ssh-key"
+      # git ref for the testing-lab repo (test code + step defs)
+      - name: tests-branch
+        value: "main"
+
+  templates:
+
+    - name: pipeline
+      dag:
+        tasks:
+          # 1. Fast BST element graph check — no build
+          - name: bst-validate
+            templateRef:
+              name: dakota-bst
+              template: bst-validate
+            arguments:
+              parameters:
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+          # 2. BST build → OCI export → push to cluster zot
+          - name: bst-build-export-push
+            dependencies: [bst-validate]
+            templateRef:
+              name: dakota-bst
+              template: bst-build-export-push
+            arguments:
+              parameters:
+                - name: variant
+                  value: "{{workflow.parameters.variant}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+          # 3. BIB golden disk from zot image (skipped if current)
+          - name: ensure-disk
+            dependencies: [bst-build-export-push]
+            templateRef:
+              name: bib-build-and-push
+              template: ensure-disk
+            arguments:
+              parameters:
+                - name: image
+                  value: "{{tasks.bst-build-export-push.outputs.parameters.image-ref}}"
+                - name: image-tag
+                  value: "{{workflow.parameters.variant}}"
+                - name: golden-root
+                  value: "/var/tmp/dakota-golden"
+
+          # 4. btrfs reflink clone + KubeVirt VM boot
+          - name: provision
+            dependencies: [ensure-disk]
+            templateRef:
+              name: provision-bluefin-vm
+              template: provision-vm
+            arguments:
+              parameters:
+                - name: image-tag
+                  value: "{{workflow.parameters.variant}}"
+                - name: vm-name
+                  value: "dakota-test-{{workflow.uid}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+                - name: golden-root
+                  value: "/var/tmp/dakota-golden"
+                - name: test-root
+                  value: "/var/tmp/dakota-test"
+
+          # 5. Run smoke test suite against the provisioned Dakota VM
+          - name: run-smoke
+            dependencies: [provision]
+            when: "'{{workflow.parameters.suites}}' contains 'smoke'"
+            templateRef:
+              name: run-gnome-tests
+              template: run-gnome-tests
+            arguments:
+              parameters:
+                - name: vm-ip
+                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
+                - name: suite
+                  value: "smoke"
+                - name: variant
+                  value: "{{workflow.parameters.variant}}"
+                - name: ssh-key-secret
+                  value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.tests-branch}}"
+
+    # ── onExit handler ──────────────────────────────────────────────────────
+    - name: teardown
+      dag:
+        tasks:
+          - name: teardown-vm
+            templateRef:
+              name: teardown-bluefin-vm
+              template: teardown-vm
+            arguments:
+              parameters:
+                - name: vm-name
+                  value: "dakota-test-{{workflow.uid}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+                - name: test-root
+                  value: "/var/tmp/dakota-test"

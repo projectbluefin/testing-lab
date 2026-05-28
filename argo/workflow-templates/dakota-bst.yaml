@@ -8,6 +8,9 @@ metadata:
       Drives dakota BuildStream builds on ghost via the existing `just` recipes.
       BST cache on striped storage (/var/mnt/ghost-data/bst-cache). Never cleared — production CAS.
       Ghost's hardware is used; k8s controls scheduling and reports outcomes.
+
+      Outputs: bst-build-export-push emits `image-ref` (192.168.1.102:5000/dakota:<tag>)
+      which dakota-qa-pipeline passes as `image` to ensure-disk.
   labels:
     app.kubernetes.io/component: dakota-bst
     app.kubernetes.io/part-of: bluefin-test-suite
@@ -22,7 +25,7 @@ spec:
 
   templates:
 
-    # ── Pipeline: validate → build ──────────────────────────────────────────
+    # ── Pipeline: validate → build-export-push ──────────────────────────────
     - name: pipeline
       dag:
         tasks:
@@ -32,9 +35,9 @@ spec:
               parameters:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
-          - name: build
+          - name: build-export-push
             dependencies: [validate]
-            template: bst-build
+            template: bst-build-export-push
             arguments:
               parameters:
                 - name: variant
@@ -60,7 +63,8 @@ spec:
             path: /dev
         - name: containers-storage
           hostPath:
-            path: /var/lib/containers/storage
+            path: /var/mnt/ghost-data/containers-iso-build
+            type: DirectoryOrCreate
         - name: bst-cache
           hostPath:
             path: /var/mnt/ghost-data/bst-cache
@@ -88,9 +92,6 @@ spec:
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
             just validate
-        env:
-          - name: BST_CACHE_DIR
-            value: /root/.cache/buildstream
         securityContext:
           privileged: true
           runAsUser: 0
@@ -99,8 +100,8 @@ spec:
             cpu: "2"
             memory: 4Gi
           limits:
-            cpu: "4"
-            memory: 8Gi
+            cpu: "2"
+            memory: 4Gi
         volumeMounts:
           - name: dev
             mountPath: /dev
@@ -111,16 +112,30 @@ spec:
           - name: src
             mountPath: /src
 
-    # ── Build: bst build + lint ─────────────────────────────────────────────
-    - name: bst-build
+    # ── Build + Export + Push ───────────────────────────────────────────────
+    # `just build <variant>` calls `just export` internally which writes the
+    # OCI image into containers-storage as `dakota:<tag>`.
+    # We then push to the cluster-local zot registry for BIB to consume.
+    #
+    # Mutex: ghost-heavy-compute — serialises all heavy BIB/BST builds on ghost.
+    # Guaranteed QoS: requests == limits so k8s never OOM-kills this pod.
+    - name: bst-build-export-push
       inputs:
         parameters:
           - name: variant
           - name: branch
+      outputs:
+        parameters:
+          - name: image-ref
+            valueFrom:
+              path: /tmp/image-ref
       metadata:
         labels:
           app.kubernetes.io/part-of: bluefin-test-suite
           bluefin.io/step: dakota-bst-build
+      synchronization:
+        mutexes:
+          - name: ghost-heavy-compute
       nodeSelector:
         kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 21600
@@ -130,7 +145,8 @@ spec:
             path: /dev
         - name: containers-storage
           hostPath:
-            path: /var/lib/containers/storage
+            path: /var/mnt/ghost-data/containers-iso-build
+            type: DirectoryOrCreate
         - name: bst-cache
           hostPath:
             path: /var/mnt/ghost-data/bst-cache
@@ -157,21 +173,34 @@ spec:
             set -euo pipefail
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
-            just build "{{inputs.parameters.variant}}"
+
+            # Derive a short build tag from the workflow UID.
+            # Argo expr syntax {{=...}} is not available in bash args — use
+            # a substring of the workflow name which is always unique.
+            TAG=$(echo "{{workflow.uid}}" | cut -c1-8)
+            IMAGE_REF="192.168.1.102:5000/dakota:${TAG}"
+
+            echo "=== BST build: variant={{inputs.parameters.variant}} tag=${TAG} ==="
+            BUILD_IMAGE_NAME=dakota BUILD_IMAGE_TAG="${TAG}" just build "{{inputs.parameters.variant}}"
+
+            echo "=== Pushing ${IMAGE_REF} ==="
+            podman push --tls-verify=false "docker://${IMAGE_REF}"
+
+            echo "=== Lint ==="
             just lint
-        env:
-          - name: BST_CACHE_DIR
-            value: /root/.cache/buildstream
+
+            printf '%s' "${IMAGE_REF}" > /tmp/image-ref
+            echo "=== Done: ${IMAGE_REF} ==="
         securityContext:
           privileged: true
           runAsUser: 0
         resources:
           requests:
-            cpu: "8"
-            memory: 16Gi
+            cpu: "24"
+            memory: 48Gi
           limits:
-            cpu: "16"
-            memory: 32Gi
+            cpu: "24"
+            memory: 48Gi
         volumeMounts:
           - name: dev
             mountPath: /dev

@@ -21,6 +21,14 @@ spec:
           - name: vm-name
           - name: namespace
             value: "bluefin-test"
+          # Root directory where golden disks live. Override per pipeline:
+          #   bluefin: /var/tmp/bluefin-golden (default)
+          #   dakota:  /var/tmp/dakota-golden
+          - name: golden-root
+            value: "/var/tmp/bluefin-golden"
+          # Root directory where per-VM reflinked disks are written.
+          - name: test-root
+            value: "/var/tmp/bluefin-test"
       outputs:
         parameters:
           - name: vm-ip
@@ -35,6 +43,10 @@ spec:
                   value: '{{inputs.parameters.image-tag}}'
                 - name: vm-name
                   value: '{{inputs.parameters.vm-name}}'
+                - name: golden-root
+                  value: '{{inputs.parameters.golden-root}}'
+                - name: test-root
+                  value: '{{inputs.parameters.test-root}}'
         - - name: create-vm
             template: create-vm
             arguments:
@@ -45,6 +57,8 @@ spec:
                   value: '{{inputs.parameters.vm-name}}'
                 - name: namespace
                   value: '{{inputs.parameters.namespace}}'
+                - name: test-root
+                  value: '{{inputs.parameters.test-root}}'
         - - name: wait-for-vm
             template: wait-for-vm-ready
             arguments:
@@ -65,16 +79,20 @@ spec:
         parameters:
           - name: image-tag
           - name: vm-name
+          - name: golden-root
+            value: "/var/tmp/bluefin-golden"
+          - name: test-root
+            value: "/var/tmp/bluefin-test"
       nodeSelector:
         kubernetes.io/hostname: ghost
       outputs: {}
       volumes:
         - name: golden
           hostPath:
-            path: /var/tmp/bluefin-golden
+            path: "{{inputs.parameters.golden-root}}"
         - name: test-disks
           hostPath:
-            path: /var/tmp/bluefin-test
+            path: "{{inputs.parameters.test-root}}"
             type: DirectoryOrCreate
       script:
         image: quay.io/podman/stable:latest
@@ -91,15 +109,15 @@ spec:
             memory: 512Mi
         volumeMounts:
           - name: golden
-            mountPath: /var/tmp/bluefin-golden
+            mountPath: "{{inputs.parameters.golden-root}}"
           - name: test-disks
-            mountPath: /var/tmp/bluefin-test
+            mountPath: "{{inputs.parameters.test-root}}"
         source: |
           set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
           VM="{{inputs.parameters.vm-name}}"
-          GOLDEN="/var/tmp/bluefin-golden/${TAG}/disk.raw"
-          DEST="/var/tmp/bluefin-test/${VM}.raw"
+          GOLDEN="{{inputs.parameters.golden-root}}/${TAG}/disk.raw"
+          DEST="{{inputs.parameters.test-root}}/${VM}.raw"
 
           if [[ ! -f "${GOLDEN}" ]]; then
             echo "ERROR: golden disk not found: ${GOLDEN}" >&2
@@ -124,6 +142,8 @@ spec:
           - name: image-tag
           - name: vm-name
           - name: namespace
+          - name: test-root
+            value: "/var/tmp/bluefin-test"
       outputs: {}
       resource:
         action: apply
@@ -165,7 +185,7 @@ spec:
                 volumes:
                   - name: rootdisk
                     hostDisk:
-                      path: /var/tmp/bluefin-test/{{inputs.parameters.vm-name}}.raw
+                      path: "{{inputs.parameters.test-root}}/{{inputs.parameters.vm-name}}.raw"
                       type: Disk
 
     - name: wait-for-vm-ready

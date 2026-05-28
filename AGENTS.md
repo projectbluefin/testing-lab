@@ -33,13 +33,38 @@ When deciding what to test or prioritize:
 
 **No SSH from workstations — ever. All reads and mutations go through the Kubernetes API and MCP servers.**
 
-The only SSH in this system is **in-cluster**: workflow pods and probe pods SSH into test VMs (titan, fresh VMs) as the test execution mechanism. That is not an operator access pattern — it is how behave/qecore delivers tests. Workstation operators and agents have no SSH path to anything; they submit workflows and query the API.
+The only SSH in this system is **in-cluster**: workflow pods and probe pods SSH into test VMs (fresh KubeVirt VMs) as the test execution mechanism. That is not an operator access pattern — it is how behave/qecore delivers tests. Workstation operators and agents have no SSH path to anything; they submit workflows and query the API.
 
-For canonical commands — workflow submission, ArgoCD actions, titan recovery, CronWorkflow operations,
+For canonical commands — workflow submission, ArgoCD actions, CronWorkflow operations,
 key secret rotation, PR queue steps, safe cleanup, bootstrap, and live fact lookup — see
 [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md).
 
 If an MCP tool doesn't exist for an operation, the right fix is to build or deploy that capability — not to fall back to SSH.
+
+## Core Tenet: Knuckle VM Lifecycle Is Argo-Native
+
+**`ssh $GHOST kubectl/virtctl` is a policy violation. No WorkflowTemplate may add `ssh $GHOST` calls.**
+
+The current `projectbluefin/knuckle` `scripts/lib/vm-kubevirt.sh` tunnels `kubectl`/`virtctl` through SSH to ghost (`_kube()`, `_vc()`). This is a known violation tracked in issues #113–#118 and is being migrated.
+
+The correct pattern is **in-pod kubectl/virtctl on ghost** via Argo workflow steps:
+```yaml
+nodeSelector:
+  kubernetes.io/hostname: ghost
+volumes:
+  - name: knuckle-test
+    hostPath:
+      path: /var/tmp/knuckle-test
+```
+Pods scheduled on ghost have direct k8s API access. No SSH hop needed. See `provision-flatcar-vm.yaml` and `knuckle-qa-pipeline.yaml` for the reference implementation.
+
+**The only permitted SSH** in knuckle workflows is **from workflow pods into the Flatcar test VM** — this is legitimate in-cluster test execution (`kv_wait_ssh`, `kv_ssh`, `kv_scp_to_vm`), not operator access to the host.
+
+## Core Tenet: No Persistent Test VMs
+
+**All test runs use ephemeral KubeVirt VMs. No persistent VMs sit idle consuming cluster resources.**
+
+Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on workflow start and tears it down via `onExit` handler. `just list-vms` should show zero VMs when no workflows are running.
 
 ## Cluster Topology
 

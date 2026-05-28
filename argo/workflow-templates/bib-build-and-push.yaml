@@ -18,6 +18,10 @@ spec:
             value: "ghcr.io/ublue-os/bluefin:latest"
           - name: image-tag
             value: "latest"
+          # Root directory for golden disks. Override to /var/tmp/dakota-golden
+          # for dakota builds. Default keeps Bluefin pipelines unchanged.
+          - name: golden-root
+            value: "/var/tmp/bluefin-golden"
       steps:
         # `check` outputs "missing" | "stale" | "exists".
         #   missing — no disk.raw on disk; build path runs
@@ -32,6 +36,8 @@ spec:
                   value: "{{inputs.parameters.image}}"
                 - name: image-tag
                   value: "{{inputs.parameters.image-tag}}"
+                - name: golden-root
+                  value: "{{inputs.parameters.golden-root}}"
 
         - - name: pull-image
             template: bib-img-pull
@@ -60,6 +66,8 @@ spec:
                   value: "{{inputs.parameters.image}}"
                 - name: image-tag
                   value: "{{inputs.parameters.image-tag}}"
+                - name: golden-root
+                  value: "{{inputs.parameters.golden-root}}"
 
     # Freshness check: missing | stale | exists.
     # Compares stored remote-digest marker against `skopeo inspect` of the
@@ -70,12 +78,14 @@ spec:
         parameters:
           - name: image
           - name: image-tag
+          - name: golden-root
+            value: "/var/tmp/bluefin-golden"
       nodeSelector:
         kubernetes.io/hostname: ghost
       volumes:
         - name: golden
           hostPath:
-            path: /var/tmp/bluefin-golden
+            path: "{{inputs.parameters.golden-root}}"
             type: DirectoryOrCreate
       script:
         # podman/stable already cached on ghost for bib-img-pull; ships skopeo
@@ -91,11 +101,12 @@ spec:
             memory: 512Mi
         volumeMounts:
           - name: golden
-            mountPath: /var/tmp/bluefin-golden
+            mountPath: "{{inputs.parameters.golden-root}}"
         source: |
           set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
           IMAGE_REF="{{inputs.parameters.image}}"
+          GOLDEN_ROOT="{{inputs.parameters.golden-root}}"
           # If the caller passed `image` without a tag (e.g. bluefin-qa-pipeline
           # default), append the explicit image-tag so skopeo inspects the
           # right manifest. `*:*` distinguishes a tag from a `host:port/` ref —
@@ -103,7 +114,7 @@ spec:
           if [[ "${IMAGE_REF}" != *:* ]]; then
             IMAGE_REF="${IMAGE_REF}:${TAG}"
           fi
-          GOLDEN_DIR="/var/tmp/bluefin-golden/${TAG}"
+          GOLDEN_DIR="${GOLDEN_ROOT}/${TAG}"
           DISK="${GOLDEN_DIR}/disk.raw"
           MARKER="${GOLDEN_DIR}/source-digest"
 
@@ -179,6 +190,11 @@ spec:
         parameters:
           - name: image
           - name: image-tag
+      # Serialize all heavy BIB/BST builds on ghost — prevents resource
+      # starvation when concurrent pipelines (Bluefin latest, lts, Dakota) run.
+      synchronization:
+        mutexes:
+          - name: ghost-heavy-compute
       nodeSelector:
         kubernetes.io/hostname: ghost
       volumes:
@@ -238,6 +254,12 @@ spec:
         parameters:
           - name: image
           - name: image-tag
+          - name: golden-root
+            value: "/var/tmp/bluefin-golden"
+      # Keep mutex through configure — it does heavy loop-device I/O on ghost.
+      synchronization:
+        mutexes:
+          - name: ghost-heavy-compute
       nodeSelector:
         kubernetes.io/hostname: ghost
       volumes:
@@ -249,7 +271,7 @@ spec:
             path: /var/tmp/bib-output
         - name: golden
           hostPath:
-            path: /var/tmp/bluefin-golden
+            path: "{{inputs.parameters.golden-root}}"
             type: DirectoryOrCreate
         # Needed for `podman image inspect` to read the digest of the image
         # bib-img-pull just fetched — see source-digest marker below.
@@ -280,7 +302,7 @@ spec:
           - name: bib-output
             mountPath: /var/tmp/bib-output
           - name: golden
-            mountPath: /var/tmp/bluefin-golden
+            mountPath: "{{inputs.parameters.golden-root}}"
           - name: containers-storage
             mountPath: /var/lib/containers/storage
         command: [bash, -c]
@@ -371,7 +393,7 @@ spec:
             losetup -d "${LOOP}"
 
             # Move to golden hostPath — this is the file reflink clones will come from
-            GOLDEN_DIR="/var/tmp/bluefin-golden/${TAG}"
+            GOLDEN_DIR="{{inputs.parameters.golden-root}}/${TAG}"
             mkdir -p "${GOLDEN_DIR}"
             mv "${DISK}" "${GOLDEN_DIR}/disk.raw"
             rmdir "/var/tmp/bib-output/${TAG}/image" 2>/dev/null || true
