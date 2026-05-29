@@ -291,26 +291,67 @@ run-otel-patch:
 
 # ── Dakota BST builds ────────────────────────────────────────────────────────
 
+# Report lab build result as a GitHub commit status (updates in-place, no comment spam).
+# Posting to the same context always overwrites the previous result — one indicator, ever.
+# Also syncs lab:pass / lab:fail labels on the PR.
+# Usage: just lab-report <pr_number> <pass|fail> <argo_workflow_name>
+lab-report pr_number status workflow:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    REPO="projectbluefin/dakota"
+    SHA=$(gh pr view {{ pr_number }} --repo "${REPO}" --json headRefOid --jq .headRefOid)
+    if [ "{{ status }}" = "pass" ]; then
+        STATE=success; LABEL="lab:pass"; REMOVE="lab:fail"
+        DESC="BST build passed ({{ workflow }})"
+    else
+        STATE=failure; LABEL="lab:fail"; REMOVE="lab:pass"
+        DESC="BST build failed ({{ workflow }})"
+    fi
+    gh api "repos/${REPO}/statuses/${SHA}" \
+        --method POST \
+        --field state="${STATE}" \
+        --field description="${DESC}" \
+        --field context="ghost-lab / bst-build" \
+        --field target_url="http://192.168.1.102:2746/workflows/argo/{{ workflow }}"
+    gh pr edit {{ pr_number }} --repo "${REPO}" \
+        --add-label "${LABEL}" --remove-label "${REMOVE}" 2>/dev/null || true
+
 # Validate dakota element graph (bst show, no build — fast)
-run-dakota-validate branch="main":
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-validate ref_type="branch" ref_value="main":
     argo submit --from workflowtemplate/dakota-bst \
-      -p variant=default \
-      -p branch={{ branch }} \
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
       --entrypoint bst-validate \
       -n {{ argo_ns }} --watch
 
-# Build a dakota variant (default | nvidia | all) and lint the result
-run-dakota-build variant="default" branch="main":
-    argo submit --from workflowtemplate/dakota-bst \
+# Build a dakota variant (default | nvidia | all) and lint the result.
+# Automatically reports build result as a commit status when ref_type=pr.
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-build variant="default" ref_type="branch" ref_value="main":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    WF=$(argo submit --from workflowtemplate/dakota-bst \
       -p variant={{ variant }} \
-      -p branch={{ branch }} \
-      -n {{ argo_ns }} --watch
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
+      -n {{ argo_ns }} \
+      --output name)
+    echo "Submitted: ${WF}"
+    argo watch "${WF}" -n {{ argo_ns }} && RC=0 || RC=$?
+    if [ "{{ ref_type }}" = "pr" ]; then
+        [ "${RC}" -eq 0 ] && STATUS=pass || STATUS=fail
+        just lab-report {{ ref_value }} "${STATUS}" "${WF}"
+    fi
+    exit "${RC}"
 
 # Full Dakota QA pipeline: BST build → BIB disk → VM → smoke tests
-run-dakota-qa variant="default" branch="main":
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-qa variant="default" ref_type="branch" ref_value="main":
     argo submit --from workflowtemplate/dakota-qa-pipeline \
       -p variant={{ variant }} \
-      -p branch={{ branch }} \
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
       -n {{ argo_ns }} --watch
 
 # ── Validation ───────────────────────────────────────────────────────────────
