@@ -4,7 +4,7 @@ metadata:
   name: run-gnome-tests
   namespace: argo
   annotations:
-    bluefin.io/stack: "qecore-headless + behave + dogtail + gnome-ponytail-daemon"
+    bluefin.io/stack: "qecore + behave + dogtail + gnome-ponytail-daemon"
 spec:
   serviceAccountName: argo
   templates:
@@ -171,7 +171,7 @@ spec:
                   echo 'Installing test dependencies...' >&2
                   sudo ostree admin unlock 2>/dev/null || true
                   sudo dnf clean packages -q 2>/dev/null || true
-                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail -3
+                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon python3-gobject at-spi2-core 2>&1 | tail -3
                   pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
                   python3 -m pip install --quiet --user qecore behave dogtail python-uinput 2>&1 | tail -3
                   for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \"\$f\" /usr/local/bin/\$(basename \"\$f\") 2>/dev/null; done
