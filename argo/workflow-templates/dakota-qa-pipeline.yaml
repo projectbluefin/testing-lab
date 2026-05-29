@@ -33,8 +33,12 @@ spec:
 
   arguments:
     parameters:
-      - name: branch
+      - name: ref_type
+        value: "branch"    # branch | pr | sha
+      - name: ref_value
         value: "main"
+      - name: repo
+        value: "https://github.com/projectbluefin/dakota"
       - name: variant
         value: "default"   # default | nvidia
       - name: namespace
@@ -53,15 +57,32 @@ spec:
     - name: pipeline
       dag:
         tasks:
+          # 0. Resolve ref_type + ref_value → clone_url + clone_ref
+          - name: resolve-source
+            templateRef:
+              name: dakota-bst
+              template: resolve-source
+            arguments:
+              parameters:
+                - name: ref_type
+                  value: "{{workflow.parameters.ref_type}}"
+                - name: ref_value
+                  value: "{{workflow.parameters.ref_value}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
+
           # 1. Fast BST element graph check — no build
           - name: bst-validate
+            depends: "resolve-source.Succeeded"
             templateRef:
               name: dakota-bst
               template: bst-validate
             arguments:
               parameters:
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
+                - name: clone_url
+                  value: "{{tasks.resolve-source.outputs.parameters.clone_url}}"
+                - name: clone_ref
+                  value: "{{tasks.resolve-source.outputs.parameters.clone_ref}}"
 
           # 2. BST build → OCI export → push to cluster zot
           - name: bst-build-export-push
@@ -73,8 +94,10 @@ spec:
               parameters:
                 - name: variant
                   value: "{{workflow.parameters.variant}}"
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
+                - name: clone_url
+                  value: "{{tasks.resolve-source.outputs.parameters.clone_url}}"
+                - name: clone_ref
+                  value: "{{tasks.resolve-source.outputs.parameters.clone_ref}}"
 
           # 3. BIB golden disk from zot image (skipped if current)
           - name: ensure-disk

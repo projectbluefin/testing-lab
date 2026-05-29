@@ -292,25 +292,30 @@ run-otel-patch:
 # ── Dakota BST builds ────────────────────────────────────────────────────────
 
 # Validate dakota element graph (bst show, no build — fast)
-run-dakota-validate branch="main":
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-validate ref_type="branch" ref_value="main":
     argo submit --from workflowtemplate/dakota-bst \
-      -p variant=default \
-      -p branch={{ branch }} \
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
       --entrypoint bst-validate \
       -n {{ argo_ns }} --watch
 
 # Build a dakota variant (default | nvidia | all) and lint the result
-run-dakota-build variant="default" branch="main":
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-build variant="default" ref_type="branch" ref_value="main":
     argo submit --from workflowtemplate/dakota-bst \
       -p variant={{ variant }} \
-      -p branch={{ branch }} \
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
       -n {{ argo_ns }} --watch
 
 # Full Dakota QA pipeline: BST build → BIB disk → VM → smoke tests
-run-dakota-qa variant="default" branch="main":
+# ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
+run-dakota-qa variant="default" ref_type="branch" ref_value="main":
     argo submit --from workflowtemplate/dakota-qa-pipeline \
       -p variant={{ variant }} \
-      -p branch={{ branch }} \
+      -p ref_type={{ ref_type }} \
+      -p ref_value={{ ref_value }} \
       -n {{ argo_ns }} --watch
 
 # ── Validation ───────────────────────────────────────────────────────────────

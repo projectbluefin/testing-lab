@@ -9,6 +9,12 @@ metadata:
       BST cache on striped storage (/var/mnt/ghost-data/bst-cache). Never cleared — production CAS.
       Ghost's hardware is used; k8s controls scheduling and reports outcomes.
 
+      Source resolution: pass ref_type=branch|pr|sha + ref_value. The resolve-source
+      step converts PR numbers to branch names and fork URLs before cloning.
+
+      All large I/O lands on /var/mnt/ghost-data/ — root filesystem is not touched
+      by builds. src, tmp, bst-cache, and containers-storage are all hostPath mounts.
+
       Outputs: bst-build-export-push emits `image-ref` (192.168.1.102:5000/dakota:<tag>)
       which dakota-qa-pipeline passes as `image` to ensure-disk.
   labels:
@@ -20,41 +26,141 @@ spec:
     parameters:
       - name: variant
         value: "default"   # default | nvidia | all
-      - name: branch
+      - name: ref_type
+        value: "branch"    # branch | pr | sha
+      - name: ref_value
         value: "main"
       - name: repo
         value: "https://github.com/projectbluefin/dakota"  # override for fork PRs
 
   templates:
 
-    # ── Pipeline: validate → build-export-push ──────────────────────────────
+    # ── Pipeline: resolve-source → validate → build-export-push ────────────
     - name: pipeline
       steps:
+        - - name: resolve
+            template: resolve-source
+            arguments:
+              parameters:
+                - name: ref_type
+                  value: "{{workflow.parameters.ref_type}}"
+                - name: ref_value
+                  value: "{{workflow.parameters.ref_value}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
         - - name: validate
             template: bst-validate
             arguments:
               parameters:
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
-                - name: repo
-                  value: "{{workflow.parameters.repo}}"
+                - name: clone_url
+                  value: "{{steps.resolve.outputs.parameters.clone_url}}"
+                - name: clone_ref
+                  value: "{{steps.resolve.outputs.parameters.clone_ref}}"
         - - name: build-export-push
             template: bst-build-export-push
             arguments:
               parameters:
                 - name: variant
                   value: "{{workflow.parameters.variant}}"
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
-                - name: repo
-                  value: "{{workflow.parameters.repo}}"
+                - name: clone_url
+                  value: "{{steps.resolve.outputs.parameters.clone_url}}"
+                - name: clone_ref
+                  value: "{{steps.resolve.outputs.parameters.clone_ref}}"
+
+    # ── Resolve source: branch | pr | sha → clone_url + clone_ref ──────────
+    # Lightweight pod — no BST cache, no containers-storage needed.
+    # For PR refs: reads head branch and fork URL from GitHub API via gh CLI.
+    # Outputs written to /tmp (emptyDir, ephemeral — values passed via Argo).
+    - name: resolve-source
+      inputs:
+        parameters:
+          - name: ref_type
+          - name: ref_value
+          - name: repo
+      outputs:
+        parameters:
+          - name: clone_url
+            valueFrom:
+              path: /tmp/clone-url
+          - name: clone_ref
+            valueFrom:
+              path: /tmp/clone-ref
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: dakota-bst-resolve
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 120
+      priorityClassName: bst-build
+      volumes:
+        - name: gh-token
+          secret:
+            secretName: gh-token
+            optional: true
+      container:
+        image: quay.io/fedora/fedora:latest
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            REF_TYPE="{{inputs.parameters.ref_type}}"
+            REF_VALUE="{{inputs.parameters.ref_value}}"
+            REPO="{{inputs.parameters.repo}}"
+            REPO_SLUG="${REPO#https://github.com/}"
+
+            case "$REF_TYPE" in
+              branch)
+                printf '%s' "$REPO"      > /tmp/clone-url
+                printf '%s' "$REF_VALUE" > /tmp/clone-ref
+                ;;
+              pr)
+                dnf install -y --quiet gh 2>&1 | tail -2
+                GH_TOKEN=$(cat /run/secrets/gh-token/token 2>/dev/null || echo "")
+                export GH_TOKEN
+                BRANCH=$(gh pr view "$REF_VALUE" --repo "$REPO_SLUG" \
+                  --json headRefName --jq .headRefName)
+                FORK_URL=$(gh pr view "$REF_VALUE" --repo "$REPO_SLUG" \
+                  --json headRepositoryOwner,headRepository \
+                  --jq '"https://github.com/\(.headRepositoryOwner.login)/\(.headRepository.name)"')
+                printf '%s' "$FORK_URL" > /tmp/clone-url
+                printf '%s' "$BRANCH"   > /tmp/clone-ref
+                ;;
+              sha)
+                # SHA: clone default branch, fetch + checkout the specific commit.
+                # clone-ref is the SHA; initContainer handles detached checkout.
+                printf '%s' "$REPO"      > /tmp/clone-url
+                printf '%s' "$REF_VALUE" > /tmp/clone-ref
+                ;;
+              *)
+                echo "ERROR: unknown ref_type '$REF_TYPE' — must be branch|pr|sha" >&2
+                exit 1
+                ;;
+            esac
+
+            echo "=== Resolved: $(cat /tmp/clone-url) @ $(cat /tmp/clone-ref) ==="
+        securityContext:
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "100m"
+            memory: 256Mi
+            ephemeral-storage: 500Mi
+          limits:
+            cpu: "500m"
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+        volumeMounts:
+          - name: gh-token
+            mountPath: /run/secrets/gh-token
+            readOnly: true
 
     # ── Validate: bst show — fast graph check, no build ─────────────────────
     - name: bst-validate
       inputs:
         parameters:
-          - name: branch
-          - name: repo
+          - name: clone_url
+          - name: clone_ref
       synchronization:
         mutexes:
           - name: ghost-heavy-compute
@@ -65,6 +171,7 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 1800
+      priorityClassName: bst-build
       volumes:
         - name: dev
           hostPath:
@@ -78,19 +185,39 @@ spec:
             path: /var/mnt/ghost-data/bst-cache
             type: DirectoryOrCreate
         - name: src
-          emptyDir: {}
+          hostPath:
+            path: /var/mnt/ghost-data/bst-src
+            type: DirectoryOrCreate
+        - name: tmp
+          hostPath:
+            path: /var/mnt/ghost-data/bst-tmp
+            type: DirectoryOrCreate
       initContainers:
         - name: git-clone
           image: quay.io/fedora/fedora:latest
           command: [bash, -c]
           args:
             - |
+              set -euo pipefail
               dnf install -y --quiet git 2>&1 | tail -2
-              git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
-                "{{inputs.parameters.repo}}" /src
+              rm -rf /src/*
+              CLONE_REF="{{inputs.parameters.clone_ref}}"
+              CLONE_URL="{{inputs.parameters.clone_url}}"
+              if [[ "$CLONE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+                git clone --depth 1 "$CLONE_URL" /src
+                git -C /src fetch --depth 1 origin "$CLONE_REF"
+                git -C /src checkout "$CLONE_REF"
+              else
+                git clone --depth 1 --branch "$CLONE_REF" "$CLONE_URL" /src
+              fi
+          env:
+            - name: TMPDIR
+              value: /tmp
           volumeMounts:
             - name: src
               mountPath: /src
+            - name: tmp
+              mountPath: /tmp
       container:
         image: quay.io/podman/stable:latest
         command: [bash, -c]
@@ -100,6 +227,9 @@ spec:
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
             just validate 2>/dev/null || just bst show --deps all oci/bluefin.bst
+        env:
+          - name: TMPDIR
+            value: /tmp
         securityContext:
           privileged: true
           runAsUser: 0
@@ -107,9 +237,11 @@ spec:
           requests:
             cpu: "2"
             memory: 4Gi
+            ephemeral-storage: 500Mi
           limits:
             cpu: "2"
             memory: 4Gi
+            ephemeral-storage: 2Gi
         volumeMounts:
           - name: dev
             mountPath: /dev
@@ -119,6 +251,8 @@ spec:
             mountPath: /root/.cache/buildstream
           - name: src
             mountPath: /src
+          - name: tmp
+            mountPath: /tmp
 
     # ── Build + Export + Push ───────────────────────────────────────────────
     # `just build <variant>` calls `just export` internally which writes the
@@ -126,18 +260,22 @@ spec:
     # We then push to the cluster-local zot registry for BIB to consume.
     #
     # Mutex: ghost-heavy-compute — serialises all heavy BIB/BST builds on ghost.
-    # Guaranteed QoS: requests == limits so k8s never OOM-kills this pod.
+    # Guaranteed QoS: requests == limits.
+    # PriorityClass bst-build: non-preempting, below system pods.
+    # All large I/O on ghost-data: root filesystem untouched during builds.
+    # Resources: 20 CPU / 40Gi leaves 12 CPU + 22Gi for API server and system pods
+    # (up from 8 CPU + 14Gi with the previous 24/48 allocation).
     - name: bst-build-export-push
       inputs:
         parameters:
           - name: variant
-          - name: branch
-          - name: repo
+          - name: clone_url
+          - name: clone_ref
       outputs:
         parameters:
           - name: image-ref
             valueFrom:
-              path: /tmp/image-ref
+              path: /root/.cache/buildstream/image-ref
       metadata:
         labels:
           app.kubernetes.io/part-of: bluefin-test-suite
@@ -148,6 +286,7 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 21600
+      priorityClassName: bst-build
       volumes:
         - name: dev
           hostPath:
@@ -161,19 +300,39 @@ spec:
             path: /var/mnt/ghost-data/bst-cache
             type: DirectoryOrCreate
         - name: src
-          emptyDir: {}
+          hostPath:
+            path: /var/mnt/ghost-data/bst-src
+            type: DirectoryOrCreate
+        - name: tmp
+          hostPath:
+            path: /var/mnt/ghost-data/bst-tmp
+            type: DirectoryOrCreate
       initContainers:
         - name: git-clone
           image: quay.io/fedora/fedora:latest
           command: [bash, -c]
           args:
             - |
+              set -euo pipefail
               dnf install -y --quiet git 2>&1 | tail -2
-              git clone --depth 1 --branch "{{inputs.parameters.branch}}" \
-                "{{inputs.parameters.repo}}" /src
+              rm -rf /src/*
+              CLONE_REF="{{inputs.parameters.clone_ref}}"
+              CLONE_URL="{{inputs.parameters.clone_url}}"
+              if [[ "$CLONE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+                git clone --depth 1 "$CLONE_URL" /src
+                git -C /src fetch --depth 1 origin "$CLONE_REF"
+                git -C /src checkout "$CLONE_REF"
+              else
+                git clone --depth 1 --branch "$CLONE_REF" "$CLONE_URL" /src
+              fi
+          env:
+            - name: TMPDIR
+              value: /tmp
           volumeMounts:
             - name: src
               mountPath: /src
+            - name: tmp
+              mountPath: /tmp
       container:
         image: quay.io/podman/stable:latest
         command: [bash, -c]
@@ -183,9 +342,6 @@ spec:
             dnf install -y --quiet just 2>&1 | tail -2
             cd /src
 
-            # Derive a short build tag from the workflow UID.
-            # Argo expr substitution is not available in bash args — use
-            # a substring of the workflow name which is always unique.
             TAG=$(echo "{{workflow.uid}}" | cut -c1-8)
             IMAGE_REF="192.168.1.102:5000/dakota:${TAG}"
 
@@ -198,18 +354,23 @@ spec:
             echo "=== Lint ==="
             just lint
 
-            printf '%s' "${IMAGE_REF}" > /tmp/image-ref
+            printf '%s' "${IMAGE_REF}" > /root/.cache/buildstream/image-ref
             echo "=== Done: ${IMAGE_REF} ==="
+        env:
+          - name: TMPDIR
+            value: /tmp
         securityContext:
           privileged: true
           runAsUser: 0
         resources:
           requests:
-            cpu: "24"
-            memory: 48Gi
+            cpu: "20"
+            memory: 40Gi
+            ephemeral-storage: 1Gi
           limits:
-            cpu: "24"
-            memory: 48Gi
+            cpu: "20"
+            memory: 40Gi
+            ephemeral-storage: 4Gi
         volumeMounts:
           - name: dev
             mountPath: /dev
@@ -219,3 +380,5 @@ spec:
             mountPath: /root/.cache/buildstream
           - name: src
             mountPath: /src
+          - name: tmp
+            mountPath: /tmp
