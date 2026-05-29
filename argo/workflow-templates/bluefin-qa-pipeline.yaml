@@ -71,7 +71,7 @@ spec:
           # 3a. Phase 1 — smoke (behave + qecore, every PR)
           - name: run-smoke
             depends: "provision.Succeeded"
-            when: "'{{workflow.parameters.suites}}' contains 'smoke'"
+            when: "'{{workflow.parameters.suites}}' =~ 'smoke'"
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
@@ -91,7 +91,7 @@ spec:
           # 3b. Phase 2 — developer tools (sequential after smoke)
           - name: run-developer
             depends: "run-smoke.Succeeded"
-            when: "'{{workflow.parameters.suites}}' contains 'developer'"
+            when: "'{{workflow.parameters.suites}}' =~ 'developer'"
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
@@ -111,7 +111,7 @@ spec:
           # 3c. Phase 3 — software management (sequential, only if in suites list)
           - name: run-software
             depends: "run-developer.Succeeded"
-            when: "'{{workflow.parameters.suites}}' contains 'software'"
+            when: "'{{workflow.parameters.suites}}' =~ 'software'"
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
