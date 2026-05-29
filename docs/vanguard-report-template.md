@@ -46,6 +46,12 @@
 **🟢 GO** / **🔴 NOGO** — {one-line summary}
 
 <!-- status:{PASS|FAIL} target:{...} label:{...} digest:{...} -->
+
+---
+
+## AGENT INSTRUCTIONS:
+<!-- Reviewer: edit this section to leave requested changes. Agent reads here first. -->
+- none
 ```
 
 ## Tier Lore Descriptors
@@ -126,4 +132,10 @@ bluefin-lts-test titan-lts       7d   Running   True
 **🟢 GO** — titan smoke green against `latest`; no behave regressions vs main.
 
 <!-- status:PASS target:testing-lab label:agent-tested digest:abcdef012345 -->
+
+---
+
+## AGENT INSTRUCTIONS:
+<!-- Reviewer: edit this section to leave requested changes. Agent reads here first. -->
+- none
 ```
