@@ -113,7 +113,7 @@ spec:
           # 5. Run smoke test suite against the provisioned Dakota VM
           - name: run-smoke
             depends: "provision.Succeeded"
-            when: "'{{workflow.parameters.suites}}' contains 'smoke'"
+            when: "'{{workflow.parameters.suites}}' =~ 'smoke'"
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
