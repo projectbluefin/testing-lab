@@ -47,6 +47,9 @@ spec:
       # git ref for the testing-lab repo (test code + step defs)
       - name: tests-branch
         value: "main"
+      # upstream repo — override with fork URL for fork PRs
+      - name: repo
+        value: "https://github.com/projectbluefin/dakota"
 
   templates:
 
@@ -62,6 +65,8 @@ spec:
               parameters:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
 
           # 2. BST build → OCI export → push to cluster zot
           - name: bst-build-export-push
@@ -75,6 +80,8 @@ spec:
                   value: "{{workflow.parameters.variant}}"
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
+                - name: repo
+                  value: "{{workflow.parameters.repo}}"
 
           # 3. BIB golden disk from zot image (skipped if current)
           - name: ensure-disk
