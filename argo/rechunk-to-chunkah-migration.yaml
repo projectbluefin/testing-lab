@@ -81,7 +81,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "migration-latest-default-{{workflow.uid}}"
+                  value: "mig-latest-def-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: golden-root
@@ -97,7 +97,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "migration-latest-experimental-{{workflow.uid}}"
+                  value: "mig-latest-exp-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: golden-root
@@ -113,7 +113,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-stable}}"
                 - name: vm-name
-                  value: "migration-stable-default-{{workflow.uid}}"
+                  value: "mig-stable-def-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: golden-root
@@ -129,7 +129,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-stable}}"
                 - name: vm-name
-                  value: "migration-stable-experimental-{{workflow.uid}}"
+                  value: "mig-stable-exp-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: golden-root
@@ -144,7 +144,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "migration-latest-default-{{workflow.uid}}"
+                  value: "mig-latest-def-{{workflow.uid}}"
                 - name: vm-ip
                   value: "{{steps.provision-latest-default.outputs.parameters.vm-ip}}"
                 - name: ssh-user
@@ -170,7 +170,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "migration-latest-experimental-{{workflow.uid}}"
+                  value: "mig-latest-exp-{{workflow.uid}}"
                 - name: vm-ip
                   value: "{{steps.provision-latest-experimental.outputs.parameters.vm-ip}}"
                 - name: ssh-user
@@ -196,7 +196,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-stable}}"
                 - name: vm-name
-                  value: "migration-stable-default-{{workflow.uid}}"
+                  value: "mig-stable-def-{{workflow.uid}}"
                 - name: vm-ip
                   value: "{{steps.provision-stable-default.outputs.parameters.vm-ip}}"
                 - name: ssh-user
@@ -222,7 +222,7 @@ spec:
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-stable}}"
                 - name: vm-name
-                  value: "migration-stable-experimental-{{workflow.uid}}"
+                  value: "mig-stable-exp-{{workflow.uid}}"
                 - name: vm-ip
                   value: "{{steps.provision-stable-experimental.outputs.parameters.vm-ip}}"
                 - name: ssh-user
@@ -1321,7 +1321,7 @@ spec:
             arguments:
               parameters:
                 - name: vm-name
-                  value: "migration-latest-default-{{workflow.uid}}"
+                  value: "mig-latest-def-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
@@ -1333,7 +1333,7 @@ spec:
             arguments:
               parameters:
                 - name: vm-name
-                  value: "migration-latest-experimental-{{workflow.uid}}"
+                  value: "mig-latest-exp-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
@@ -1345,7 +1345,7 @@ spec:
             arguments:
               parameters:
                 - name: vm-name
-                  value: "migration-stable-default-{{workflow.uid}}"
+                  value: "mig-stable-def-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
@@ -1357,7 +1357,7 @@ spec:
             arguments:
               parameters:
                 - name: vm-name
-                  value: "migration-stable-experimental-{{workflow.uid}}"
+                  value: "mig-stable-exp-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
