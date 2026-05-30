@@ -626,9 +626,7 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet openssh-clients python3 2>&1 | tail -3
 
           export VM_IP="{{inputs.parameters.vm-ip}}"
           export SSH_USER="{{inputs.parameters.ssh-user}}"
@@ -776,9 +774,7 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet openssh-clients python3 2>&1 | tail -3
 
           export VM_IP="{{inputs.parameters.vm-ip}}"
           export SSH_USER="{{inputs.parameters.ssh-user}}"
@@ -929,9 +925,7 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet openssh-clients 2>&1 | tail -2
 
           VM_IP="{{inputs.parameters.vm-ip}}"
           SSH_USER="{{inputs.parameters.ssh-user}}"
@@ -1013,20 +1007,9 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet openssh-clients python3 2>&1 | tail -3
 
           export VM_IP="{{inputs.parameters.vm-ip}}"
-          export SSH_USER="{{inputs.parameters.ssh-user}}"
-          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
-          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
-          export STEP="{{inputs.parameters.step}}"
-          export EXPECTED_IMAGE="{{inputs.parameters.expected-image}}"
-          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
-          export AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
-
-          python3 - <<'PY'
           import json
           import os
           import pathlib
@@ -1242,9 +1225,7 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet openssh-clients python3 2>&1 | tail -3
 
           export VM_IP="{{inputs.parameters.vm-ip}}"
           export SSH_USER="{{inputs.parameters.ssh-user}}"
