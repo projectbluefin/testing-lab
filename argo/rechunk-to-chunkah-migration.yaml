@@ -1010,6 +1010,15 @@ spec:
           dnf install -y --quiet openssh-clients python3 2>&1 | tail -3
 
           export VM_IP="{{inputs.parameters.vm-ip}}"
+          export SSH_USER="{{inputs.parameters.ssh-user}}"
+          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
+          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
+          export STEP="{{inputs.parameters.step}}"
+          export EXPECTED_IMAGE="{{inputs.parameters.expected-image}}"
+          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
+          export AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
+
+          python3 - <<'PY'
           import json
           import os
           import pathlib
