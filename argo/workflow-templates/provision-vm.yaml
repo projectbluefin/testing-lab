@@ -102,11 +102,11 @@ spec:
           runAsUser: 0
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
+            cpu: "1"
             memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 1Gi
         volumeMounts:
           - name: golden
             mountPath: "{{inputs.parameters.golden-root}}"
@@ -131,6 +131,26 @@ spec:
           chcon -t svirt_sandbox_file_t "${DEST}" 2>/dev/null || true
           ELAPSED=$(( ($(date +%s%N) - START) / 1000000 ))
           echo "reflink clone: ${ELAPSED}ms → ${DEST}"
+
+          # Expand VM disk to 40GB so bootc unified-storage has headroom for a
+          # full second image download (~5GB) alongside the running OS (~7GB).
+          TARGET_BYTES=$((40 * 1024 * 1024 * 1024))
+          CURRENT_SIZE=$(stat -c%s "${DEST}")
+          if [[ "${CURRENT_SIZE}" -lt "${TARGET_BYTES}" ]]; then
+            echo "Expanding VM disk from ${CURRENT_SIZE} bytes to 40GB..."
+            dnf install -y cloud-utils-growpart e2fsprogs \
+              --quiet --setopt=install_weak_deps=False 2>&1 | tail -3
+            truncate -s 40G "${DEST}"
+            LOOP_EXP=$(losetup -f --show -P "${DEST}")
+            # growpart fixes GPT backup header + extends partition 4 (root)
+            growpart "${LOOP_EXP}" 4
+            e2fsck -f -y "${LOOP_EXP}p4" 2>/dev/null || true
+            resize2fs "${LOOP_EXP}p4"
+            losetup -d "${LOOP_EXP}"
+            echo "VM disk expanded: $(stat -c%s "${DEST}") bytes"
+          else
+            echo "VM disk already >= 40GB (${CURRENT_SIZE} bytes), skipping expansion"
+          fi
 
     - name: create-vm
       metadata:
