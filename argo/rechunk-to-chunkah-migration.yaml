@@ -288,7 +288,7 @@ spec:
                   value: "{{inputs.parameters.aggregate-path}}"
 
           - name: pre-switch
-            depends: "compression-inspect.Succeeded"
+            depends: "compression-inspect"
             template: collect-evidence
             arguments:
               parameters:
@@ -521,11 +521,7 @@ spec:
             readOnly: true
         source: |
           set -euo pipefail
-          if ! command -v jq >/dev/null 2>&1; then
-            dnf install -y --quiet jq openssh-clients 2>&1 | tail -2
-          elif ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+          dnf install -y --quiet jq openssh-clients skopeo 2>&1 | tail -3
 
           VM_IP="{{inputs.parameters.vm-ip}}"
           SSH_USER="{{inputs.parameters.ssh-user}}"
@@ -568,7 +564,7 @@ spec:
             -o UserKnownHostsFile=/dev/null \
             -o ConnectTimeout=10 \
             -o LogLevel=ERROR \
-            compression-state.json "${SSH_USER}@${VM_IP}:${OUTPUT_ROOT}/compression-state.json"
+            compression-state.json "${SSH_USER}@${VM_IP}:${OUTPUT_ROOT}/compression-state.json" || true
 
           if scp -i "${KEY}" \
             -o StrictHostKeyChecking=no \
@@ -588,7 +584,7 @@ spec:
             -o UserKnownHostsFile=/dev/null \
             -o ConnectTimeout=10 \
             -o LogLevel=ERROR \
-            migration-evidence.json "${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}"
+            migration-evidence.json "${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}" || true
     - name: prepare-storage-backend
       inputs:
         parameters:
