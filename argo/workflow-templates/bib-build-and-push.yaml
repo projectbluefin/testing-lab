@@ -238,8 +238,13 @@ spec:
               echo "disk.raw already exists at ${OUT}/image/disk.raw, skipping BIB build"
               exit 0
             fi
+            # Request 40GB minimum disk so bootc unified-storage can pull a
+            # second copy of the image (~5GB) alongside the live OS (~7GB).
+            printf '[customizations.disk]\nminsize = 42949672960\n' \
+              > "${OUT}/bib-config.toml"
             bootc-image-builder build \
               --type raw --rootfs ext4 \
+              --config "${OUT}/bib-config.toml" \
               --output "${OUT}" \
               {{inputs.parameters.image}} 2>&1 | tee "${OUT}/bib-build.log"
             echo "BIB exit: ${PIPESTATUS[0]}"

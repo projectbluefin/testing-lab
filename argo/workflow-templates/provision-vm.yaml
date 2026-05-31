@@ -94,30 +94,24 @@ spec:
           hostPath:
             path: "{{inputs.parameters.test-root}}"
             type: DirectoryOrCreate
-        - name: dev
-          hostPath:
-            path: /dev
       script:
         image: quay.io/podman/stable:latest
         command:
           - bash
         securityContext:
           runAsUser: 0
-          privileged: true
         resources:
           requests:
-            cpu: "1"
-            memory: 512Mi
+            cpu: 100m
+            memory: 128Mi
           limits:
-            cpu: "2"
-            memory: 1Gi
+            cpu: 500m
+            memory: 512Mi
         volumeMounts:
           - name: golden
             mountPath: "{{inputs.parameters.golden-root}}"
           - name: test-disks
             mountPath: "{{inputs.parameters.test-root}}"
-          - name: dev
-            mountPath: /dev
         source: |
           set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
@@ -136,32 +130,7 @@ spec:
           chmod 664 "${DEST}"
           chcon -t svirt_sandbox_file_t "${DEST}" 2>/dev/null || true
           ELAPSED=$(( ($(date +%s%N) - START) / 1000000 ))
-          echo "reflink clone: ${ELAPSED}ms → ${DEST}"
-
-          # Expand VM disk to 40GB so bootc unified-storage has headroom for a
-          # full second image download (~5GB) alongside the running OS (~7GB).
-          TARGET_BYTES=$((40 * 1024 * 1024 * 1024))
-          CURRENT_SIZE=$(stat -c%s "${DEST}")
-          if [[ "${CURRENT_SIZE}" -lt "${TARGET_BYTES}" ]]; then
-            echo "Expanding VM disk from ${CURRENT_SIZE} bytes to 40GB..."
-            dnf install -y cloud-utils-growpart e2fsprogs \
-              --quiet --setopt=install_weak_deps=False 2>&1 | tail -3
-            truncate -s 40G "${DEST}"
-            # BIB holds loop10 with an exclusive lock; losetup -f fails if all
-            # default loop devices are also occupied. Create high-index devices
-            # (loop50-loop99) so losetup -f always has a free slot. mknod is
-            # idempotent — safe to run on devices that already exist.
-            for _n in $(seq 50 99); do mknod /dev/loop${_n} b 7 ${_n} 2>/dev/null || true; done
-            LOOP_EXP=$(losetup -f --show -P "${DEST}")
-            # growpart fixes GPT backup header + extends partition 4 (root)
-            growpart "${LOOP_EXP}" 4
-            e2fsck -f -y "${LOOP_EXP}p4" 2>/dev/null || true
-            resize2fs "${LOOP_EXP}p4"
-            losetup -d "${LOOP_EXP}"
-            echo "VM disk expanded: $(stat -c%s "${DEST}") bytes"
-          else
-            echo "VM disk already >= 40GB (${CURRENT_SIZE} bytes), skipping expansion"
-          fi
+          echo "reflink clone: ${ELAPSED}ms → ${DEST} ($(stat -c%s "${DEST}") bytes)"
 
     - name: create-vm
       metadata:
