@@ -222,7 +222,7 @@ spec:
                 '# D-Bus cannot auto-activate it (ServiceUnknown) in the qecore-headless' \
                 '# session because the service file is installed after first boot.' \
                 '# Starting it explicitly here ensures it registers before behave runs.' \
-                'gnome-ponytail-daemon &' \
+                '/usr/libexec/gnome-ponytail-daemon &' \
                 'sleep 2' \
                 'exec \$(which behave) /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}' \
                 > /tmp/run-suite.sh && chmod +x /tmp/run-suite.sh"
