@@ -94,12 +94,16 @@ spec:
           hostPath:
             path: "{{inputs.parameters.test-root}}"
             type: DirectoryOrCreate
+        - name: dev
+          hostPath:
+            path: /dev
       script:
         image: quay.io/podman/stable:latest
         command:
           - bash
         securityContext:
           runAsUser: 0
+          privileged: true
         resources:
           requests:
             cpu: "1"
@@ -112,6 +116,8 @@ spec:
             mountPath: "{{inputs.parameters.golden-root}}"
           - name: test-disks
             mountPath: "{{inputs.parameters.test-root}}"
+          - name: dev
+            mountPath: /dev
         source: |
           set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
