@@ -15,7 +15,7 @@ metadata:
       All large I/O lands on /var/mnt/ghost-data/ — root filesystem is not touched
       by builds. src, tmp, bst-cache, and containers-storage are all hostPath mounts.
 
-      Outputs: bst-build-export-push emits `image-ref` (192.168.1.102:5000/dakota:<tag>)
+      Outputs: bst-build-export-push emits `image-ref` (192.168.1.102:30500/dakota:<tag>)
       which dakota-qa-pipeline passes as `image` to ensure-disk.
   labels:
     app.kubernetes.io/component: dakota-bst
@@ -343,7 +343,7 @@ spec:
             cd /src
 
             TAG=$(echo "{{workflow.uid}}" | cut -c1-8)
-            IMAGE_REF="192.168.1.102:5000/dakota:${TAG}"
+            IMAGE_REF="192.168.1.102:30500/dakota:${TAG}"
 
             echo "=== BST build: variant={{inputs.parameters.variant}} tag=${TAG} ==="
             BUILD_IMAGE_NAME=dakota BUILD_IMAGE_TAG="${TAG}" just build "{{inputs.parameters.variant}}"
