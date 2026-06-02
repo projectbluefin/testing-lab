@@ -241,6 +241,13 @@ spec:
                   kill \"\$_pid\" 2>/dev/null || true
                 done
                 unset _pid
+                # Stop any lingering gnome-ponytail-daemon from the prior suite so the
+                # next suite can register its own instance on the D-Bus session.
+                for _pid in \$(ls -la /proc/[0-9]*/exe 2>/dev/null \
+                               | awk '/gnome-ponytail/{match(\$0, /\\/proc\\/([0-9]+)\\//, m); print m[1]}'); do
+                  kill \"\$_pid\" 2>/dev/null || true
+                done
+                unset _pid
                 sleep 2
                 rm -f /tmp/headless* /tmp/qecore* /tmp/.headless* 2>/dev/null || true
                 \$HOME/.local/bin/qecore-headless \
