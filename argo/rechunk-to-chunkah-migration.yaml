@@ -42,6 +42,14 @@ spec:
         value: "/tmp/migration-results"
       - name: aggregate-path
         value: "/tmp/migration-evidence.json"
+      # chunked lane: zstd:chunked image via local zot + unified storage
+      # set chunked-enabled to "false" to disable if upgrades break
+      - name: chunked-enabled
+        value: "true"
+      - name: chunkah-image-chunked
+        value: "192.168.1.102:5000/bluefin"
+      - name: chunkah-image-tag-chunked
+        value: "zstd-chunked"
 
   templates:
     - name: matrix
@@ -56,19 +64,6 @@ spec:
                   value: "{{workflow.parameters.legacy-image}}:{{workflow.parameters.image-tag-latest}}"
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag-latest}}"
-                - name: golden-root
-                  value: "{{workflow.parameters.golden-root}}"
-
-        - - name: ensure-disk-stable
-            templateRef:
-              name: bib-build-and-push
-              template: ensure-disk
-            arguments:
-              parameters:
-                - name: image
-                  value: "{{workflow.parameters.legacy-image}}:{{workflow.parameters.image-tag-stable}}"
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag-stable}}"
                 - name: golden-root
                   value: "{{workflow.parameters.golden-root}}"
 
@@ -88,7 +83,7 @@ spec:
                   value: "{{workflow.parameters.golden-root}}"
                 - name: test-root
                   value: "{{workflow.parameters.test-root}}"
-          - name: provision-latest-experimental
+          - name: provision-latest-exp
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
@@ -104,38 +99,32 @@ spec:
                   value: "{{workflow.parameters.golden-root}}"
                 - name: test-root
                   value: "{{workflow.parameters.test-root}}"
-          - name: provision-stable-default
+          - name: provision-chunked
+            when: "'{{workflow.parameters.chunked-enabled}}' == 'true'"
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
             arguments:
               parameters:
                 - name: image-tag
-                  value: "{{workflow.parameters.image-tag-stable}}"
+                  value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "mig-stable-def-{{workflow.uid}}"
+                  value: "mig-chunked-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: golden-root
                   value: "{{workflow.parameters.golden-root}}"
                 - name: test-root
                   value: "{{workflow.parameters.test-root}}"
-          - name: provision-stable-experimental
-            templateRef:
-              name: provision-bluefin-vm
-              template: provision-vm
+          - name: prepare-chunked-image
+            when: "'{{workflow.parameters.chunked-enabled}}' == 'true'"
+            template: prepare-chunked-image
             arguments:
               parameters:
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag-stable}}"
-                - name: vm-name
-                  value: "mig-stable-exp-{{workflow.uid}}"
-                - name: namespace
-                  value: "{{workflow.parameters.vm-namespace}}"
-                - name: golden-root
-                  value: "{{workflow.parameters.golden-root}}"
-                - name: test-root
-                  value: "{{workflow.parameters.test-root}}"
+                - name: source-image-ref
+                  value: "{{workflow.parameters.chunkah-image}}:{{workflow.parameters.chunkah-image-tag}}"
+                - name: dest-image-ref
+                  value: "{{workflow.parameters.chunkah-image-chunked}}:{{workflow.parameters.chunkah-image-tag-chunked}}"
 
         - - name: migration-latest-default
             template: migration-sequence
@@ -163,7 +152,7 @@ spec:
                   value: "{{workflow.parameters.evidence-root}}"
                 - name: aggregate-path
                   value: "{{workflow.parameters.aggregate-path}}"
-          - name: migration-latest-experimental
+          - name: migration-latest-exp
             template: migration-sequence
             arguments:
               parameters:
@@ -172,7 +161,7 @@ spec:
                 - name: vm-name
                   value: "mig-latest-exp-{{workflow.uid}}"
                 - name: vm-ip
-                  value: "{{steps.provision-latest-experimental.outputs.parameters.vm-ip}}"
+                  value: "{{steps.provision-latest-exp.outputs.parameters.vm-ip}}"
                 - name: ssh-user
                   value: "{{workflow.parameters.ssh-user}}"
                 - name: ssh-key-secret
@@ -189,16 +178,17 @@ spec:
                   value: "{{workflow.parameters.evidence-root}}"
                 - name: aggregate-path
                   value: "{{workflow.parameters.aggregate-path}}"
-          - name: migration-stable-default
+          - name: migration-chunked
+            when: "'{{workflow.parameters.chunked-enabled}}' == 'true'"
             template: migration-sequence
             arguments:
               parameters:
                 - name: image-tag
-                  value: "{{workflow.parameters.image-tag-stable}}"
+                  value: "{{workflow.parameters.image-tag-latest}}"
                 - name: vm-name
-                  value: "mig-stable-def-{{workflow.uid}}"
+                  value: "mig-chunked-{{workflow.uid}}"
                 - name: vm-ip
-                  value: "{{steps.provision-stable-default.outputs.parameters.vm-ip}}"
+                  value: "{{steps.provision-chunked.outputs.parameters.vm-ip}}"
                 - name: ssh-user
                   value: "{{workflow.parameters.ssh-user}}"
                 - name: ssh-key-secret
@@ -206,35 +196,9 @@ spec:
                 - name: legacy-image
                   value: "{{workflow.parameters.legacy-image}}"
                 - name: chunkah-image
-                  value: "{{workflow.parameters.chunkah-image}}"
+                  value: "{{workflow.parameters.chunkah-image-chunked}}"
                 - name: chunkah-image-tag
-                  value: "{{workflow.parameters.chunkah-image-tag}}"
-                - name: storage-variant
-                  value: "default"
-                - name: evidence-root
-                  value: "{{workflow.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{workflow.parameters.aggregate-path}}"
-          - name: migration-stable-experimental
-            template: migration-sequence
-            arguments:
-              parameters:
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag-stable}}"
-                - name: vm-name
-                  value: "mig-stable-exp-{{workflow.uid}}"
-                - name: vm-ip
-                  value: "{{steps.provision-stable-experimental.outputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{workflow.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
-                - name: legacy-image
-                  value: "{{workflow.parameters.legacy-image}}"
-                - name: chunkah-image
-                  value: "{{workflow.parameters.chunkah-image}}"
-                - name: chunkah-image-tag
-                  value: "{{workflow.parameters.chunkah-image-tag}}"
+                  value: "{{workflow.parameters.chunkah-image-tag-chunked}}"
                 - name: storage-variant
                   value: "experimental-unified-storage"
                 - name: evidence-root
@@ -535,7 +499,10 @@ spec:
             local image_ref="$1"
             local inspect_json=""
             local rc=0
-            if inspect_json=$(skopeo inspect --override-os linux --override-arch amd64 "docker://${image_ref}" 2>&1); then
+            local tls_flag=""
+            # Local HTTP registry needs --tls-verify=false
+            [[ "${image_ref}" == 192.168.* ]] && tls_flag="--tls-verify=false"
+            if inspect_json=$(skopeo inspect ${tls_flag} --override-os linux --override-arch amd64 "docker://${image_ref}" 2>&1); then
               printf '%s' "${inspect_json}" | jq --arg image_ref "${image_ref}" '{image_ref: $image_ref, layers: (.LayersData | length), compression: (.LayersData[0].MIMEType // null), zstd_chunked: (([.LayersData[]? | select(.Annotations["io.github.containers.zstd-chunked.manifest-checksum"] != null)] | length) > 0), ostree_chunked: ((.LayersData[1:] // []) | all(.Annotations["ostree.components"] != null))}'
             else
               rc=$?
@@ -830,10 +797,21 @@ spec:
 
           subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
 
-          flags = ["--enforce-container-sigpolicy"]
+          flags = []
+          pre_commands = []
+          if direction == "forward" and image_ref.startswith("192.168.1.102:5000/"):
+              pre_commands.extend([
+                  "sudo mkdir -p /etc/containers/registries.conf.d/",
+                  r"""printf '[[registry]]\nlocation = "192.168.1.102:5000"\ninsecure = true\n' | sudo tee /etc/containers/registries.conf.d/local-test.conf""",
+                  r"""sudo python3 -c 'import json; p=json.load(open("/etc/containers/policy.json")); p.setdefault("transports",{}).setdefault("docker",{})["192.168.1.102:5000"]=[{"type":"insecureAcceptAnything"}]; open("/etc/containers/policy.json","w").write(json.dumps(p,indent=2))'""",
+                  "curl -fsSL --max-time 10 http://192.168.1.102:5000/v2/ -o /dev/null && echo 'registry OK' || { echo 'ERROR: registry unreachable at 192.168.1.102:5000'; exit 1; }",
+              ])
+              # No --enforce-container-sigpolicy — policy.json is patched above to accept the local registry
+          else:
+              flags.append("--enforce-container-sigpolicy")
           if storage_variant == "experimental-unified-storage":
               flags.append("--experimental-unified-storage")
-          switch_cmd = "sudo bootc switch " + " ".join(flags) + f" {shlex.quote(image_ref)}"
+          switch_cmd = " && ".join(pre_commands + ["sudo bootc switch " + " ".join(flags) + f" {shlex.quote(image_ref)}"])
           switch_result = run_remote(switch_cmd)
           bootc_status = run_remote("sudo bootc status --json")
           ostree_status = run_remote("sudo ostree admin status")
@@ -915,10 +893,10 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 128Mi
+            memory: 256Mi
           limits:
             cpu: 500m
-            memory: 256Mi
+            memory: 512Mi
         volumeMounts:
           - name: ssh-key
             mountPath: /etc/ssh/test-key
@@ -1301,6 +1279,42 @@ spec:
           )
           PY
 
+    - name: prepare-chunked-image
+      inputs:
+        parameters:
+          - name: source-image-ref
+          - name: dest-image-ref
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 1800
+      podSpecPatch: |
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+      script:
+        image: quay.io/podman/stable:latest
+        command: [bash]
+        resources:
+          requests:
+            cpu: 500m
+            memory: 256Mi
+          limits:
+            cpu: "2"
+            memory: 1Gi
+        source: |
+          set -euo pipefail
+          dnf install -y --quiet skopeo 2>&1 | tail -3
+
+          SOURCE="{{inputs.parameters.source-image-ref}}"
+          DEST="{{inputs.parameters.dest-image-ref}}"
+
+          echo "Repushing ${SOURCE} → ${DEST} with zstd:chunked compression..." >&2
+          skopeo copy \
+            --dest-tls-verify=false \
+            --dest-compress-format=zstd:chunked \
+            "docker://${SOURCE}" \
+            "docker://${DEST}"
+          echo "Done: ${DEST}" >&2
+
     - name: cleanup
       steps:
         - - name: teardown-latest-default
@@ -1315,7 +1329,7 @@ spec:
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
                   value: "{{workflow.parameters.test-root}}"
-          - name: teardown-latest-experimental
+          - name: teardown-latest-exp
             templateRef:
               name: teardown-bluefin-vm
               template: teardown-vm
@@ -1327,26 +1341,15 @@ spec:
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
                   value: "{{workflow.parameters.test-root}}"
-          - name: teardown-stable-default
+          - name: teardown-chunked
+            when: "'{{workflow.parameters.chunked-enabled}}' == 'true'"
             templateRef:
               name: teardown-bluefin-vm
               template: teardown-vm
             arguments:
               parameters:
                 - name: vm-name
-                  value: "mig-stable-def-{{workflow.uid}}"
-                - name: namespace
-                  value: "{{workflow.parameters.vm-namespace}}"
-                - name: test-root
-                  value: "{{workflow.parameters.test-root}}"
-          - name: teardown-stable-experimental
-            templateRef:
-              name: teardown-bluefin-vm
-              template: teardown-vm
-            arguments:
-              parameters:
-                - name: vm-name
-                  value: "mig-stable-exp-{{workflow.uid}}"
+                  value: "mig-chunked-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.vm-namespace}}"
                 - name: test-root
