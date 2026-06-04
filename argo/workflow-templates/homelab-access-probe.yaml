@@ -62,6 +62,26 @@ spec:
                   value: "homelab-access"
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
+          - name: run-https-exposure-tests
+            depends: "deploy-fixture.Succeeded"
+            when: "'{{workflow.parameters.auth-mode}}' == 'false'"
+            templateRef:
+              name: run-incluster-tests
+              template: run-pytest
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-access-{{workflow.uid}}"
+                - name: suite-path
+                  value: "homelab_access/test_https_exposure.py"
+                - name: lane
+                  value: "homelab-https-exposure"
+                - name: app-label
+                  value: "app=homelab-access"
+                - name: service-name
+                  value: "homelab-access"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
           - name: run-auth-tests
             depends: "deploy-fixture.Succeeded"
             when: "'{{workflow.parameters.auth-mode}}' == 'true'"
