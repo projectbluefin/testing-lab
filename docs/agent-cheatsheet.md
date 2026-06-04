@@ -32,6 +32,7 @@
 | List workflows / VMs | `just list-workflows` · `just list-vms` |
 | ArgoCD status / force sync | `just argocd-status` · `just argocd-sync` |
 | Lint Argo YAML | `just lint` |
+| Fix missing upstream remote on ghost knuckle repo | `just setup-knuckle-upstream` (one-time) |
 | Bootstrap repo-owner workstation access | §9 |
 
 Rule: **if a `just` recipe exists, use it.** Otherwise use Kubernetes MCP / Argo MCP recipes from this guide; do not fall back to workstation `kubectl`/`argo`.
@@ -55,6 +56,8 @@ Run `just logs` first. Then match a row:
 | `run-gnome-tests` pod errors immediately | Fix the WorkflowTemplate in git; `volumes:` must live at template scope, not under `container:` |
 | Workflow stuck `Pending` | Run §3 |
 | Template change did not take effect | Run §4 |
+| `qa-test-pr.sh`: `fatal: 'upstream' does not appear to be a git repository` | `just setup-knuckle-upstream` (one-time fix) |
+| `qa-test-pr.sh`: `gh auth login` prompt | Pass `GH_TOKEN=$(gh auth token)` from the calling machine when invoking the script |
 
 If no row matches:
 
