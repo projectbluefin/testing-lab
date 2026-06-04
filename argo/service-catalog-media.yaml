@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: svc-media-
+  namespace: argo
+  labels:
+    bluefin.io/lane: svc-media
+spec:
+  serviceAccountName: argo
+  workflowTemplateRef:
+    name: service-catalog-pipeline
+  arguments:
+    parameters:
+      - name: lane
+        value: "media"
+      - name: image-tag
+        value: "latest"
+      - name: branch
+        value: "main"
