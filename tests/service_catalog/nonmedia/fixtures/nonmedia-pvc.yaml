@@ -1,0 +1,16 @@
+---
+# PVC fixture for the non-media service lane (config volume).
+# Applied first so the Deployment can reference it immediately.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nonmedia-service-config
+  labels:
+    app: nonmedia-service
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

@@ -96,6 +96,10 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| `PVC nonmedia-service-config not Bound` in service-catalog lane | No default StorageClass or provisioner not ready | Verify `kubectl get storageclass`; ensure the local-path provisioner pod is Running on ghost |
+| `nonmedia-service` pod stuck `Pending` in lane tests | nodeSelector `ghost` doesn't match any Ready node | Check `kubectl get nodes` — exo-1 is ineligible; ghost must be Ready |
+| Lane test suite skipped entirely | `TEST_NAMESPACE` env var unset or empty | Confirm the runner pod is launched from the `run-incluster-tests` template, not directly |
+| Cleanup step hangs waiting for namespace deletion | Finalizers on PVCs blocking namespace GC | Run `kubectl get pvc -n <ns>` and remove stuck finalizers with `kubectl patch pvc … -p '{"metadata":{"finalizers":[]}}'` |
 
 ## Historical notes
 

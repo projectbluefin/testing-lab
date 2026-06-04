@@ -292,6 +292,13 @@ run-homelab-restore:
     argo submit --from workflowtemplate/homelab-restore-drill \
       -n {{ argo_ns }} --wait --log
 
+# ── Service-catalog workload lanes ───────────────────────────────────────────
+
+# Run the non-media (OpenPrinting/CUPS base) service-catalog lane (#81)
+run-service-nonmedia:
+    argo submit --from workflowtemplate/homelab-nonmedia-service \
+      -n {{ argo_ns }} --wait --log
+
 # ── Ghost maintenance ─────────────────────────────────────────────────────────
 
 # Patch ghost OTel collector config to remove noisy process scraper (#117)

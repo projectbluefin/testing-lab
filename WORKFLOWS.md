@@ -170,6 +170,55 @@ just run-dakota-build all             # both variants sequentially
 
 ---
 
+## Service-catalog workload lanes
+
+In-cluster validation suites that deploy a fixture workload into a per-run namespace,
+run pytest checks against the live Kubernetes objects, and clean up on exit.
+Each lane is a self-contained `WorkflowTemplate` with the DAG:
+`create-namespace → deploy-fixture → run-tests (onExit: cleanup)`.
+
+All lanes delegate the test-runner pod to the shared `run-incluster-tests / run-pytest`
+template, which clones the testing-lab repo and runs `pytest -q <suite-path>`.
+
+### `homelab-nonmedia-service` (issue #81)
+
+Validates the base homelab workload contract for network-only print services
+(OpenPrinting/CUPS class, bluespeed#11).  The fixture is a lightweight nginx stub
+on port 631 (IPP-standard) so the contract can be proven without real CUPS hardware.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `lane` | `nonmedia` | Fixed; used as `TEST_LANE` env var inside the runner pod. |
+| `branch` | `main` | testing-lab git ref cloned by the runner. |
+
+Suite path: `tests/service_catalog/nonmedia/test_nonmedia_lane.py` (15 tests; 2 explicit skips for USB and mDNS hardware — see issue #67).
+
+```
+just run-service-nonmedia             # submit + stream logs, ~5–8 min
+```
+
+Out-of-scope (separate lanes):
+- USB printer device hostPath passthrough → `homelab-print-device` (issue #67)
+- avahi mDNS / LAN discovery → `homelab-print-device` (issue #67)
+- GPU transcoding → `homelab-media-gpu` (issue #63)
+
+### `bluefin-service-catalog-pipeline` (issue #81)
+
+Top-level aggregation pipeline for the service-catalog suite.  Routes to the
+matching lane WorkflowTemplate based on the `lane` parameter.
+
+| Parameter | Default | Valid values |
+|---|---|---|
+| `lane` | `nonmedia` | `nonmedia` (first lane; extend as new lanes are added) |
+| `branch` | `main` | testing-lab git ref |
+
+```
+argo submit --from workflowtemplate/bluefin-service-catalog-pipeline \
+  -n argo -p lane=nonmedia --wait --log
+```
+
+---
+
 ## CronWorkflows
 
 Lives in `manifests/`, applied via the `testing-lab-infra` ArgoCD app:
