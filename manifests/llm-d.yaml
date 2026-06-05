@@ -1,9 +1,11 @@
 # llm-d model server — vLLM on ROCm, pinned to ghost (Strix Halo / gfx1151).
 #
 # Stack: ghcr.io/llm-d/llm-d-rocm:v0.7.0 (vLLM + RIXL, AMD ROCm backend)
-# Model: Qwen/Qwen3.6-35B-A3B (~67GB BF16 MoE — same model hanthor runs as
-#   batiai/Qwen3.6-35B-A3B-GGUF:Q6_K; native HF format for vLLM.
-#   35.6B total params, 3B active per token. Fits in 96GB with KV headroom.)
+# Model: batiai/Qwen3.6-35B-A3B-GGUF Q4_K_M (~21GB) via vLLM GGUF loader.
+#   BF16 native weights (~67GB) exceed ghost's 64GB unified memory.
+#   Q4_K_M fits in ~21GB, leaving ~40GB headroom for KV cache + system.
+#   hanthor uses Q6_K (~28.5GB); Q4_K_M chosen here to maximize KV headroom.
+#   Tokenizer pulled separately from Qwen/Qwen3.6-35B-A3B (base model HF repo).
 #
 # Why not Gemma 4:
 #   vLLM-ROCm on gfx1151 has SWA disabled (vllm-project/vllm#19367), which is
@@ -77,13 +79,16 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["vllm", "serve"]
           args:
-            - "Qwen/Qwen3.6-35B-A3B"
+            - "batiai/Qwen3.6-35B-A3B-GGUF"
             - "--host=0.0.0.0"
             - "--port=8000"
+            - "--tokenizer=Qwen/Qwen3.6-35B-A3B"
+            - "--load-format=gguf"
+            - "--gguf-filename=Qwen-Qwen3.6-35B-A3B-Q4_K_M.gguf"
             - "--tensor-parallel-size=1"
             - "--enforce-eager"
-            - "--max-model-len=16384"
-            - "--gpu-memory-utilization=0.85"
+            - "--max-model-len=32768"
+            - "--gpu-memory-utilization=0.90"
             - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
           env:
             # gfx1151 (RDNA 3.5 / Strix Halo) runtime overrides.
@@ -110,11 +115,11 @@ spec:
           resources:
             requests:
               cpu: "8"
-              memory: 48Gi
+              memory: 32Gi
               amd.com/gpu: "1"
             limits:
               cpu: "16"
-              memory: 60Gi
+              memory: 48Gi
               amd.com/gpu: "1"
           volumeMounts:
             - name: shm
