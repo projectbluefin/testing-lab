@@ -26,8 +26,8 @@
 # Model cache: HostPath at /var/tmp/llm-models on ghost. Pre-pull the model:
 #   huggingface-cli download Qwen/Qwen3.6-35B-A3B --local-dir /var/tmp/llm-models/Qwen3.6-35B-A3B
 #
-# NodePort 32800: OpenAI-compatible API endpoint.
-#   curl http://192.168.1.102:32800/v1/models
+# NodePort 30800: OpenAI-compatible API endpoint.
+#   curl http://192.168.1.102:30800/v1/models
 #
 # Full llm-d router (KV-cache-aware routing, Gateway API Inference Extension):
 #   Add the standalone Helm chart once the model server is stable.
@@ -193,8 +193,8 @@ spec:
           emptyDir: {}
 ---
 # NodePort service — OpenAI-compatible API reachable at:
-#   http://192.168.1.102:32800/v1/chat/completions
-#   http://192.168.1.102:32800/v1/models
+#   http://192.168.1.102:30800/v1/chat/completions
+#   http://192.168.1.102:30800/v1/models
 # hostNetwork: true means the pod is already on host networking,
 # but we still register a Service for in-cluster consumers (hive agents, Argo pods).
 apiVersion: v1
@@ -213,5 +213,5 @@ spec:
     - name: http
       port: 8000
       targetPort: 8000
-      nodePort: 32800
+      nodePort: 30800
       protocol: TCP

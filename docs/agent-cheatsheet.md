@@ -298,7 +298,7 @@ Expected steady state:
 
 ## 12. llm-d hive node — local model inference
 
-Ghost runs an OpenAI-compatible inference server at **`http://192.168.1.102:32800`**.
+Ghost runs an OpenAI-compatible inference server at **`http://192.168.1.102:30800`**.
 Model: `Qwen/Qwen3.6-35B-A3B` via `ghcr.io/llm-d/llm-d-rocm:v0.7.0` (ROCm, gfx1151).
 Namespace: `llm-d`. Managed by GitOps (`testing-lab-infra` ArgoCD app).
 
@@ -309,8 +309,8 @@ kubernetes-mcp-pods_list namespace=llm-d
 
 **Test the API:**
 ```text
-curl http://192.168.1.102:32800/v1/models
-curl http://192.168.1.102:32800/v1/chat/completions \
+curl http://192.168.1.102:30800/v1/models
+curl http://192.168.1.102:30800/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"Qwen/Qwen3.6-35B-A3B","messages":[{"role":"user","content":"hello"}]}'
 ```
