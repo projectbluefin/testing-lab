@@ -4,7 +4,7 @@ metadata:
   name: run-gnome-tests
   namespace: argo
   annotations:
-    bluefin.io/stack: "qecore-headless + behave + dogtail + gnome-ponytail-daemon"
+    bluefin.io/stack: "qecore + behave + dogtail + gnome-ponytail-daemon"
 spec:
   serviceAccountName: argo
   templates:
