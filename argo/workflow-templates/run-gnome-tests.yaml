@@ -155,10 +155,11 @@ spec:
             ${SSH} "
               set -euo pipefail
               if [[ "${SUITE}" == "system" ]]; then
-                if python3 -c 'import behave' 2>/dev/null; then
+                if python3 -c 'import behave' 2>/dev/null && command -v pip3 &>/dev/null; then
                   echo 'System-suite dependencies already installed, skipping.' >&2
                 else
                   echo 'Installing system-suite dependencies...' >&2
+                  sudo dnf install -y --quiet python3-pip python3-behave 2>&1 | tail -3
                   pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
                   python3 -m pip install --quiet --user behave 2>&1 | tail -3
                 fi
@@ -171,9 +172,9 @@ spec:
                   echo 'Installing test dependencies...' >&2
                   sudo ostree admin unlock 2>/dev/null || true
                   sudo dnf clean packages -q 2>/dev/null || true
-                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail -3
+                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon python3-pip python3-virtualenv python3-behave 2>&1 | tail -3
                   pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
-                  python3 -m pip install --quiet --user qecore behave dogtail python-uinput 2>&1 | tail -3
+                  python3 -m pip install --quiet --user qecore dogtail python-uinput 2>&1 | tail -3
                   for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \"\$f\" /usr/local/bin/\$(basename \"\$f\") 2>/dev/null; done
                 fi
                 sudo modprobe uinput 2>/dev/null || true
