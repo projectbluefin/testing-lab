@@ -246,6 +246,31 @@ Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](
 | `reflink-disk` | 100m / 500m | 128Mi / 512Mi |
 | `preflight` (deprecated manual titan smoke) | 100m / 200m | 64Mi / 128Mi |
 
+## Hive Contributor
+
+Ghost's local llama.cpp model (`Qwen/Qwen3.6-35B-A3B` at `http://192.168.1.102:30800`) can
+contribute to the projectbluefin hive swarm as an autonomous agent.
+
+**Start:** `./scripts/hive-contribute.sh`
+
+The script:
+1. Clones/refreshes `github.com/kubestellar/hive` at `/tmp/hive`
+2. Patches the relay to prepend guardrails to every task prompt
+3. Sets `GOOSE_MOIM_MESSAGE_TEXT` so goose's Top-of-Mind extension injects rules on every turn
+4. Runs `just contribute-setup goose` (idempotent) then `just contribute-hive goose local`
+
+**Guardrails (enforced at relay + Top-of-Mind layers):**
+- ONE comment per issue/PR — edit existing, never post a new one
+- Never merge or approve PRs — open for human review only
+- No spam / status update comments — only post a concrete complete result
+- Conservative — propose changes, don't push code when uncertain
+- Don't close issues unless your PR was already merged by a maintainer
+- Stay scoped to the assigned repo/issue
+
+**Monitor:** `tmux attach -t hive-goose-<id>` (session name printed on start)
+
+**Contributor ID:** `c-ad58129be630` (registered as `castrojo`, tier: contributor)
+
 ## Canonical Command Reference
 
 See [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) for the canonical command reference.
