@@ -107,7 +107,6 @@ spec:
             - "32768"
             - "-ngl"
             - "99"
-            - "--flash-attn"
             - "--threads"
             - "8"
             - "--parallel"
