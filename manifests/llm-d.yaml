@@ -111,11 +111,11 @@ spec:
           resources:
             requests:
               cpu: "8"
-              memory: 70Gi
+              memory: 48Gi
               amd.com/gpu: "1"
             limits:
               cpu: "16"
-              memory: 80Gi
+              memory: 60Gi
               amd.com/gpu: "1"
           volumeMounts:
             - name: shm
