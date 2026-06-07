@@ -92,6 +92,91 @@ The HTML comment at the end is parsed by automation. Keep it on its own line.
 - Skipped Tier when one was actually run (e.g. "trusted the unit test layer").
 - Missing blocker issue links when verdict is NOGO.
 
+## Full example (titan fast path, Tier 3, GO) — 2026-05-26
+
+This example demonstrates a complete titan fast-path Tier 3 run against both
+`latest` and `lts` variants, with all four workflow steps passing.  Use it as
+a reference for parallel-titan report shape, GO verdict formatting, and the
+Workflow Evidence section when no fresh-VM provisioning is involved.
+
+```markdown
+## ⚡ Vanguard Lab Strike Report: titan-bluefin + titan-lts
+**Alpha**: Blue Universal CI Companion · testing-lab GNOME E2E
+**Guardian on Duty**: `castrojo` on Ghost Homelab
+
+*"All icons hold. Smoke clears clean across both variants."*
+
+| Field | Value |
+|---|---|
+| **Branch** | `main` @ `f9cef2521e6e` |
+| **Target** | `testing-lab` |
+| **VM/Host** | `titan-bluefin` (bluefin-test ns, ghost) · `titan-lts` (bluefin-lts-test ns, ghost) |
+| **Image** | `ghcr.io/ublue-os/bluefin:latest` + `ghcr.io/ublue-os/bluefin:lts` |
+| **Date** | 2026-05-26T21:14:25-04:00 |
+| **Tier** | 3 · **Strike Confirmed** |
+| **Labels** | `area:smoke-test` |
+
+---
+
+### Tier 1 — Recon Element · VM Liveness
+
+```text
+=== bluefin-test ===
+NAME            AGE   STATUS    READY
+titan-bluefin   80m   Running   True
+
+=== bluefin-lts-test ===
+NAME        AGE   STATUS    READY
+titan-lts   80m   Running   True
+
+titan-bluefin IP: 10.42.0.28
+titan-lts IP:     10.42.0.27
+```
+
+---
+
+### Tier 3 — Strike Confirmed · Full Loop
+
+```text
+$ just run-titan-smoke
+
+STEP                          TEMPLATE                         PODNAME                                               DURATION  MESSAGE
+ ✔ bluefin-titan-smoke-xb9c2  run-smoke
+ ├─┬─✔ preflight-latest       preflight                        bluefin-titan-smoke-xb9c2-preflight-2557673761        28s
+ │ └─✔ preflight-lts          preflight                        bluefin-titan-smoke-xb9c2-preflight-1719761299        29s
+ └─┬─✔ smoke-latest           run-gnome-tests/run-gnome-tests  bluefin-titan-smoke-xb9c2-run-gnome-tests-299232976   4m
+   └─✔ smoke-lts              run-gnome-tests/run-gnome-tests  bluefin-titan-smoke-xb9c2-run-gnome-tests-3595901320  3m
+
+Status:   Succeeded
+Duration: 4 minutes 50 seconds
+Progress: 4/4
+```
+
+### Workflow Evidence
+
+```text
+Workflow:  bluefin-titan-smoke-xb9c2
+Namespace: argo
+Status:    Succeeded
+Created:   Tue May 26 21:14:25 -0400
+Finished:  Tue May 26 21:19:15 -0400
+Duration:  4 minutes 50 seconds
+Parameters:
+  vm-ip-latest: 10.42.0.28
+  vm-ip-lts:    10.42.0.27
+  suite:        smoke
+  branch:       main
+```
+
+---
+
+**🟢 GO** — `bluefin-titan-smoke-xb9c2` succeeded 4/4; GNOME smoke green on both `latest` and `lts` titans.
+
+<!-- status:PASS target:testing-lab label:area:smoke-test digest:f9cef2521e6e -->
+```
+
+---
+
 ## Minimum example (testing-lab self-PR, Tier 1)
 
 ```markdown
