@@ -329,6 +329,18 @@ spec:
             fi
             echo "Using pubkey: ${PUBKEY}"
 
+            # Idempotency guard: another workflow may have already configured and
+            # moved the disk to golden (see issue #154). Check golden first.
+            if [[ ! -f "${DISK}" ]]; then
+              GOLDEN_DISK="{{inputs.parameters.golden-root}}/${TAG}/disk.raw"
+              if [[ -f "${GOLDEN_DISK}" ]]; then
+                echo "disk.raw already moved to golden by another workflow: ${GOLDEN_DISK}" >&2
+                exit 0
+              fi
+              echo "ERROR: disk.raw missing at ${DISK} and not in golden either" >&2
+              exit 1
+            fi
+
             echo "=== Configuring golden disk: ${DISK} ==="
             LOOP=$(losetup -f --show -P "${DISK}")
             echo "Loop: ${LOOP}"
@@ -372,6 +384,31 @@ spec:
               echo "ERROR: authorized_keys empty or not written" >&2; exit 1
             }
             chown -R "${BFT_UID}:${BFT_UID}" "${VAR}/home/bluefin-test"
+            # ── GDM auto-login (#161) ────────────────────────────────────
+            # Required for AT-SPI test automation — without this the VM boots to
+            # a login screen with no GNOME session and all AT-SPI tests fail.
+            mkdir -p "${ROOT}/etc/gdm"
+            printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=bluefin-test\nWaylandEnable=true\n' \
+              > "${ROOT}/etc/gdm/custom.conf"
+
+            # Install gnome-ponytail-daemon — needed for AT-SPI / Dogtail tests.
+            # On bootc images we can't use dnf install. Copy the rpm and extract
+            # it into the deploy root via rpm2cpio.
+            GPD_RPM="/host/var/cache/dnf/fedora*/packages/gnome-ponytail-daemon-*.rpm"
+            if ls ${GPD_RPM} 2>/dev/null | head -1; then
+              GPD=$(ls ${GPD_RPM} 2>/dev/null | head -1)
+              rpm2cpio "${GPD}" | (cd "${ROOT}" && cpio -idm 2>/dev/null)
+              # Enable as user service for the test user
+              mkdir -p "${VAR}/home/bluefin-test/.config/systemd/user/graphical-session.target.wants"
+              if [[ -f "${ROOT}/usr/lib/systemd/user/gnome-ponytail-daemon.service" ]]; then
+                ln -sf /usr/lib/systemd/user/gnome-ponytail-daemon.service \
+                  "${VAR}/home/bluefin-test/.config/systemd/user/graphical-session.target.wants/gnome-ponytail-daemon.service"
+              fi
+              echo "Installed gnome-ponytail-daemon."
+            else
+              echo "WARNING: gnome-ponytail-daemon RPM not found in DNF cache — AT-SPI tests may fail (see #161)" >&2
+            fi
+
             # 750 on home dir: sshd StrictModes rejects world- or group-writable home
             chmod 750 "${VAR}/home/bluefin-test"
             chmod 700 "${VAR}/home/bluefin-test/.ssh"
