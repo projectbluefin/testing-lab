@@ -1,0 +1,38 @@
+---
+# Auth-gated homelab access fixture manifest.
+#
+# Defines the GitOps-owned auth secret for the homelab-access-probe
+# workflow when it runs in auth-mode=true.  The workflow's create-secrets
+# step generates a fresh ephemeral TLS cert and auth secret per run; this
+# manifest documents the canonical shape for operators who need to inspect
+# or pre-apply the auth configuration outside of a workflow run.
+#
+# Out of scope:
+#   - SSO / identity-provider integration → follow-up issue #61
+#   - cert-manager or external CA integration → future work
+#
+# The homelab-auth-config ConfigMap below is mounted into the probe workflow
+# as documentation only; actual credentials are injected at runtime by the
+# create-secrets template step in homelab-access-probe.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homelab-auth-config
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: homelab-auth
+    app.kubernetes.io/part-of: bluefin-test-suite
+    bluefin.io/lane: homelab-auth
+data:
+  # Expected authentication scheme for the first auth lane.
+  auth-scheme: "Basic"
+  # Realm advertised in WWW-Authenticate challenge.
+  auth-realm: "homelab"
+  # Expected HTTP status for unauthenticated requests.
+  expected-unauth-status: "401"
+  # Header key that must be present on 401 responses.
+  challenge-header: "WWW-Authenticate"
+  # Docs: actual credentials are stored in the per-run
+  # homelab-access-auth Secret created by the workflow's create-secrets step.
+  # Username: homelab  Password: controlnode (ephemeral per workflow run)
+  artifact-dir: "/tmp/results"
