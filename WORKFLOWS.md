@@ -99,6 +99,39 @@ selinux=0, sudoers) on an existing golden disk without rebuilding it.
 |---|---|---|
 | `image-tag` | `latest` | Disk dir under `/var/tmp/bluefin-golden/`. |
 
+### `service-catalog-pipeline` (lane=media)
+
+First concrete lane in the service-catalog pipeline. Deploys a
+Jellyfin-based (linuxserver.io) media workload into an ephemeral
+namespace and validates deployment, persistence, reachability,
+environment injection, and teardown.
+
+Requires the `service-catalog-pipeline` WorkflowTemplate from #79.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `lane` | `media` | Fixed for this lane |
+| `image-tag` | `latest` | Passed through to the pipeline |
+| `branch` | `main` | testing-lab branch to clone |
+
+Wall-clock: ~3–5 min (depends on image pull).
+
+```
+just run-service-media                          # default
+just run-service-media image-tag=lts            # LTS variant
+just run-service-media branch=feat/my-branch    # test a branch
+```
+
+Test coverage:
+- Deployment readiness, pod Running, service endpoints, lane labels
+- Config PVC (1Gi) and data PVC (10Gi) bound and writable
+- Cluster DNS resolution and HTTP reachability on port 8096
+- PUID/PGID/TZ environment variable injection
+- Config and data sentinel files survive rollout restart
+- No cluster-scoped resource leaks
+- Mount/storage observability artifacts for operator evidence
+- GPU transcoding and device passthrough explicitly skipped (→ #63)
+
 ---
 
 ## Supporting templates (called via `templateRef`)

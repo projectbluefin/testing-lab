@@ -96,6 +96,26 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| Media lane image pull timeout | Jellyfin image is large (~500MB+); cold pull exceeds readiness probe | Increase `initialDelaySeconds` in the readiness probe or pre-pull the image |
+| Media lane PVC stuck Pending | No default StorageClass or insufficient capacity | Verify `kubectl get sc` shows a default class; check PV availability |
+| Media lane persistence test fails | Sentinel file lost across restart | Check PVC reclaim policy is `Retain`; verify volume is not ephemeral |
+
+## Media-service lane
+
+The media lane (`lane=media`) is the first concrete workload in the
+service-catalog pipeline. It deploys a Jellyfin (linuxserver.io) container
+with two PVCs (config 1Gi, data 10Gi) and validates the base behaviors
+from the workload contract (#66):
+
+- Raw-manifest deployment in Kubernetes
+- Persistent state/config survives restart
+- Service health endpoint reachable on port 8096
+- Clean teardown via namespace deletion
+- Operator-readable evidence in workflow logs
+
+GPU transcoding and device passthrough are explicitly deferred to #63.
+
+Entry point: `just run-service-media`
 
 ## Historical notes
 
