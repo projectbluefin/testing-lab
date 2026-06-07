@@ -5,6 +5,10 @@ testing-lab QA factory. It covers the workload matrix (#57), shared-storage
 and RWX limits (#62), storage observability surface (#70, #78), and the
 fleet-client vs. cluster-node boundary (#72).
 
+For the service-catalog workload contract that all service lanes must
+satisfy, see [`docs/service-catalog-contract.md`](service-catalog-contract.md)
+(#66).
+
 ---
 
 ## 1. In-Cluster Workload Matrix (#57)
