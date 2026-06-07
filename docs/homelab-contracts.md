@@ -18,6 +18,7 @@ access guarantees it must prove.
 | **General-purpose** | `homelab-substrate` | `tests/homelab_substrate/` | k3s scheduling, pod lifecycle, in-cluster HTTP/TCP reachability, `local-path` PVC allocation |
 | **NAS / storage** | `homelab-storage` | `tests/homelab_storage/` | PVC bound on `local-path`, data survives `rollout restart`, `findmnt`/`df`/`lsblk`/ZFS artifacts captured |
 | **Service access** | `homelab-access-probe` | `tests/homelab_access/` | Cluster-DNS resolution, TLS handshake, expected-host routing via SNI |
+| **Media service** | `homelab-media-service` | `tests/service_catalog/media/` | Dual-PVC deployment (config + data), PUID/PGID/TZ env injection, port 8096 reachability, state survives `rollout restart` |
 
 ### Minimum persistence contract per class
 
@@ -38,9 +39,18 @@ access guarantees it must prove.
 - TLS handshake reports a certificate with `Protocol version` in the output.
 - Health endpoint returns `access-ok` with `Host:` header routing.
 
+#### Media service
+- Config PVC (1Gi `local-path` ReadWriteOnce) binds and is writable at `/config`.
+- Media-data PVC (10Gi `local-path` ReadWriteOnce) binds and is writable at `/data`.
+- Both PVCs survive a `rollout restart` (sentinel files checked after pod replacement).
+- `PUID`, `PGID`, and `TZ` environment variables are present in the container env.
+- Web UI port 8096 is reachable within the cluster namespace (TCP connect succeeds).
+- Cluster DNS resolves `homelab-media-service.<namespace>.svc.cluster.local`.
+- **GPU transcoding deferred to #63** — requires GPU passthrough feature gate.
+- **RWX shared-media mount blocked until #62** — current `local-path` is RWO only.
+
 ### Gaps surfaced explicitly
-- Media streaming / transcoding lane: not yet defined. GPU passthrough is a
-  known blocker; filed as a follow-up under the service-catalog epic.
+- GPU transcoding / hardware passthrough: split into #63.
 - ReadWriteMany / shared-media access: blocked by #62.
 - Service-to-service auth: deferred to service-catalog auth-gating lane (#61).
 
@@ -196,4 +206,58 @@ The lab validates the following hostname/routing pattern for exposed in-cluster 
 | #61 auth-gated service UI | ❌ deferred | service-catalog baseline lane first |
 | #60 first restore drill | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | #84 PVC restore drill with backup artifact | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
-| Media service lane | ❌ deferred | #62 (shared mount) + #63 (GPU) |
+| #59 Media service lane (base) | ✅ implemented | `homelab-media-service` WorkflowTemplate + `tests/service_catalog/media/` |
+
+---
+
+## 7. Media-Service Workload Lane (#59)
+
+### Lane definition
+
+The first representative media-service lane validates the **in-cluster
+Plex/Jellyfin-class workload contract** for homelab services following the
+linuxserver.io pattern.  It is the base lane under the service-catalog epic
+(#51) and is intentionally scoped to what can run today without GPU hardware
+or RWX storage.
+
+### Minimum workload behaviors this lane must prove
+
+| Behavior | Test | Evidence artifact |
+|---|---|---|
+| Deployment reaches Running | `test_deployment_becomes_ready` | `media-deployment.json` |
+| Pod is fully ready | `test_pod_reaches_running_state` | `media-pods.json` |
+| ClusterIP service has endpoints on port 8096 | `test_service_has_endpoints` | `media-service.json`, `media-endpoints.json` |
+| Config PVC (1Gi) binds on `local-path` | `test_config_pvc_is_bound` | `media-pvc-homelab-media-config.json` |
+| Config mount writable at `/config` | `test_config_mount_is_writable` | — |
+| Media-data PVC (10Gi) binds on `local-path` | `test_data_pvc_is_bound` | `media-pvc-homelab-media-data.json` |
+| Data mount writable at `/data` | `test_data_mount_is_writable` | — |
+| Port 8096 reachable in-cluster | `test_media_port_is_reachable_in_cluster` | `media-reachability.txt` |
+| Cluster DNS resolves service FQDN | `test_cluster_dns_resolves_media_service` | `media-dns.txt` |
+| PUID / PGID / TZ env vars injected | `test_puid_pgid_tz_env_vars_are_present` | `media-env.txt` |
+| Config + data state survive `rollout restart` | `test_config_and_data_state_survive_rollout_restart` | `media-pods-before/after-restart.json`, `media-rollout-status.txt` |
+| Storage observability artifacts captured | `test_collects_storage_observability_artifacts` | `media-{config,data}-{df,findmnt,stat}.txt` |
+
+### Out-of-scope for base lane
+
+| Path | Issue | Reason |
+|---|---|---|
+| GPU transcoding / hardware passthrough | #63 | Requires `DevicePlugin` + KubeVirt GPU feature gate |
+| ReadWriteMany / shared-media mount | #62 | `local-path` is RWO-only; needs NFS CSI or Longhorn |
+| Auth-gated service UI | #61 | Deferred until base lane is proven |
+| External / LAN hostname routing | bluespeed repo | Outside cluster-internal contract scope |
+
+### Dependencies
+
+This lane requires the following contracts to be proven first:
+
+- **#54 (homelab substrate)** — in-cluster workload scheduling and pod lifecycle
+- **#52 (homelab storage)** — `local-path` PVC binding and persistence contract
+- **#53 (homelab access)** — cluster-DNS and in-cluster reachability contract
+
+### Fixture image note
+
+The validation fixture uses `nginx:1.27.5-alpine` on port 8096 to represent
+the HTTP service interface.  The contract validated (dual PVC, env injection,
+port reachability, rollout persistence) is fully representative of the
+linuxserver.io pattern.  Replace the fixture with `linuxserver/jellyfin` or
+equivalent when the lane graduates to integration testing.
