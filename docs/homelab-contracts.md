@@ -2,8 +2,9 @@
 
 This document defines the in-cluster workload validation contracts for the
 testing-lab QA factory. It covers the workload matrix (#57), shared-storage
-and RWX limits (#62), storage observability surface (#70, #78), and the
-fleet-client vs. cluster-node boundary (#72).
+and RWX limits (#62), storage observability surface (#70, #78), the
+fleet-client vs. cluster-node boundary (#72), and the auth-gating lane for
+exposed homelab service UIs (#61).
 
 ---
 
@@ -18,6 +19,7 @@ access guarantees it must prove.
 | **General-purpose** | `homelab-substrate` | `tests/homelab_substrate/` | k3s scheduling, pod lifecycle, in-cluster HTTP/TCP reachability, `local-path` PVC allocation |
 | **NAS / storage** | `homelab-storage` | `tests/homelab_storage/` | PVC bound on `local-path`, data survives `rollout restart`, `findmnt`/`df`/`lsblk`/ZFS artifacts captured |
 | **Service access** | `homelab-access-probe` | `tests/homelab_access/` | Cluster-DNS resolution, TLS handshake, expected-host routing via SNI |
+| **Auth-gating** | `homelab-access-probe` (`auth-mode=true`) | `tests/homelab_access/test_auth_probe.py` | Unauthenticated rejection, credential validation, challenge headers, no credential leakage (§6) |
 
 ### Minimum persistence contract per class
 
@@ -42,7 +44,8 @@ access guarantees it must prove.
 - Media streaming / transcoding lane: not yet defined. GPU passthrough is a
   known blocker; filed as a follow-up under the service-catalog epic.
 - ReadWriteMany / shared-media access: blocked by #62.
-- Service-to-service auth: deferred to service-catalog auth-gating lane (#61).
+- Service-to-service auth: basic auth validation defined in §6 (#61);
+  SSO/OIDC identity-provider integration deferred to follow-up.
 
 ---
 
@@ -187,13 +190,113 @@ The lab validates the following hostname/routing pattern for exposed in-cluster 
 
 ---
 
-## 6. Known Blockers and Deferred Work
+## 6. Auth-Gating Lane for Exposed Service UIs (#61)
+
+This section defines the auth-gating validation lane under the access/TLS
+epic (#53). It layers credential enforcement on top of the HTTPS transport
+proven by the service-access lane and the hostname/routing contract in §5.
+
+### Representative endpoint
+
+The lane reuses the `homelab-access` fixture (same as the service-access
+class) with `auth-mode=true`. The fixture's Python HTTPS server enforces
+HTTP Basic authentication when this mode is enabled.
+
+| Property | Value |
+|---|---|
+| **Service** | `homelab-access.<namespace>.svc.cluster.local:8443` |
+| **Expected hostname** | `homelab-access.local` |
+| **Auth scheme** | HTTP Basic (`Authorization: Basic <base64>`) |
+| **Credentials source** | `homelab-access-auth` Secret (username + password) |
+| **Authenticated response** | `access-ok` on `GET /healthz` with valid credentials |
+| **Unauthenticated response** | HTTP 401 with `WWW-Authenticate: Basic realm="homelab"` |
+
+### What counts as acceptable authenticated vs. unauthenticated exposure
+
+#### Authenticated (acceptable)
+- Request includes a valid `Authorization: Basic` header with credentials
+  matching the `homelab-access-auth` Secret.
+- Server returns HTTP 200 with body `access-ok`.
+- The exchange occurs over TLS (HTTPS) — credentials must never traverse
+  the network in cleartext.
+
+#### Unauthenticated (must be rejected)
+- Request with no `Authorization` header → HTTP 401 with `WWW-Authenticate`
+  challenge.
+- Request with invalid credentials → HTTP 401.
+- The 401 response body must not leak valid credentials, usernames, or
+  internal service details.
+
+### Minimum evidence the lane must capture
+
+Every run of this lane must produce the following evidence artifacts:
+
+| Check | Evidence artifact | Pass criteria |
+|---|---|---|
+| **Unauthenticated rejection** | `auth-unauth-status.txt` | HTTP status code is 401 |
+| **Challenge header present** | `auth-challenge-headers.txt` | Response includes `WWW-Authenticate: Basic realm="homelab"` |
+| **Bad credentials rejected** | `auth-bad-creds-status.txt` | HTTP status code is 401 for wrong user/pass |
+| **Valid credentials accepted** | `auth-valid-creds.txt` | HTTP 200 with body `access-ok` |
+| **Auth over TLS** | `auth-tls-evidence.txt` | Request used HTTPS scheme |
+| **No credential leakage** | `auth-failure-body.txt` | 401 body is `auth-required`, contains no credentials |
+
+### Relationship to the HTTPS exposure lane (#58)
+
+The auth-gating lane **depends on** the HTTPS exposure lane:
+- Transport security (TLS handshake, certificate, protocol version) is
+  validated by #58, not re-tested here.
+- This lane assumes the service is reachable over HTTPS and focuses
+  exclusively on the authentication layer.
+- Both lanes use the same fixture deployment; only the `auth-mode`
+  parameter differs.
+
+### What this lane validates vs. what it defers
+
+| Concern | This lane (#61) | Deferred to |
+|---|---|---|
+| HTTP Basic auth enforcement | ✅ | — |
+| 401 challenge with correct scheme and realm | ✅ | — |
+| Bad-credential rejection | ✅ | — |
+| Credential confidentiality (no leakage in 401 body) | ✅ | — |
+| Auth credentials transit over TLS only | ✅ | — |
+| SSO / OIDC identity-provider integration | ❌ | Follow-up issue under #53 |
+| OAuth2 proxy or reverse-proxy auth | ❌ | Follow-up once IdP is chosen |
+| Session management / token refresh | ❌ | Follow-up with SSO |
+| RBAC / role-based access within the service | ❌ | Service-specific lanes |
+| Multi-factor authentication | ❌ | Not in scope for homelab baseline |
+| NetworkPolicy restricting auth bypass | ❌ | Follow-up under #53 |
+
+### Follow-up work called out explicitly
+
+1. **SSO / OIDC identity provider**: The current lane validates HTTP Basic
+   auth as a baseline. Real homelab service UIs (Grafana, Home Assistant,
+   Argo Server) use OAuth2/OIDC. A follow-up issue should define what
+   identity provider the lab uses and how to validate redirect-based login
+   flows. This is a product-stack decision that belongs in bluespeed, not
+   in this first lane.
+
+2. **OAuth2 proxy pattern**: Many homelab services delegate auth to an
+   oauth2-proxy sidecar or ingress annotation. Validating this pattern
+   requires choosing an IdP first (see above) and is explicitly deferred.
+
+3. **Per-service auth expectations**: Different services have different auth
+   models (API keys, bearer tokens, cookie sessions). This lane validates
+   the generic pattern; service-specific auth validation belongs in the
+   service-catalog lanes under #51.
+
+4. **Credential rotation**: The fixture uses static credentials from a
+   Kubernetes Secret. Validating Secret rotation, credential expiry, or
+   vault integration is out of scope for this baseline lane.
+
+---
+
+## 7. Known Blockers and Deferred Work
 
 | Issue | Status | Dependency |
 |---|---|---|
 | #62 RWX / shared-storage | ❌ blocked | NFS CSI or Longhorn installation on ghost |
 | #63 GPU transcoding lane | ❌ deferred | GPU passthrough KubeVirt feature gate |
-| #61 auth-gated service UI | ❌ deferred | service-catalog baseline lane first |
+| #61 auth-gated service UI | ✅ implemented | `homelab-access-probe` (auth-mode=true) + `tests/homelab_access/test_auth_probe.py` |
 | #60 first restore drill | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | #84 PVC restore drill with backup artifact | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | Media service lane | ❌ deferred | #62 (shared mount) + #63 (GPU) |
