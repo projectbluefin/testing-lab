@@ -26,7 +26,7 @@ run test suites → teardown VM on exit.
 
 | Parameter | Default | Notes |
 |---|---|---|
-| `image` | `ghcr.io/ublue-os/bluefin` | Source image. Tag is appended from `image-tag` for some callers; pass with tag if invoking directly. |
+| `image` | `ghcr.io/projectbluefin/bluefin` | Source image. Tag is appended from `image-tag` for some callers; pass with tag if invoking directly. |
 | `image-tag` | `latest` | `latest`, `lts`, etc. Also used as the golden-disk dir name. |
 | `namespace` | `bluefin-test` | KubeVirt VM namespace. Use `bluefin-lts-test` for LTS. |
 | `suites` | `smoke,developer` | Comma list; valid: `smoke`, `developer`, `software`. |
