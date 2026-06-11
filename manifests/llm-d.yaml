@@ -26,6 +26,8 @@
 #
 # NodePort 30800: OpenAI-compatible API endpoint.
 #   curl http://192.168.1.102:30800/v1/models
+#
+# Set replicas: 1 to re-enable.
 ---
 apiVersion: v1
 kind: Namespace
@@ -45,7 +47,7 @@ metadata:
     llm-d.ai/model: gemma-4-31B-it
     llm-d.ai/accelerator-vendor: amd
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: llm-d-modelserver
