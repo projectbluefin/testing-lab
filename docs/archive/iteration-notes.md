@@ -3,6 +3,14 @@
 These notes were moved out of `RUNBOOK.md` so the runbook can stay timeless.
 They are preserved here for debugging history and migration context.
 
+## GNOME smoke baseline (2026-05-26)
+
+First recorded clean GNOME smoke run on both titan VMs. Workflow
+`bluefin-titan-smoke-xb9c2` succeeded 4/4 in 4m 50s with no fixes needed.
+Full report: [gnome-smoke-2026-05-26.md](gnome-smoke-2026-05-26.md).
+
+This establishes the baseline for titan fast-path regression detection.
+
 ## Iteration 2 lessons (2026-05-25)
 
 ### dogtail API changes — root cause + migration
