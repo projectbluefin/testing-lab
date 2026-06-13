@@ -47,6 +47,20 @@ spec:
                 - name: image
                   value: "{{inputs.parameters.image}}"
 
+        # Pre-boot image integrity check — gates BIB disk build.
+        # Runs bootc container lint + verifies composefs-critical xattrs
+        # (file capabilities on newuidmap/newgidmap/ping) are present.
+        # Catches broken exports (e.g. buildah commit multi-layer issue
+        # that failed xattr injection — dakota#841, bluefin-lts boot failure)
+        # before we waste BIB time building a disk that won't boot.
+        - - name: preflight
+            template: oci-image-preflight
+            when: "{{steps.check.outputs.result}} != exists"
+            arguments:
+              parameters:
+                - name: image
+                  value: "{{inputs.parameters.image}}"
+
         - - name: build
             template: bib-img-build
             when: "{{steps.check.outputs.result}} != exists"
@@ -419,3 +433,110 @@ spec:
 
             echo "=== Golden disk ready: ${GOLDEN_DIR}/disk.raw ==="
             ls -lh "${GOLDEN_DIR}/disk.raw"
+
+    # Pre-boot OCI image integrity check.
+    # Runs after bib-img-pull, before BIB disk build.
+    # Catches broken exports before wasting BIB time on a disk that won't boot.
+    #
+    # Checks:
+    #   1. bootc container lint passes (already in publish pipeline, guard here too)
+    #   2. containers.bootc: 1 label is present (required by bootc)
+    #   3. prepare-root.conf exists and has composefs enabled
+    #   4. Key executables retain file capabilities (security.capability xattrs) —
+    #      these are injected by chunka; missing = composefs xattr injection failed.
+    #      Regression: buildah commit multi-layer export broke xattr injection
+    #      (dakota#841, bluefin-lts boot failure 2026-06-13).
+    - name: oci-image-preflight
+      inputs:
+        parameters:
+          - name: image
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      volumes:
+        - name: containers-storage
+          hostPath:
+            path: /var/lib/containers/storage
+      container:
+        image: quay.io/podman/stable:latest
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "1"
+            memory: 1Gi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+        volumeMounts:
+          - name: containers-storage
+            mountPath: /var/lib/containers/storage
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            IMAGE="{{inputs.parameters.image}}"
+            PULL_ARGS=()
+            if [[ "${IMAGE}" == 192.168.1.102:* ]]; then
+              PULL_ARGS+=(--tls-verify=false)
+            fi
+
+            echo "=== Pre-boot OCI image preflight: ${IMAGE} ==="
+
+            # 1. bootc container lint
+            echo "--- bootc container lint ---"
+            if ! podman run --rm "${PULL_ARGS[@]}" "${IMAGE}" bootc container lint 2>&1; then
+              echo "FAIL: bootc container lint failed" >&2
+              exit 1
+            fi
+
+            # 2. containers.bootc label
+            echo "--- containers.bootc label ---"
+            BOOTC_LABEL=$(podman image inspect --format '{{index .Labels "containers.bootc"}}' "${IMAGE}" 2>/dev/null || true)
+            if [[ "${BOOTC_LABEL}" != "1" ]]; then
+              echo "FAIL: containers.bootc label missing or != 1 (got: '${BOOTC_LABEL}')" >&2
+              exit 1
+            fi
+            echo "OK: containers.bootc=${BOOTC_LABEL}"
+
+            # 3. prepare-root.conf has composefs enabled
+            echo "--- prepare-root.conf composefs check ---"
+            PREPROOT=$(podman run --rm "${PULL_ARGS[@]}" "${IMAGE}" cat /usr/lib/ostree/prepare-root.conf 2>/dev/null || true)
+            if ! echo "${PREPROOT}" | grep -q "enabled.*=.*yes"; then
+              echo "FAIL: composefs not enabled in prepare-root.conf" >&2
+              echo "Content: ${PREPROOT}" >&2
+              exit 1
+            fi
+            echo "OK: composefs enabled in prepare-root.conf"
+
+            # 4. File capabilities on composefs-critical executables.
+            # These are set via security.capability xattrs injected by chunka.
+            # Missing caps = xattr injection failed = image will not boot correctly.
+            echo "--- file capabilities check ---"
+            FAIL=0
+            declare -A EXPECTED_CAPS=(
+              ["/usr/bin/newuidmap"]="cap_setuid"
+              ["/usr/bin/newgidmap"]="cap_setgid"
+              ["/usr/bin/ping"]="cap_net_raw"
+            )
+            for BIN in "${!EXPECTED_CAPS[@]}"; do
+              CAP="${EXPECTED_CAPS[$BIN]}"
+              RESULT=$(podman run --rm "${PULL_ARGS[@]}" "${IMAGE}" \
+                sh -c "getcap '${BIN}' 2>/dev/null || echo MISSING" 2>/dev/null || echo "MISSING")
+              if echo "${RESULT}" | grep -q "${CAP}"; then
+                echo "OK: ${BIN} has ${CAP} (${RESULT})"
+              else
+                echo "FAIL: ${BIN} missing ${CAP} — got: ${RESULT}" >&2
+                FAIL=1
+              fi
+            done
+            if [[ "${FAIL}" -eq 1 ]]; then
+              echo "" >&2
+              echo "FAIL: file capabilities missing — composefs xattr injection likely failed." >&2
+              echo "This usually means the image was exported with a tool that does not" >&2
+              echo "produce a single flat layer (e.g. buildah commit without --squash)." >&2
+              echo "The disk this image produces will NOT boot correctly." >&2
+              exit 1
+            fi
+
+            echo "=== Preflight passed ==="

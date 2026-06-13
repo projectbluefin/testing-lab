@@ -35,6 +35,4 @@ spec:
         - name: branch
           value: "main"
         - name: suites
-          value: "smoke"
-        - name: namespace
-          value: "bluefin-test"
+          value: "smoke,system"
