@@ -96,6 +96,8 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| `qa-test-pr.sh`: `fatal: 'upstream' does not appear to be a git repository` | ghost's `~/src/knuckle` is missing the `upstream` remote | `just setup-knuckle-upstream` (one-time fix) |
+| `qa-test-pr.sh`: `gh auth login` prompt / unauthenticated | `gh` CLI on ghost has no token | Pass `GH_TOKEN=$(gh auth token)` from the calling machine, or run `gh auth login` on ghost |
 
 ## Historical notes
 

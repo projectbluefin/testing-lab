@@ -99,6 +99,19 @@ selinux=0, sudoers) on an existing golden disk without rebuilding it.
 |---|---|---|
 | `image-tag` | `latest` | Disk dir under `/var/tmp/bluefin-golden/`. |
 
+### `setup-knuckle-upstream`
+
+One-shot: adds the missing `upstream` remote pointing at
+`projectbluefin/knuckle` to ghost's `~/src/knuckle` repo. Required for
+`qa-test-pr.sh` which calls `git fetch upstream pull/${PR}/head:...`.
+Idempotent — safe to re-run.
+
+No parameters. Run once:
+
+```
+just setup-knuckle-upstream
+```
+
 ---
 
 ## Supporting templates (called via `templateRef`)

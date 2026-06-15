@@ -130,6 +130,13 @@ setup-ghost-ssh-banner:
         -n {{ argo_ns }} \
         --wait --log
 
+# One-time: add upstream remote to ghost's ~/src/knuckle repo (#104).
+# Fixes `fatal: 'upstream' does not appear to be a git repository` in qa-test-pr.sh.
+setup-knuckle-upstream:
+    argo submit --from workflowtemplate/setup-knuckle-upstream \
+        -n {{ argo_ns }} \
+        --wait --log
+
 # One-time fixture setup for titan VMs: installs Firefox Flatpak and sets default browser.
 # Run this before smoke tests that cover xdg-settings (#107).
 setup-titan-fixtures:

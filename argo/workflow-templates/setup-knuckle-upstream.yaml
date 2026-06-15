@@ -1,0 +1,83 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: setup-knuckle-upstream
+  namespace: argo
+  annotations:
+    description: |
+      One-shot: adds the missing `upstream` remote to ghost's ~/src/knuckle
+      repo and verifies gh CLI auth via GH_TOKEN. Fixes #104.
+      Usage: argo submit --from workflowtemplate/setup-knuckle-upstream -n argo --wait --log
+spec:
+  serviceAccountName: argo
+  entrypoint: fix-knuckle-infra
+  ttlStrategy:
+    secondsAfterCompletion: 3600
+
+  templates:
+    - name: fix-knuckle-infra
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      activeDeadlineSeconds: 120
+      podSpecPatch: |
+        hostPID: true
+        securityContext:
+          runAsUser: 0
+      volumes:
+        - name: jorge-home
+          hostPath:
+            path: /var/home/jorge
+            type: Directory
+      script:
+        image: quay.io/fedora/fedora:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: jorge-home
+            mountPath: /host/home/jorge
+        command: [bash]
+        source: |
+          set -euo pipefail
+
+          KNUCKLE_DIR="/host/home/jorge/src/knuckle"
+
+          if [[ ! -d "${KNUCKLE_DIR}/.git" ]]; then
+            echo "ERROR: ${KNUCKLE_DIR} is not a git repo" >&2
+            exit 1
+          fi
+
+          echo "=== Current remotes ===" >&2
+          git -C "${KNUCKLE_DIR}" remote -v >&2
+
+          UPSTREAM_URL="https://github.com/projectbluefin/knuckle.git"
+
+          if git -C "${KNUCKLE_DIR}" remote get-url upstream >/dev/null 2>&1; then
+            CURRENT=$(git -C "${KNUCKLE_DIR}" remote get-url upstream)
+            if [[ "${CURRENT}" == "${UPSTREAM_URL}" ]]; then
+              echo "upstream remote already set to ${UPSTREAM_URL}" >&2
+            else
+              echo "Updating upstream remote from ${CURRENT} to ${UPSTREAM_URL}" >&2
+              git -C "${KNUCKLE_DIR}" remote set-url upstream "${UPSTREAM_URL}"
+            fi
+          else
+            echo "Adding upstream remote: ${UPSTREAM_URL}" >&2
+            git -C "${KNUCKLE_DIR}" remote add upstream "${UPSTREAM_URL}"
+          fi
+
+          echo "=== Verifying upstream fetch ===" >&2
+          git -C "${KNUCKLE_DIR}" fetch upstream --dry-run 2>&1 | head -5 >&2 || {
+            echo "WARNING: upstream fetch --dry-run failed (network issue?)" >&2
+          }
+
+          echo "=== Updated remotes ===" >&2
+          git -C "${KNUCKLE_DIR}" remote -v >&2
+
+          echo "setup-complete"
