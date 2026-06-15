@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: bluefin-service-catalog-pipeline
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: service-catalog-pipeline
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  entrypoint: pipeline
+  serviceAccountName: argo
+  # ── parameters ──────────────────────────────────────────────────────────────
+  arguments:
+    parameters:
+      # Lane selector: controls which service-catalog workload is exercised.
+      # Valid values: nonmedia (media lanes are in separate templates)
+      - name: lane
+        value: "nonmedia"
+      # git ref the in-cluster runner clones when executing pytest suites.
+      - name: branch
+        value: "main"
+
+  # ── pipeline DAG ────────────────────────────────────────────────────────────
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          # Route execution to the matching lane WorkflowTemplate.
+          # New lanes are added as additional when/templateRef entries here.
+          - name: nonmedia-lane
+            template: run-nonmedia-lane
+            when: "\"{{workflow.parameters.lane}}\" == \"nonmedia\""
+            arguments:
+              parameters:
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    - name: run-nonmedia-lane
+      inputs:
+        parameters:
+          - name: branch
+      steps:
+        - - name: execute
+            templateRef:
+              name: homelab-nonmedia-service
+              template: pipeline
+            arguments:
+              parameters:
+                - name: lane
+                  value: "nonmedia"
+                - name: branch
+                  value: "{{inputs.parameters.branch}}"

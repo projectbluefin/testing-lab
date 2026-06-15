@@ -1,0 +1,84 @@
+---
+# Fixture: OpenPrinting/CUPS non-media service lane
+# Namespace label and PVC are created by the workflow; this manifest
+# creates the Deployment and Service that the lane tests validate.
+#
+# Parameterised fields (substituted by the deploy-fixture template step):
+#   NAMESPACE   — per-run namespace injected by the workflow
+#   LANE        — workflow parameter, default "nonmedia"
+#
+# Out-of-scope for this base fixture:
+#   - USB printer device hostPath   → issue #67
+#   - avahi sidecar / NodePort LB   → issue #67
+#   - GPU or hardware passthrough   → not applicable
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nonmedia-service
+  labels:
+    app: nonmedia-service
+    app.kubernetes.io/part-of: bluefin-test-suite
+    bluefin.io/workload-class: nonmedia-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nonmedia-service
+  template:
+    metadata:
+      labels:
+        app: nonmedia-service
+        app.kubernetes.io/part-of: bluefin-test-suite
+        bluefin.io/workload-class: nonmedia-service
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: print-server
+          # Representative linuxserver.io-style fixture for the
+          # OpenPrinting/CUPS workload class (bluespeed#11).
+          # Uses nginx as a lightweight proxy for the HTTP-reachability
+          # contract on port 631 (IPP standard).  Replace with
+          # lscr.io/linuxserver/cups when the lane graduates from
+          # validation to integration testing.
+          image: docker.io/library/nginx:1.27.5-alpine
+          ports:
+            - containerPort: 631
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "UTC"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          # nginx listens on 80 by default; rewrite the listen port to
+          # 631 so the reachability contract matches the IPP standard
+          # without requiring a custom image.
+          command:
+            - sh
+            - -c
+            - |
+              sed -i 's/listen\s*80;/listen 631;/g' /etc/nginx/conf.d/default.conf
+              exec nginx -g 'daemon off;'
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: nonmedia-service-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nonmedia-service
+  labels:
+    app: nonmedia-service
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  selector:
+    app: nonmedia-service
+  ports:
+    - name: ipp
+      port: 631
+      targetPort: 631

@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: nonmedia-service-
+  namespace: argo
+spec:
+  serviceAccountName: argo
+  workflowTemplateRef:
+    name: homelab-nonmedia-service
+  arguments:
+    parameters:
+      - name: lane
+        value: "nonmedia"
+      - name: branch
+        value: "main"
