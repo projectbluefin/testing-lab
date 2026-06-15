@@ -146,6 +146,48 @@ hostDisk clone. Invoked as `onExit` from the pipeline templates.
 
 ---
 
+## Homelab in-cluster probe lanes
+
+Stateless probe workflows that deploy a fixture workload, run pytest checks
+against the live Kubernetes objects, and clean up on exit.  Delegated runner
+pod uses `run-incluster-tests / run-pytest`.
+
+### `homelab-access-probe` (issues #82 / #83)
+
+Validates hostname resolution, HTTPS reachability, and (optionally) auth gating
+for k8s-hosted homelab workloads.  A self-contained Python HTTPS server is
+deployed inline as the probe target; TLS cert and auth credentials are
+generated fresh each run.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `auth-mode` | `false` | `false` runs `test_access_probe.py`; `true` runs `test_auth_probe.py` |
+| `branch` | `main` | testing-lab git ref cloned by the runner |
+
+**Non-auth mode** (`auth-mode=false`) — suite `tests/homelab_access/test_access_probe.py`:
+- Cluster DNS resolves the service FQDN
+- HTTPS handshake exposes a valid certificate
+- Expected Host header reaches the fixture and returns `access-ok`
+
+**Auth mode** (`auth-mode=true`) — suite `tests/homelab_access/test_auth_probe.py` (15 tests; 1 explicit skip for SSO — issue #61):
+- Unauthenticated request returns HTTP 401
+- 401 carries `WWW-Authenticate: Basic realm="homelab"` header
+- Wrong credentials are rejected
+- Authenticated request returns HTTP 200 with `access-ok` body
+- TLS handshake completes independently of auth status
+- Failure artifacts captured: response status, headers, body, TLS evidence
+
+Artifacts are written to `/tmp/results/` inside the runner pod and collected by the workflow log tail.
+
+```
+just run-homelab-access        # non-auth probe, ~4–6 min
+just run-homelab-auth          # auth-gated probe, ~4–6 min
+```
+
+Out of scope: SSO / identity-provider integration (see issue #61).
+
+---
+
 ## Dakota BST builds
 
 ### `dakota-bst`

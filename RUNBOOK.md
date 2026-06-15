@@ -96,6 +96,11 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| Auth probe returns 200 without credentials | `REQUIRE_AUTH` env var not injected into the fixture pod | Confirm `auth-mode=true` was passed to the workflow; check `kubectl describe pod` env section |
+| `test_authenticated_returns_200` fails with connection error | TLS cert generation step failed or secret not mounted | Inspect `create-secrets` step logs; confirm `homelab-access-tls` Secret exists in the run namespace |
+| Auth tests get 421 instead of 401 | Host header mismatch — runner is using the pod IP instead of `homelab-access.local` | The fixture validates `Host:`; ensure `TEST_HOSTNAME` is unset so the default `homelab-access.local` is used |
+| `www-authenticate` header missing from 401 response | Fixture server code path not reached (connection refused or wrong port) | Check that `homelab-access` Service exposes port 8443 and the pod is Ready before tests run |
+| Auth artifact files absent after run | Runner pod did not reach the test step (deploy-fixture failure) | Inspect `deploy-fixture` step logs for rollout timeout; check pod events in the run namespace |
 
 ## Historical notes
 
