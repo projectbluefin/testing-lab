@@ -99,12 +99,58 @@ selinux=0, sudoers) on an existing golden disk without rebuilding it.
 |---|---|---|
 | `image-tag` | `latest` | Disk dir under `/var/tmp/bluefin-golden/`. |
 
+### `service-catalog-pipeline`
+
+K8s-native service-catalog validation pipeline. Deploys a lane's workload
+manifests into an ephemeral namespace, runs the lane's pytest suite, and
+tears down on exit. Does not use VMs or GNOME infrastructure — runs
+directly against k8s-hosted workloads.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `lane` | `media` | Lane name — must match a directory under `tests/service_catalog/<lane>/` and `tests/service_catalog/<lane>/manifests.yaml` |
+| `image-tag` | `latest` | Passed to lane manifests (available for future per-lane image selection) |
+| `branch` | `main` | testing-lab branch to clone for manifests and tests |
+
+Wall-clock: ~3–5 min (depends on image pull and test count).
+
+```
+just run-service-catalog-smoke                        # media lane, latest
+just run-service-catalog-smoke lane=non-media         # non-media lane
+just run-service-catalog-smoke lane=media branch=feat/my-branch
+```
+
+Pipeline structure:
+```
+create-namespace → deploy-workload → run-tests → cleanup (onExit)
+```
+
+The deploy step reads `tests/service_catalog/<lane>/manifests.yaml` from
+the cloned repo and applies it to the ephemeral namespace. Each lane owns
+its own manifests — the pipeline is lane-agnostic.
+
+Test runner: `run-service-tests` (see supporting templates below). Uses
+the shared helpers in `tests/service_catalog/shared/` for deployment,
+persistence, reachability, redeploy, and teardown assertions.
+
 ---
 
 ## Supporting templates (called via `templateRef`)
 
 These are exposed only because they are referenced by the entry points;
 submit them directly only for diagnosis.
+
+### `run-service-tests` (template: `run-pytest`)
+
+Non-GNOME test runner for service-catalog lanes. Clones testing-lab,
+discovers the test suite under `tests/service_catalog/<lane>/`, and runs
+pytest with JUnit XML output. Emits a summary line (`N/M pytest checks
+passed`) to stdout for Argo/Loki consumption.
+
+Env vars passed to the test container: `TEST_NAMESPACE`, `TEST_LANE`,
+`TEST_RESULTS_DIR`. Lane-specific tests import shared helpers from
+`tests/service_catalog/shared/` (deploy, persistence, reachability,
+redeploy, teardown).
 
 ### `bib-build-and-push` (template: `ensure-disk`)
 

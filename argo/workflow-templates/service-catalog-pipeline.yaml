@@ -1,0 +1,136 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: service-catalog-pipeline
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: service-catalog
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  entrypoint: pipeline
+  onExit: cleanup
+  serviceAccountName: homelab-runner
+  arguments:
+    parameters:
+      - name: lane
+        value: "media"
+      - name: image-tag
+        value: "latest"
+      - name: branch
+        value: "main"
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          - name: create-namespace
+            template: create-namespace
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "svc-{{workflow.parameters.lane}}-{{workflow.uid}}"
+                - name: lane
+                  value: "{{workflow.parameters.lane}}"
+          - name: deploy-workload
+            depends: "create-namespace.Succeeded"
+            template: deploy-workload
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "svc-{{workflow.parameters.lane}}-{{workflow.uid}}"
+                - name: lane
+                  value: "{{workflow.parameters.lane}}"
+                - name: image-tag
+                  value: "{{workflow.parameters.image-tag}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+          - name: run-tests
+            depends: "deploy-workload.Succeeded"
+            templateRef:
+              name: run-service-tests
+              template: run-pytest
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "svc-{{workflow.parameters.lane}}-{{workflow.uid}}"
+                - name: lane
+                  value: "{{workflow.parameters.lane}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    - name: create-namespace
+      inputs:
+        parameters:
+          - name: namespace
+          - name: lane
+      resource:
+        action: create
+        manifest: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{inputs.parameters.namespace}}"
+            labels:
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: "svc-{{inputs.parameters.lane}}"
+
+    - name: deploy-workload
+      inputs:
+        parameters:
+          - name: namespace
+          - name: lane
+          - name: image-tag
+          - name: branch
+      script:
+        image: quay.io/fedora/fedora:latest
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="{{inputs.parameters.namespace}}"
+          LANE="{{inputs.parameters.lane}}"
+          BRANCH="{{inputs.parameters.branch}}"
+
+          dnf install -y --quiet git kubernetes-client 2>&1 | tail -4
+
+          REPO_DIR=$(mktemp -d)
+          git clone --depth 1 --branch "${BRANCH}" \
+            https://github.com/projectbluefin/testing-lab "${REPO_DIR}" 2>&1
+
+          MANIFEST="${REPO_DIR}/tests/service_catalog/${LANE}/manifests.yaml"
+          if [[ ! -f "${MANIFEST}" ]]; then
+            echo "ERROR: No manifests found at ${MANIFEST}" >&2
+            echo "Each lane must provide tests/service_catalog/<lane>/manifests.yaml" >&2
+            exit 1
+          fi
+
+          echo "Deploying lane=${LANE} into namespace=${NS}" >&2
+          kubectl apply -n "${NS}" -f "${MANIFEST}" >&2
+
+          DEPLOYMENT=$(kubectl get deployments -n "${NS}" \
+            -l "bluefin.io/lane=svc-${LANE}" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+          if [[ -z "${DEPLOYMENT}" ]]; then
+            DEPLOYMENT=$(kubectl get deployments -n "${NS}" \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+          fi
+
+          if [[ -n "${DEPLOYMENT}" ]]; then
+            echo "Waiting for deployment/${DEPLOYMENT} in ${NS}..." >&2
+            kubectl rollout status "deployment/${DEPLOYMENT}" \
+              -n "${NS}" --timeout=300s >&2
+          else
+            echo "WARNING: No deployment found; lane may use a different workload type" >&2
+          fi
+
+          echo "deploy-complete"
+
+    - name: cleanup
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="svc-{{workflow.parameters.lane}}-{{workflow.uid}}"
+          kubectl delete namespace "${NS}" --ignore-not-found=true >&2 || true
+          timeout 180 bash -c "until ! kubectl get namespace \"${NS}\" >/dev/null 2>&1; do sleep 5; done" >&2 || true
+          echo "cleanup-complete"

@@ -1,0 +1,126 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: run-service-tests
+  namespace: argo
+  annotations:
+    bluefin.io/stack: "k8s workload + pytest"
+spec:
+  templates:
+    - name: run-pytest
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: run-service-tests
+          bluefin.io/lane: "svc-{{inputs.parameters.lane}}"
+      inputs:
+        parameters:
+          - name: namespace
+          - name: lane
+          - name: branch
+            value: "main"
+      activeDeadlineSeconds: 1800
+      initContainers:
+        - name: git-sync
+          image: quay.io/fedora/fedora:latest
+          env:
+            - name: BRANCH
+              value: "{{inputs.parameters.branch}}"
+          command: [bash, -c]
+          args:
+            - |
+              set -euo pipefail
+              dnf install -y --quiet git 2>&1 | tail -2
+              for attempt in 1 2 3; do
+                rm -rf /workspace/testing-lab
+                if git clone --depth 1 --branch "${BRANCH}" \
+                    https://github.com/projectbluefin/testing-lab \
+                    /workspace/testing-lab 2>&1; then
+                  echo "Synced testing-lab @ ${BRANCH} (attempt ${attempt})"
+                  exit 0
+                fi
+                rm -rf /workspace/testing-lab
+                if git clone https://github.com/projectbluefin/testing-lab /workspace/testing-lab 2>&1 && \
+                   git -C /workspace/testing-lab checkout "${BRANCH}" 2>&1; then
+                  echo "Synced testing-lab @ ${BRANCH} via SHA fallback (attempt ${attempt})"
+                  exit 0
+                fi
+                echo "Attempt ${attempt} failed, retrying in 15s..."
+                sleep 15
+              done
+              exit 1
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+      container:
+        image: quay.io/fedora/fedora:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: "500m"
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+        env:
+          - name: TEST_NAMESPACE
+            value: "{{inputs.parameters.namespace}}"
+          - name: TEST_LANE
+            value: "{{inputs.parameters.lane}}"
+          - name: TEST_RESULTS_DIR
+            value: /tmp/results
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+            readOnly: true
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            mkdir -p /tmp/results
+            LOG=/tmp/results/runner.log
+            exec > >(tee -a "${LOG}") 2>&1
+
+            dnf install -y --quiet python3 python3-pytest kubernetes-client jq curl openssl 2>&1 | tail -4
+
+            LANE="{{inputs.parameters.lane}}"
+            SUITE="/workspace/testing-lab/tests/service_catalog/${LANE}"
+
+            if [[ ! -d "${SUITE}" ]]; then
+              echo "ERROR: No test suite at ${SUITE}" >&2
+              exit 1
+            fi
+
+            export PYTHONPATH="/workspace/testing-lab:${PYTHONPATH:-}"
+
+            TEST_RC=0
+            python3 -m pytest -q "${SUITE}" \
+              --junitxml /tmp/results/pytest-results.xml || TEST_RC=$?
+
+            echo "Collected result files:" >&2
+            find /tmp/results -maxdepth 1 -type f -printf '%f\n' | sort >&2
+
+            if [[ -f /tmp/results/pytest-results.xml ]]; then
+              SUMMARY="$(python3 -c "
+            import xml.etree.ElementTree as ET
+            root = ET.parse('/tmp/results/pytest-results.xml').getroot()
+            suites = [root] if root.tag == 'testsuite' else root.findall('testsuite')
+            tests = sum(int(s.attrib.get('tests', 0)) for s in suites)
+            skipped = sum(int(s.attrib.get('skipped', 0)) for s in suites)
+            failures = sum(int(s.attrib.get('failures', 0)) + int(s.attrib.get('errors', 0)) for s in suites)
+            passed = tests - skipped - failures
+            print(f'{passed}/{tests} pytest checks passed')
+            " 2>/dev/null || true)"
+              if [[ -n "${SUMMARY}" ]]; then
+                printf '%s\n' "${SUMMARY}"
+              else
+                echo "pytest results present"
+              fi
+            else
+              echo "pytest results missing"
+            fi
+
+            exit "${TEST_RC}"
+      volumes:
+        - name: workspace
+          emptyDir: {}

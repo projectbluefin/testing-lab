@@ -292,6 +292,19 @@ run-homelab-restore:
     argo submit --from workflowtemplate/homelab-restore-drill \
       -n {{ argo_ns }} --wait --log
 
+# ── Service-catalog workload validation (#51) ────────────────────────────────
+
+# Run service-catalog pipeline for a given lane (default: media)
+# Usage: just run-service-catalog-smoke
+# Usage: just run-service-catalog-smoke lane=non-media
+# Usage: just run-service-catalog-smoke lane=media image-tag=lts branch=feat/my-branch
+run-service-catalog-smoke lane="media" image-tag="latest" branch="main":
+    argo submit --from workflowtemplate/service-catalog-pipeline \
+      -p lane={{ lane }} \
+      -p image-tag={{ image-tag }} \
+      -p branch={{ branch }} \
+      -n {{ argo_ns }} --wait --log
+
 # ── Ghost maintenance ─────────────────────────────────────────────────────────
 
 # Patch ghost OTel collector config to remove noisy process scraper (#117)

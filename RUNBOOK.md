@@ -84,6 +84,45 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 - `findChild(..., requireResult=...)` is not a supported dogtail pattern in this repo's stack.
 - `findChildren(...)` and `findChild(..., retry=False)` are the canonical presence-check APIs.
 
+## Service-catalog pipeline
+
+A second execution path validates homelab service workloads directly in
+Kubernetes, without VMs or GNOME infrastructure:
+
+```
+Argo Workflow (argo namespace)
+        │
+        ├─ create-namespace       ─► ephemeral namespace svc-<lane>-<uid>
+        ├─ deploy-workload        ─► clone repo, kubectl apply lane manifests
+        ├─ run-service-tests      ─► pytest against live k8s workload
+        └─ cleanup (onExit)       ─► delete namespace
+```
+
+| Property | Value |
+|---|---|
+| Entry point | `just run-service-catalog-smoke` or `argo submit --from workflowtemplate/service-catalog-pipeline` |
+| Parameters | `lane` (default: media), `image-tag` (default: latest), `branch` (default: main) |
+| Wall-clock | ~3–5 min |
+| Evidence | pytest JUnit XML + per-check artifacts in pod logs (Loki) |
+
+### Adding a new lane
+
+1. Create `tests/service_catalog/<lane>/manifests.yaml` with the workload's
+   Kubernetes manifests (Deployment, Service, PVC, Secrets, ConfigMaps).
+2. Create `tests/service_catalog/<lane>/test_<lane>.py` importing helpers
+   from `tests/service_catalog/shared/` (deploy, persistence, reachability,
+   redeploy, teardown).
+3. Run: `just run-service-catalog-smoke lane=<lane>`
+4. The pipeline creates a namespace, applies manifests, runs tests, cleans up.
+
+### Inspecting results
+
+- `argo logs @latest` — test output including summary and artifact list.
+- Loki query: `{namespace="argo"} |= "svc-catalog"` — all service-catalog
+  workflow logs.
+- JUnit XML is emitted to the pod stdout and captured by Argo's log
+  archival. No separate artifact upload path is needed.
+
 ## Common failure modes
 
 | Symptom | Root cause | Durable fix |
@@ -96,6 +135,9 @@ Golden disks can be patched by workflow after key rotation; titan disk key refre
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| Service-catalog deploy step fails with "No manifests found" | Lane directory missing `manifests.yaml` | Create `tests/service_catalog/<lane>/manifests.yaml` per the contract |
+| Service-catalog test step fails with "No test suite" | Lane directory missing under `tests/service_catalog/` | Create the lane test directory with at least one `test_*.py` file |
+| Service-catalog namespace stuck terminating | Finalizer or PVC not released | Check for stuck PVCs or pods with `kubectl get all -n <ns>`, delete manually if needed |
 
 ## Historical notes
 
