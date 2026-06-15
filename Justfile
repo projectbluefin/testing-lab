@@ -287,6 +287,12 @@ run-homelab-access:
     argo submit --from workflowtemplate/homelab-access-probe \
       -n {{ argo_ns }} --wait --log
 
+# Run in-cluster homelab auth-gating probe (#61)
+run-homelab-auth:
+    argo submit --from workflowtemplate/homelab-access-probe \
+      -p auth-mode=true \
+      -n {{ argo_ns }} --wait --log
+
 # Run first PVC/local-path restore drill (#60 #74 #84)
 run-homelab-restore:
     argo submit --from workflowtemplate/homelab-restore-drill \

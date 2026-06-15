@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: homelab-auth-
+  namespace: argo
+spec:
+  serviceAccountName: argo
+  workflowTemplateRef:
+    name: homelab-access-probe
+  arguments:
+    parameters:
+      - name: auth-mode
+        value: "true"
+      - name: branch
+        value: "main"
