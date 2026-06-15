@@ -18,6 +18,7 @@ access guarantees it must prove.
 | **General-purpose** | `homelab-substrate` | `tests/homelab_substrate/` | k3s scheduling, pod lifecycle, in-cluster HTTP/TCP reachability, `local-path` PVC allocation |
 | **NAS / storage** | `homelab-storage` | `tests/homelab_storage/` | PVC bound on `local-path`, data survives `rollout restart`, `findmnt`/`df`/`lsblk`/ZFS artifacts captured |
 | **Service access** | `homelab-access-probe` | `tests/homelab_access/` | Cluster-DNS resolution, TLS handshake, expected-host routing via SNI |
+| **Print service** | `homelab-print-service` | `tests/service_catalog/print/` | Config PVC (1Gi) binding and writability, IPP port 631 reachability, PUID/PGID/TZ env injection, state survives `rollout restart` |
 
 ### Minimum persistence contract per class
 
@@ -38,11 +39,21 @@ access guarantees it must prove.
 - TLS handshake reports a certificate with `Protocol version` in the output.
 - Health endpoint returns `access-ok` with `Host:` header routing.
 
+#### Print service
+- Config PVC (1Gi `local-path` ReadWriteOnce) binds and is writable at `/config`.
+- Config PVC survives a `rollout restart` (sentinel file checked after pod replacement).
+- `PUID`, `PGID`, and `TZ` environment variables are present in the container env.
+- IPP port 631 is reachable within the cluster namespace (TCP connect succeeds).
+- Cluster DNS resolves `homelab-print-service.<namespace>.svc.cluster.local`.
+- **USB printer device access deferred to #67** — requires host device passthrough.
+- **LAN mDNS autodiscovery deferred to #67** — requires avahi sidecar and NodePort/LoadBalancer exposure.
+
 ### Gaps surfaced explicitly
 - Media streaming / transcoding lane: not yet defined. GPU passthrough is a
   known blocker; filed as a follow-up under the service-catalog epic.
 - ReadWriteMany / shared-media access: blocked by #62.
 - Service-to-service auth: deferred to service-catalog auth-gating lane (#61).
+- USB printer device access and LAN mDNS discovery: split from print-service base lane into #67.
 
 ---
 
@@ -197,3 +208,55 @@ The lab validates the following hostname/routing pattern for exposed in-cluster 
 | #60 first restore drill | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | #84 PVC restore drill with backup artifact | ✅ implemented | `homelab-restore-drill` WorkflowTemplate + `tests/homelab_backup/` |
 | Media service lane | ❌ deferred | #62 (shared mount) + #63 (GPU) |
+| #64 first non-media homelab workload lane | ✅ implemented | `homelab-print-service` WorkflowTemplate + `tests/service_catalog/print/` |
+| #67 printer-device access and LAN discovery | ❌ deferred | #54 substrate + host device passthrough |
+
+---
+
+## 7. Print-Service Workload Lane (#64)
+
+First non-media homelab workload lane.  Validates the in-cluster deployment
+contract for an OpenPrinting/CUPS-class service (source idea:
+`projectbluefin/bluespeed#11`) without hardware attachment or LAN
+discovery, which are split into #67.
+
+### Behavior table
+
+| Behavior | Test | Artifact |
+|---|---|---|
+| Deployment reaches `availableReplicas >= 1` | `test_deployment_becomes_ready` | `print-deployment.json` |
+| Pod reaches `Running` state | `test_pod_reaches_running_state` | `print-pods.json` |
+| ClusterIP service has endpoints on port 631 | `test_service_has_endpoints` | `print-endpoints.json` |
+| Config PVC (1Gi) binds on `local-path` | `test_config_pvc_is_bound` | `print-pvc-homelab-print-config.json` |
+| Config PVC reports expected capacity and access modes | `test_config_pvc_capacity_and_access_modes` | same |
+| Config PVC uses `local-path` storage class | `test_config_pvc_storage_class` | same |
+| `/config` mount is writable | `test_config_mount_is_writable` | — |
+| IPP port 631 reachable in-cluster | `test_ipp_port_is_reachable_in_cluster` | `print-reachability.txt` |
+| Cluster DNS resolves service FQDN | `test_cluster_dns_resolves_print_service` | `print-dns.txt` |
+| `PUID`, `PGID`, `TZ` env vars present | `test_puid_pgid_tz_env_vars_are_present` | `print-env.txt` |
+| Config sentinel survives `rollout restart` | `test_config_state_survives_rollout_restart` | `print-rollout-status.txt` |
+| Storage observability artifacts collected | `test_collects_storage_observability_artifacts` | `print-config-{df,findmnt,stat}.txt` |
+| USB printer device access | `test_usb_printer_device_access_is_out_of_scope_for_base_lane` | `pytest.skip` → #67 |
+| LAN mDNS autodiscovery | `test_lan_mdns_discovery_is_out_of_scope_for_base_lane` | `pytest.skip` → #67 |
+
+### Out-of-scope splits
+
+| Behavior | Reason | Tracked |
+|---|---|---|
+| USB printer device access (`/dev/usb/lp0` hostPath) | Host device passthrough; depends on #54 substrate work | #67 |
+| LAN mDNS / avahi self-discovery | Requires avahi sidecar and NodePort/LoadBalancer exposure | #67 |
+| Administration UI auth-gating | Deferred beyond #67 | TBD |
+| NodePort / LoadBalancer for LAN printing | Out of scope for base in-cluster validation | #67 |
+
+### Dependencies
+- #52 homelab storage (local-path PVC contract proven first)
+- #53 homelab access (cluster DNS + in-cluster reachability proven first)
+- #54 homelab substrate (in-cluster scheduling proven first)
+
+### Fixture image note
+The WorkflowTemplate uses `nginx:1.27.5-alpine` on port 631 as a
+representative stub (same approach as the media-service lane).  Replace
+with `lscr.io/linuxserver/cups:latest` when the lane graduates from
+validation to integration testing.  All five deployment-contract behaviors
+(PVC, env, port, DNS, restart persistence) are fully representative even
+with the stub image.
