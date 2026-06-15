@@ -292,6 +292,20 @@ run-homelab-restore:
     argo submit --from workflowtemplate/homelab-restore-drill \
       -n {{ argo_ns }} --wait --log
 
+# ── Service-catalog media lane (#80) ─────────────────────────────────────────
+
+# Run the media-service lane through the service-catalog pipeline.
+# Requires the service-catalog-pipeline WorkflowTemplate from #79.
+# Usage: just run-service-media
+# Usage: just run-service-media image-tag=lts
+# Usage: just run-service-media branch=feat/my-branch
+run-service-media image-tag="latest" branch="main":
+    argo submit --from workflowtemplate/service-catalog-pipeline \
+      -p lane=media \
+      -p image-tag={{ image-tag }} \
+      -p branch={{ branch }} \
+      -n {{ argo_ns }} --wait --log
+
 # ── Ghost maintenance ─────────────────────────────────────────────────────────
 
 # Patch ghost OTel collector config to remove noisy process scraper (#117)
