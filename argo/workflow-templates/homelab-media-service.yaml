@@ -1,0 +1,206 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: homelab-media-service
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: homelab-media-service
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  entrypoint: pipeline
+  onExit: cleanup
+  serviceAccountName: homelab-runner
+  arguments:
+    parameters:
+      - name: lane
+        value: "homelab-media-service"
+      - name: branch
+        value: "main"
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          - name: create-namespace
+            template: create-namespace
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-media-{{workflow.uid}}"
+          - name: deploy-fixture
+            depends: "create-namespace.Succeeded"
+            template: deploy-fixture
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-media-{{workflow.uid}}"
+                - name: lane
+                  value: "{{workflow.parameters.lane}}"
+          - name: run-tests
+            depends: "deploy-fixture.Succeeded"
+            templateRef:
+              name: run-incluster-tests
+              template: run-pytest
+            arguments:
+              parameters:
+                - name: namespace
+                  value: "homelab-media-{{workflow.uid}}"
+                - name: suite-path
+                  value: "service_catalog/media"
+                - name: lane
+                  value: "{{workflow.parameters.lane}}"
+                - name: app-label
+                  value: "app=homelab-media-service"
+                - name: service-name
+                  value: "homelab-media-service"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    - name: create-namespace
+      inputs:
+        parameters:
+          - name: namespace
+      resource:
+        action: create
+        manifest: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: "{{inputs.parameters.namespace}}"
+            labels:
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: homelab-media-service
+
+    - name: deploy-fixture
+      inputs:
+        parameters:
+          - name: namespace
+          - name: lane
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="{{inputs.parameters.namespace}}"
+          kubectl apply -n "${NS}" -f - <<EOF
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: homelab-media-config
+            labels:
+              app: homelab-media-service
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: "{{inputs.parameters.lane}}"
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: homelab-media-data
+            labels:
+              app: homelab-media-service
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: "{{inputs.parameters.lane}}"
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 10Gi
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: homelab-media-service
+            labels:
+              app: homelab-media-service
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: "{{inputs.parameters.lane}}"
+              bluefin.io/workload-class: media-service
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: homelab-media-service
+            template:
+              metadata:
+                labels:
+                  app: homelab-media-service
+                  app.kubernetes.io/part-of: bluefin-test-suite
+                  bluefin.io/lane: "{{inputs.parameters.lane}}"
+                  bluefin.io/workload-class: media-service
+              spec:
+                nodeSelector:
+                  kubernetes.io/hostname: ghost
+                containers:
+                  - name: media-server
+                    # Representative linuxserver.io-style fixture.
+                    # Uses nginx as a lightweight proxy for the HTTP-reachability
+                    # contract; the real service contract (PUID/PGID/TZ env,
+                    # dual PVC mount, port 8096) is fully representative even
+                    # with a stub image.  Replace with linuxserver/jellyfin when
+                    # the lane graduates from validation to integration testing.
+                    image: docker.io/library/nginx:1.27.5-alpine
+                    ports:
+                      - containerPort: 8096
+                    env:
+                      - name: PUID
+                        value: "1000"
+                      - name: PGID
+                        value: "1000"
+                      - name: TZ
+                        value: "UTC"
+                    volumeMounts:
+                      - name: config
+                        mountPath: /config
+                      - name: data
+                        mountPath: /data
+                    # nginx listens on 80 by default; rewrite the listen port to
+                    # 8096 so the reachability contract matches the media-service
+                    # standard without requiring a custom image.
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        sed -i 's/listen\s*80;/listen 8096;/g' /etc/nginx/conf.d/default.conf
+                        exec nginx -g 'daemon off;'
+                volumes:
+                  - name: config
+                    persistentVolumeClaim:
+                      claimName: homelab-media-config
+                  - name: data
+                    persistentVolumeClaim:
+                      claimName: homelab-media-data
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: homelab-media-service
+            labels:
+              app: homelab-media-service
+              app.kubernetes.io/part-of: bluefin-test-suite
+              bluefin.io/lane: "{{inputs.parameters.lane}}"
+          spec:
+            selector:
+              app: homelab-media-service
+            ports:
+              - name: http
+                port: 8096
+                targetPort: 8096
+          EOF
+          kubectl rollout status deployment/homelab-media-service -n "${NS}" --timeout=300s >&2
+
+    - name: cleanup
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash, -c]
+        source: |
+          set -euo pipefail
+          NS="homelab-media-{{workflow.uid}}"
+          kubectl delete namespace "${NS}" --ignore-not-found=true >&2 || true
+          timeout 180 bash -c "until ! kubectl get namespace \"${NS}\" >/dev/null 2>&1; do sleep 5; done" >&2 || true
+          echo "cleanup-complete"
