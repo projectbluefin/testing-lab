@@ -19,13 +19,23 @@ jobs:
           chmod +x argo-linux-amd64
           sudo mv argo-linux-amd64 /usr/local/bin/argo
 
-      - name: Lint workflow templates (offline)
+      - name: Install actionlint
         run: |
-          argo lint --offline argo/workflow-templates/ || echo "WARNING: offline lint reported issues in argo/workflow-templates/"
+          bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          sudo mv actionlint /usr/local/bin/
 
-      - name: Lint standalone workflows (offline)
+      - name: Lint GitHub Actions workflows
+        run: actionlint
+
+      - name: Lint workflow-templates (offline, cross-file refs)
+        run: argo lint --offline argo/workflow-templates/
+
+      - name: Lint bootstrap templates (offline)
+        run: argo lint --offline argo/bootstrap/
+
+      - name: Lint standalone submit Workflows (offline)
         run: |
           for f in argo/*.yaml; do
             echo "Checking $f..."
-            argo lint --offline "$f" || echo "WARNING: $f needs server-side template resolution or has offline lint issues"
+            argo lint --offline "$f" || echo "WARNING: $f needs server-side template resolution"
           done
