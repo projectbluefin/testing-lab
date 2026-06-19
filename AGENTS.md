@@ -2,6 +2,20 @@
 
 > Load [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) first for commands. This file is the policy + architecture reference.
 
+## Skill routing — read this first
+
+Before changing anything, load the relevant skill file from `docs/skills/`:
+
+| Area | Skill file |
+|---|---|
+| Argo Workflows YAML, WorkflowTemplate authoring, lint | [`docs/skills/argo-workflows.md`](docs/skills/argo-workflows.md) |
+| KubeVirt VMs, btrfs reflink, golden disk, teardown | [`docs/skills/kubevirt-vms.md`](docs/skills/kubevirt-vms.md) |
+| ArgoCD sync, GitOps rules, bootstrap vs managed | [`docs/skills/gitops-argocd.md`](docs/skills/gitops-argocd.md) |
+| behave / qecore / dogtail / GNOME AT-SPI tests | [`docs/skills/test-authoring.md`](docs/skills/test-authoring.md) |
+| End of session — write-back loop | [`docs/skills/skill-improvement.md`](docs/skills/skill-improvement.md) |
+
+**At end of every non-trivial session:** run the write-back loop in `docs/skills/skill-improvement.md`. Every session produces two outputs: the work and the learning.
+
 ## What This Repo Is
 
 Bluefin QA pipeline: Argo Workflows + KubeVirt + ArgoCD + behave/dogtail.
@@ -162,12 +176,12 @@ Justfile                         Repo-owner convenience wrappers (require kubect
 
 ## Image Variants
 
-| Tag | Image | Golden disk | Nightly |
+| Tag (image-tag / disk dir) | Image | Golden disk on ghost | Nightly |
 |---|---|---|---|
-| `latest` | `ghcr.io/ublue-os/bluefin:latest` | `/var/tmp/bluefin-golden/latest/disk.raw` on ghost | 02:00 UTC |
-| `lts` | `ghcr.io/ublue-os/bluefin:lts` | `/var/tmp/bluefin-golden/lts/disk.raw` on ghost | 02:30 UTC |
+| `testing` | `ghcr.io/projectbluefin/bluefin:testing` | `/var/tmp/bluefin-golden/testing/disk.raw` | 02:00 UTC |
+| `lts-testing` | `ghcr.io/projectbluefin/bluefin-lts:testing` | `/var/tmp/bluefin-golden/lts-testing/disk.raw` | 02:30 UTC |
 
-`gts` and `lts-hwe` do NOT exist. Never use these tags.
+> **There is no `:latest` tag.** Bluefin publishes `:testing` (pre-promotion) and `:stable` (released). LTS publishes `:testing`, `:lts`, and `:stable`. Source: `execute-release.yml` in each repo.
 
 ## VM Lifecycle
 
