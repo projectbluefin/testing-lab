@@ -39,3 +39,19 @@ jobs:
             echo "Checking $f..."
             argo lint --offline "$f" || echo "WARNING: $f needs server-side template resolution"
           done
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Validate Python syntax
+        run: |
+          echo "Checking Python syntax..."
+          find tests/ -name '*.py' -print0 | xargs -0 python -m py_compile
+
+      - name: Check pytest collection
+        run: |
+          echo "Checking pytest imports and collection..."
+          python -m pip install pytest -q
+          python -m pytest tests/ --collect-only -q 2>&1 | tail -5
