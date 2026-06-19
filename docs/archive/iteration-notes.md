@@ -3,6 +3,34 @@
 These notes were moved out of `RUNBOOK.md` so the runbook can stay timeless.
 They are preserved here for debugging history and migration context.
 
+## Flatcar E2E bringup lessons (2026-05-26)
+
+Seven infra bugs fixed to achieve the first green Flatcar run. Full report:
+[flatcar-first-green.md](flatcar-first-green.md).
+
+### Runner pod image assumptions
+
+Fedora minimal images (`quay.io/fedora/fedora:latest`) do not include `pip3` as a
+standalone binary. Always use `python3 -m pip install` instead of `pip3 install`.
+The runner also needs `openssh-clients` installed explicitly.
+
+### Test delivery: git clone, not hostPath
+
+The original Flatcar runner read tests from a stale hostPath (`/var/tmp/bluefin-tests`).
+This is fragile — the same pattern that Bluefin runners already fixed with `git-sync`.
+Always clone tests from git at runtime.
+
+### Argo artifact outputs require storage config
+
+Adding `outputs.artifacts` to a template causes exit code 64 if the Argo artifact
+repository is not configured. Since this cluster does not use artifact storage,
+workflow evidence goes to pod stdout (captured by Loki). Omit artifact outputs.
+
+### Flatcar containerd socket permissions
+
+The `core` user cannot access `/run/containerd/containerd.sock` directly. Use
+`sudo ctr version` in tests. The `core` user has passwordless sudo on Flatcar.
+
 ## Iteration 2 lessons (2026-05-25)
 
 ### dogtail API changes — root cause + migration
