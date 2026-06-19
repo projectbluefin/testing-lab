@@ -29,6 +29,22 @@ def last_command_output_contains(context, text) -> None:
     assert text in output, f"Expected {text!r} in output:\n{output[:500]}"
 
 
+GNOME_SOFTWARE_CPU_THRESHOLD_PCT = 5.0
+
+
+@step("gnome-software CPU usage is below threshold")
+def gnome_software_cpu_below_threshold(context) -> None:
+    output = _last_output(context)
+    try:
+        cpu = float(output)
+    except ValueError:
+        cpu = 0.0
+    assert cpu < GNOME_SOFTWARE_CPU_THRESHOLD_PCT, (
+        f"gnome-software CPU usage {cpu}% exceeds "
+        f"{GNOME_SOFTWARE_CPU_THRESHOLD_PCT}% threshold (bluefin#4471)"
+    )
+
+
 @step('Start "{app_id}" via shell')
 def start_app_via_shell(context, app_id) -> None:
     _require_bazaar(app_id)

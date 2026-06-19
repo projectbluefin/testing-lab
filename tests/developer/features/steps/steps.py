@@ -61,6 +61,54 @@ def _quadlet_files_in(directory: Path) -> list[Path]:
     ]
 
 
+@step("ujust is available on PATH")
+def ujust_is_available_on_path(context) -> None:
+    result = _run_command(["which", "ujust"])
+    if result.returncode != 0:
+        just_result = _run_command(["which", "just"])
+        assert just_result.returncode == 0, (
+            "Neither ujust nor just found on PATH"
+        )
+
+
+@step("Run ujust devmode and capture output")
+def run_ujust_devmode(context) -> None:
+    result = subprocess.run(
+        ["ujust", "devmode"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "TERM": "dumb"},
+    )
+    if result.returncode != 0:
+        result = subprocess.run(
+            ["just", "devmode"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, "TERM": "dumb"},
+        )
+    context.devmode_output = f"{result.stdout}\n{result.stderr}".strip()
+    context.devmode_rc = result.returncode
+
+
+@step("ujust devmode output does not prompt to re-enable")
+def ujust_devmode_no_re_enable_prompt(context) -> None:
+    output = getattr(context, "devmode_output", "")
+    re_enable_phrases = [
+        "would you like to enable",
+        "do you want to enable",
+        "enable developer mode",
+    ]
+    output_lower = output.lower()
+    for phrase in re_enable_phrases:
+        assert phrase not in output_lower, (
+            f"ujust devmode prompted to re-enable when already enabled (bluefin#4209).\n"
+            f"Found: {phrase!r}\n"
+            f"Output:\n{output[:500]}"
+        )
+
+
 @step("Make sure window is focused for wayland testing")
 def make_sure_window_is_focused(context) -> None:
     # Pattern from GNOMETerminalAutomation steps.py — prevents input race on Wayland

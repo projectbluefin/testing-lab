@@ -59,6 +59,15 @@ Feature: gnome-software (Bazaar) smoke tests
     * Run and save command output: "coredumpctl list gnome-software --no-pager 2>&1 | grep -c 'gnome-software' || echo 0"
     * Last command output "is" "0"
 
+  @software @regression @bluefin_4471 @cpu
+  Scenario: gnome-software does not consume high CPU after close (bluefin#4471)
+    * Application "software" is running
+    * Close application "software" via "shortcut"
+    * Application "software" is no longer running
+    * Wait 30 seconds before action
+    * Run and save command output: "sh -c 'CPU=$(ps -C gnome-software -o %cpu= 2>/dev/null | tr -d \" \" | head -1); [ -z \"$CPU\" ] && echo 0 || echo \"$CPU\"'"
+    * gnome-software CPU usage is below threshold
+
   @software @close
   Scenario: Bazaar closes cleanly via shortcut
     * Close application "software" via "shortcut"
