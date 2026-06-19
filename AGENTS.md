@@ -1,5 +1,10 @@
 # Testing Lab — Agent Instructions
 
+> **You have the source code. Read it. Never guess.**
+> Image names, tags, workflow behavior, registry paths — all of it is in the repo.
+> `gh api`, `read`, `bash` are available. Use them before writing anything.
+> See the [incident log in image-registry.md](https://github.com/projectbluefin/common/blob/main/docs/skills/image-registry.md#incident-log) for what happens when you don't.
+
 > Load [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) first for commands. This file is the policy + architecture reference.
 
 ## Skill routing — read this first
