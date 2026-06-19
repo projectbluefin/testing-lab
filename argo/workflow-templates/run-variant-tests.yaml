@@ -1,0 +1,218 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: bluefin-test-suite:argoproj.io/WorkflowTemplate:argo/run-variant-tests
+    bluefin.io/replaces: run-tmt-tests
+    bluefin.io/stack: qecore-headless + behave + dogtail + gnome-ponytail-daemon
+  name: run-variant-tests
+  namespace: argo
+spec:
+  templates:
+  - activeDeadlineSeconds: 3600
+    container:
+      args:
+      - "set -euo pipefail\nmkdir -p /tmp/results\nLOG=/tmp/results/runner.log\nexec\
+        \ > >(tee -a \"$LOG\") 2>&1\n\n# Install SSH client if not present (base fedora\
+        \ image omits it)\nif ! command -v ssh &>/dev/null; then\n  dnf install -y\
+        \ --quiet openssh-clients rsync 2>&1 | tail -3\nfi\n\nSSH_OPTS=\"-i ${SSH_KEY}\
+        \ -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10\
+        \ -o LogLevel=ERROR\"\nSSH=\"ssh ${SSH_OPTS} ${VM_USER}@${VM_IP}\"\nSCP=\"\
+        scp ${SSH_OPTS} -r\"\n\n# \u2500\u2500 Wait for VM SSH to become ready (up\
+        \ to 10 minutes) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \necho \"Waiting for SSH on ${VM_IP} (variant=${VARIANT}, suite=${SUITE})...\"\
+        \ >&2\ntimeout 600 bash -c \"\n  until ${SSH} 'echo ready' 2>/dev/null; do\
+        \ sleep 10; done\n\"\necho \"SSH ready.\" >&2\n\n# \u2500\u2500 Install test\
+        \ dependencies inside the VM \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\n# gnome-ponytail-daemon: bridges AT-SPI coords to Wayland surface\
+        \ coords\n# ostree admin unlock creates a writable overlayfs on /usr so dnf\
+        \ can install.\n# Changes are discarded on reboot but persist for the current\
+        \ test run.\necho \"Installing test dependencies on VM...\" >&2\n${SSH} \"\
+        sudo ostree admin unlock 2>/dev/null || true\"\n${SSH} \"sudo dnf install\
+        \ -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon 2>&1 | tail\
+        \ -3\"\n# Fallback: bootstrap pip via ensurepip if python3-pip is absent\n\
+        ${SSH} \"pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 |\
+        \ tail -2\"\n# User install to ~/.local/bin \u2014 works regardless of read-only\
+        \ rootfs\n${SSH} \"python3 -m pip install --quiet --user qecore behave dogtail\
+        \ python-uinput 2>&1 | tail -3\"\n# qecore needs the user session bus and\
+        \ Wayland env over SSH, and\n# ponytail must already be active for dogtail\
+        \ interaction on Wayland.\n${SSH} \"\n  UID_NUM=\\$(id -u)\n  XDG=/run/user/\\\
+        ${UID_NUM}\n  SESSION_BUS=\\$(systemctl --user show-environment 2>/dev/null\
+        \ \\\n    | grep '^DBUS_SESSION_BUS_ADDRESS=' | head -1 | cut -d= -f2-)\n\
+        \  if [[ -z \"\\${SESSION_BUS}\" ]]; then\n    SESSION_BUS=\"unix:path=\\\
+        ${XDG}/bus\"\n  fi\n  WAYLAND_DISP=\\$(ls /run/user/\\${UID_NUM}/wayland-*\
+        \ 2>/dev/null \\\n    | head -1 | xargs basename 2>/dev/null || echo wayland-0)\n\
+        \  mkdir -p \\$HOME/.ssh\n  {\n    printf 'DBUS_SESSION_BUS_ADDRESS=%s\\n'\
+        \ \\\"\\${SESSION_BUS}\\\"\n    printf 'WAYLAND_DISPLAY=%s\\n' \\\"\\${WAYLAND_DISP}\\\
+        \"\n    printf 'XDG_RUNTIME_DIR=%s\\n' \\\"\\${XDG}\\\"\n    printf 'AT_SPI_BUS_ADDRESS=%s\\\
+        n' \\\"\\${SESSION_BUS}\\\"\n  } > \\$HOME/.ssh/environment\n  chmod 600 \\\
+        $HOME/.ssh/environment\n  export DBUS_SESSION_BUS_ADDRESS=\\\"\\${SESSION_BUS}\\\
+        \"\n  export WAYLAND_DISPLAY=\\\"\\${WAYLAND_DISP}\\\"\n  export XDG_RUNTIME_DIR=\\\
+        \"\\${XDG}\\\"\n  export AT_SPI_BUS_ADDRESS=\\\"\\${SESSION_BUS}\\\"\n  echo\
+        \ \\\"Ponytail env: DBUS_SESSION_BUS_ADDRESS=\\${DBUS_SESSION_BUS_ADDRESS}\
+        \ WAYLAND_DISPLAY=\\${WAYLAND_DISPLAY} XDG_RUNTIME_DIR=\\${XDG_RUNTIME_DIR}\\\
+        \" >&2\n  mkdir -p /tmp/results\n  : > /tmp/results/ponytail.log\n  nohup\
+        \ /usr/libexec/gnome-ponytail-daemon >/tmp/results/ponytail.log 2>&1 &\n \
+        \ PONYTAIL_PID=\\$!\n  echo \\\"Started gnome-ponytail-daemon pid=\\${PONYTAIL_PID}\\\
+        \" >&2\n  for attempt in 1 2 3 4 5 6 7 8 9 10; do\n    busctl --user --list\
+        \ 2>/dev/null | grep -q 'org.gnome.Ponytail' && exit 0\n    sleep 1\n  done\n\
+        \  echo 'gnome-ponytail-daemon failed to register org.gnome.Ponytail' >&2\n\
+        \  tail -50 /tmp/results/ponytail.log >&2 || true\n  exit 1\n\"\n# qecore\
+        \ installs helper scripts to ~/.local/bin but qecore-headless may\n# invoke\
+        \ them via /bin/sh which lacks ~/.local/bin in PATH. Symlink to\n# /usr/local/bin\
+        \ so the unlocked overlay makes them globally reachable.\n${SSH} \"for f in\
+        \ \\$HOME/.local/bin/qecore_*; do sudo ln -sf \\$f /usr/local/bin/\\$(basename\
+        \ \\$f) 2>/dev/null; done\"\n# uinput: needed for \"Key combo with uinput\"\
+        \ / \"Press key with uinput\" steps.\n# Load kernel module, grant access,\
+        \ and fix SELinux label.\n# The chcon is required on Bluefin/Fedora \u2014\
+        \ chmod alone is not sufficient\n# because SELinux still denies open() on\
+        \ uinput_device_t after chmod.\n${SSH} \"sudo modprobe uinput 2>/dev/null\
+        \ || true\"\n${SSH} \"sudo chmod 0666 /dev/uinput 2>/dev/null || true\"\n\
+        ${SSH} \"sudo chcon -t uinput_device_t /dev/uinput 2>/dev/null || true\"\n\
+        # cosign: required for security/image_provenance suite signature checks.\n\
+        # Try dnf first (Fedora 38+ ships cosign); fall back to GitHub release binary.\n\
+        if [[ \"${SUITE}\" == \"security\" ]]; then\n  ${SSH} \"which cosign &>/dev/null\
+        \ || sudo dnf install -y --quiet cosign 2>&1 | tail -3 || \\\n    (curl -sLo\
+        \ /tmp/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64\
+        \ && \\\n     sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign)\"\n\
+        fi\necho \"Dependencies installed.\" >&2\n\n# \u2500\u2500 Copy test suite\
+        \ to VM \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\necho \"Copying tests/${SUITE}/ to VM...\" >&2\n${SSH}\
+        \ \"mkdir -p /tmp/bluefin-tests /tmp/results\"\n${SCP} /workspace/bluefin-test-suite/tests/${SUITE}\
+        \ ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/\n\n# \u2500\u2500 Run tests via\
+        \ qecore-headless or plain SSH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# qecore-headless\
+        \ takes the full behave invocation as a single string.\n# Session env and\
+        \ ponytail are prepared explicitly above for SSH runs.\nTAGS_ARG=\"\"\nif\
+        \ [[ -n \"${BEHAVE_TAGS}\" ]]; then\n  TAGS_ARG=\"${BEHAVE_TAGS}\"\nfi\n\n\
+        EFFECTIVE_RUNNER=\"${RUNNER_TYPE}\"\nif [[ \"${EFFECTIVE_RUNNER}\" == \"qecore\"\
+        \ && \"${SUITE}\" =~ ^(lifecycle|security|hardware)$ ]]; then\n  EFFECTIVE_RUNNER=\"\
+        plain-ssh\"\nfi\necho \"Running suite ${SUITE} with runner ${EFFECTIVE_RUNNER}\"\
+        \ >&2\n\n# PATH must include ~/.local/bin for user-installed qecore-headless.\n\
+        # $BEHAVE_BIN is expanded by the remote shell so qecore-headless\n# receives\
+        \ an absolute path \u2014 subprocess.Popen(shell=False) won't\n# expand variables\
+        \ inside the command string it receives.\n# Save behave exit code so we can\
+        \ always SCP results before exiting.\nBEHAVE_RC=0\nif [[ \"${EFFECTIVE_RUNNER}\"\
+        \ == \"plain-ssh\" ]]; then\n  ${SSH} \"\n    export PATH=\\$HOME/.local/bin:\\\
+        $PATH\n    behave /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty\
+        \ --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}\n  \" || BEHAVE_RC=$?\n\
+        else\n  ${SSH} \"\n    export PATH=\\$HOME/.local/bin:\\$PATH\n    BEHAVE_BIN=\\\
+        $(which behave)\n    \\$HOME/.local/bin/qecore-headless \\\"\\$BEHAVE_BIN\
+        \ /tmp/bluefin-tests/${SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json\
+        \ --no-capture ${TAGS_ARG}\\\"\n  \" || BEHAVE_RC=$?\nfi\n\n# \u2500\u2500\
+        \ Collect results \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# Always SCP\
+        \ even when behave exits non-zero (test failures), so\n# artifacts are available\
+        \ for inspection on failed runs.\n# Use trailing /. on source to copy CONTENTS\
+        \ not the directory itself\n# (avoids /tmp/results/results/ nesting when dest\
+        \ already exists).\necho \"Collecting results...\" >&2\n${SCP} ${VM_USER}@${VM_IP}:/tmp/results/.\
+        \ /tmp/results/ || true\n\necho \"Done. Results in /tmp/results/\" >&2\n\n\
+        # \u2500\u2500 Persist results to hostPath on ghost \u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# /var/tmp/bluefin-results/<workflow-uid>/<suite>/\
+        \ survives pod deletion.\nRESULT_DIR=\"/var/tmp/bluefin-results/{{workflow.uid}}/${SUITE}\"\
+        \nmkdir -p \"${RESULT_DIR}\"\ncp -a /tmp/results/. \"${RESULT_DIR}/\" 2>/dev/null\
+        \ || true\necho \"Results persisted to ${RESULT_DIR}\" >&2\n\n# \u2500\u2500\
+        \ Summary to stdout (Argo outputs.result) \u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\
+        \u2500\u2500\u2500\npython3 -c \"\nimport json, sys\ntry:\n    data = json.load(open('/tmp/results/results.json'))\n\
+        \    failed = sum(1 for f in data for s in f.get('elements',[]) if s.get('status')\
+        \ == 'failed')\n    total  = sum(len(f.get('elements',[])) for f in data)\n\
+        \    print(f'{total - failed}/{total} scenarios passed')\nexcept Exception:\n\
+        \    print('results.json not found')\n\" 2>/dev/null || echo \"(python3 summary\
+        \ unavailable)\"\n# Re-raise behave's exit code so Argo marks the step failed\
+        \ on test failures.\nexit ${BEHAVE_RC}\n"
+      command:
+      - bash
+      - -c
+      env:
+      - name: VM_IP
+        value: '{{inputs.parameters.vm-ip}}'
+      - name: VM_USER
+        value: '{{inputs.parameters.ssh-user}}'
+      - name: SUITE
+        value: '{{inputs.parameters.suite}}'
+      - name: RUNNER_TYPE
+        value: '{{inputs.parameters.runner-type}}'
+      - name: VARIANT
+        value: '{{inputs.parameters.variant}}'
+      - name: BEHAVE_TAGS
+        value: '{{inputs.parameters.behave-tags}}'
+      - name: SSH_KEY
+        value: /etc/ssh/test-key/id_ed25519
+      image: quay.io/fedora/fedora:latest
+      imagePullPolicy: Always
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+      - mountPath: /workspace
+        name: workspace
+        readOnly: true
+      - mountPath: /var/tmp/bluefin-results
+        name: results-store
+    initContainers:
+    - args:
+      - "for attempt in 1 2 3; do\n  dnf install -y --quiet git 2>&1 | tail -2\n \
+        \ if git clone --depth 1 --branch main \\\n      https://github.com/projectbluefin/testsuite\
+        \ \\\n      /workspace/bluefin-test-suite 2>&1; then\n    echo \"Synced bluefin-test-suite\
+        \ (attempt ${attempt})\"\n    exit 0\n  fi\n  echo \"Attempt ${attempt} failed,\
+        \ retrying in 15s...\"\n  sleep 15\ndone\nexit 1\n"
+      command:
+      - bash
+      - -c
+      image: quay.io/fedora/fedora:latest
+      name: git-sync
+      volumeMounts:
+      - mountPath: /workspace
+        name: workspace
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: suite
+        value: smoke
+      - name: runner-type
+        value: qecore
+      - name: variant
+        value: latest
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: issue-title
+        value: manual
+      - name: behave-tags
+        value: ''
+    metadata:
+      annotations:
+        bluefin.io/issue: '{{inputs.parameters.issue-title}}'
+        bluefin.io/vm-ip: '{{inputs.parameters.vm-ip}}'
+      labels:
+        app.kubernetes.io/part-of: bluefin-test-suite
+        bluefin.io/step: run-variant-tests
+        bluefin.io/suite: '{{inputs.parameters.suite}}'
+        bluefin.io/variant: '{{inputs.parameters.variant}}'
+    name: run-variant-tests
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    outputs:
+      result: '{{pod.name}}'
+    podSpecPatch: "hostNetwork: true\ndnsPolicy: ClusterFirstWithHostNet\nsecurityContext:\n\
+      \  runAsUser: 0\n"
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+    - emptyDir: {}
+      name: workspace
+    - hostPath:
+        path: /var/tmp/bluefin-results
+        type: DirectoryOrCreate
+      name: results-store
+

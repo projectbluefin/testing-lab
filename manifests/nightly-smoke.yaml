@@ -36,9 +36,9 @@ spec:
     arguments:
       parameters:
         - name: image
-          value: "ghcr.io/ublue-os/bluefin:latest"
+          value: "ghcr.io/projectbluefin/bluefin:testing"
         - name: image-tag
-          value: "latest"
+          value: "testing"
         - name: namespace
           value: "bluefin-test"
         - name: suites

@@ -2,6 +2,12 @@
 
 Do not use these files. The canonical files are in `../workflow-templates/`.
 
+## Titan persistent VMs (superseded by ephemeral VM pipeline)
+
+- `bluefin-titan-smoke.yaml` — ran tests against always-on titan VMs. Replaced by `bluefin-qa-pipeline` which provisions fresh VMs per-run.
+- `setup-titan-fixtures.yaml` — installed Firefox Flatpak on titan VMs. No longer needed; ephemeral VMs provision from golden disk which already has fixtures.
+- `titan-disk-cleanup.yaml` — cleaned up titan VM disk files. No longer needed; ephemeral VM teardown handles cleanup via `onExit` handler.
+
 ## CDI/PVC v1 (superseded by btrfs reflink v2)
 
 - `provision-vm.yaml` — used CDI DataVolume + PVC. Replaced by hostDisk + btrfs reflink.

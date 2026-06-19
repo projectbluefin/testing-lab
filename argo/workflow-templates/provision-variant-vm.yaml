@@ -1,0 +1,212 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: bluefin-test-suite:argoproj.io/WorkflowTemplate:argo/provision-variant-vm
+    description: 'Provisions a Bluefin variant test VM using btrfs reflink from a
+      golden disk.raw.
+
+      ~24ms clone time (CoW). No CDI, no zot, no PVC.
+
+      Requires HostDisk feature gate (already enabled in KubeVirt config).
+
+      hw-profile=full-hw adds TPM 2.0, ich9 audio, and i6300esb watchdog for hardware-suite
+      tests.
+
+      '
+  name: provision-variant-vm
+  namespace: argo
+spec:
+  arguments: {}
+  templates:
+  - inputs:
+      parameters:
+      - name: image
+        value: ghcr.io/ublue-os/bluefin:latest
+      - name: image-tag
+        value: latest
+      - name: vm-name
+      - name: namespace
+        value: bluefin-test
+      - name: hw-profile
+        value: standard
+    metadata: {}
+    name: provision-variant-vm
+    outputs:
+      parameters:
+      - name: vm-ip
+        valueFrom:
+          parameter: '{{steps.wait-for-vm.outputs.result}}'
+    steps:
+    - - arguments:
+          parameters:
+          - name: image
+            value: '{{inputs.parameters.image}}'
+          - name: image-tag
+            value: '{{inputs.parameters.image-tag}}'
+          - name: vm-name
+            value: '{{inputs.parameters.vm-name}}'
+        name: reflink-disk
+        template: reflink-disk
+    - - arguments:
+          parameters:
+          - name: image-tag
+            value: '{{inputs.parameters.image-tag}}'
+          - name: vm-name
+            value: '{{inputs.parameters.vm-name}}'
+          - name: namespace
+            value: '{{inputs.parameters.namespace}}'
+        name: create-vm
+        template: create-vm
+        when: '''{{inputs.parameters.hw-profile}}'' == ''standard'''
+      - arguments:
+          parameters:
+          - name: image-tag
+            value: '{{inputs.parameters.image-tag}}'
+          - name: vm-name
+            value: '{{inputs.parameters.vm-name}}'
+          - name: namespace
+            value: '{{inputs.parameters.namespace}}'
+        name: create-vm-full-hw
+        template: create-vm-full-hw
+        when: '''{{inputs.parameters.hw-profile}}'' == ''full-hw'''
+    - - arguments:
+          parameters:
+          - name: image-tag
+            value: '{{inputs.parameters.image-tag}}'
+          - name: vm-name
+            value: '{{inputs.parameters.vm-name}}'
+          - name: namespace
+            value: '{{inputs.parameters.namespace}}'
+        name: wait-for-vm
+        template: wait-for-vm-ready
+  - inputs:
+      parameters:
+      - name: image
+      - name: image-tag
+      - name: vm-name
+    metadata:
+      labels:
+        bluefin.io/step: reflink-disk
+        bluefin.io/variant: '{{inputs.parameters.image-tag}}'
+    name: reflink-disk
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    outputs: {}
+    script:
+      command:
+      - bash
+      image: quay.io/podman/stable:latest
+      securityContext:
+        runAsUser: 0
+      source: "set -euo pipefail\nIMAGE=\"{{inputs.parameters.image}}\"\nTAG=\"{{inputs.parameters.image-tag}}\"\
+        \nVM=\"{{inputs.parameters.vm-name}}\"\nGOLDEN=\"/var/tmp/bluefin-golden/${TAG}/disk.raw\"\
+        \nDEST=\"/var/tmp/bluefin-test/${VM}.raw\"\n\necho \"Using golden disk for\
+        \ ${IMAGE}\" >&2\n\nif [[ ! -f \"${GOLDEN}\" ]]; then\n  echo \"ERROR: golden\
+        \ disk not found: ${GOLDEN}\" >&2\n  exit 1\nfi\n\nSTART=$(date +%s%N)\ncp\
+        \ --reflink=auto \"${GOLDEN}\" \"${DEST}\"\nchown 107:107 \"${DEST}\"\nchmod\
+        \ 664 \"${DEST}\"\nchcon -t svirt_sandbox_file_t \"${DEST}\" 2>/dev/null ||\
+        \ true\nELAPSED=$(( ($(date +%s%N) - START) / 1000000 ))\necho \"reflink clone:\
+        \ ${ELAPSED}ms \u2192 ${DEST}\"\n"
+      volumeMounts:
+      - mountPath: /var/tmp/bluefin-golden
+        name: golden
+      - mountPath: /var/tmp/bluefin-test
+        name: test-disks
+    volumes:
+    - hostPath:
+        path: /var/tmp/bluefin-golden
+      name: golden
+    - hostPath:
+        path: /var/tmp/bluefin-test
+        type: DirectoryOrCreate
+      name: test-disks
+  - inputs:
+      parameters:
+      - name: image-tag
+      - name: vm-name
+      - name: namespace
+    metadata:
+      labels:
+        bluefin.io/step: create-vm
+        bluefin.io/variant: '{{inputs.parameters.image-tag}}'
+    name: create-vm
+    outputs: {}
+    resource:
+      action: apply
+      manifest: "apiVersion: kubevirt.io/v1\nkind: VirtualMachine\nmetadata:\n  name:\
+        \ \"{{inputs.parameters.vm-name}}\"\n  namespace: \"{{inputs.parameters.namespace}}\"\
+        \n  labels:\n    app: bluefin-test\n    argo-workflow: \"{{workflow.name}}\"\
+        \nspec:\n  runStrategy: Always\n  template:\n    metadata:\n      labels:\n\
+        \        kubevirt.io/vm: \"{{inputs.parameters.vm-name}}\"\n    spec:\n  \
+        \    nodeSelector:\n        kubernetes.io/hostname: ghost\n      domain:\n\
+        \        cpu:\n          cores: 4\n        memory:\n          guest: 8Gi\n\
+        \        devices:\n          disks:\n            - name: rootdisk\n      \
+        \        disk:\n                bus: virtio\n              bootOrder: 1\n\
+        \          interfaces:\n            - name: default\n              masquerade:\
+        \ {}\n      networks:\n        - name: default\n          pod: {}\n      volumes:\n\
+        \        - name: rootdisk\n          hostDisk:\n            path: /var/tmp/bluefin-test/{{inputs.parameters.vm-name}}.raw\n\
+        \            type: Disk\n"
+  - inputs:
+      parameters:
+      - name: image-tag
+      - name: vm-name
+      - name: namespace
+    metadata:
+      labels:
+        bluefin.io/hw-profile: full-hw
+        bluefin.io/step: create-vm
+        bluefin.io/variant: '{{inputs.parameters.image-tag}}'
+    name: create-vm-full-hw
+    outputs: {}
+    resource:
+      action: apply
+      manifest: "apiVersion: kubevirt.io/v1\nkind: VirtualMachine\nmetadata:\n  name:\
+        \ \"{{inputs.parameters.vm-name}}\"\n  namespace: \"{{inputs.parameters.namespace}}\"\
+        \n  labels:\n    app: bluefin-test\n    argo-workflow: \"{{workflow.name}}\"\
+        \n    bluefin.io/hw-profile: full-hw\nspec:\n  runStrategy: Always\n  template:\n\
+        \    metadata:\n      labels:\n        kubevirt.io/vm: \"{{inputs.parameters.vm-name}}\"\
+        \n    spec:\n      nodeSelector:\n        kubernetes.io/hostname: ghost\n\
+        \      domain:\n        cpu:\n          cores: 4\n        memory:\n      \
+        \    guest: 8Gi\n        devices:\n          disks:\n            - name: rootdisk\n\
+        \              disk:\n                bus: virtio\n              bootOrder:\
+        \ 1\n          interfaces:\n            - name: default\n              masquerade:\
+        \ {}\n          # TPM 2.0 emulator \u2014 required for secure-boot and tpm-attestation\
+        \ tests\n          tpm: {}\n          # ich9 audio \u2014 validates audio\
+        \ device presence in hardware suite\n          sound:\n            name: ich9\n\
+        \          # i6300esb watchdog \u2014 validates watchdog keepalive/reboot\
+        \ behaviour\n          watchdog:\n            name: mywatchdog\n         \
+        \   i6300esb:\n              action: poweroff\n      networks:\n        -\
+        \ name: default\n          pod: {}\n      volumes:\n        - name: rootdisk\n\
+        \          hostDisk:\n            path: /var/tmp/bluefin-test/{{inputs.parameters.vm-name}}.raw\n\
+        \            type: Disk\n"
+  - inputs:
+      parameters:
+      - name: image-tag
+      - name: vm-name
+      - name: namespace
+    metadata:
+      labels:
+        bluefin.io/step: wait-for-vm
+        bluefin.io/variant: '{{inputs.parameters.image-tag}}'
+    name: wait-for-vm-ready
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    outputs: {}
+    podSpecPatch: 'hostNetwork: true
+
+      dnsPolicy: ClusterFirstWithHostNet
+
+      '
+    script:
+      command:
+      - bash
+      image: cgr.dev/chainguard/kubectl:latest-dev
+      source: "set -e\nNS=\"{{inputs.parameters.namespace}}\"\nVM=\"{{inputs.parameters.vm-name}}\"\
+        \nLABEL=\"kubevirt.io/vm=${VM}\"\n\necho \"Waiting for VMI ready...\" >&2\n\
+        kubectl wait vmi -n \"${NS}\" \"${VM}\" \\\n  --for=condition=Ready --timeout=600s\
+        \ >&2\n\nPOD_IP=$(kubectl get pod -n \"${NS}\" -l \"${LABEL}\" \\\n  -o jsonpath='{.items[0].status.podIP}')\n\
+        \necho \"Waiting for SSH on ${POD_IP}...\" >&2\ntimeout 120 bash -c \\\n \
+        \ \"until bash -c 'echo >/dev/tcp/${POD_IP}/22' 2>/dev/null; do sleep 5; done\"\
+        \n\necho \"${POD_IP}\"\n"
+

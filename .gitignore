@@ -2,3 +2,4 @@ bluefin-test-id_ed25519
 .env.test-pubkey
 __pycache__/
 *.pyc
+argo-results/

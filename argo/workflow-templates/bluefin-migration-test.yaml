@@ -1,1185 +1,878 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: bluefin-migration-test
-  namespace: argo
+  annotations:
+    argocd.argoproj.io/tracking-id: testing-lab:argoproj.io/WorkflowTemplate:argo/bluefin-migration-test
+    description: 'Tests two-way bootc switch migration between legacy-rechunk ublue-os/bluefin
+
+      and chunkah projectbluefin/bluefin, including experimental unified storage
+
+      coverage and zstd-compression verification.
+
+      '
   labels:
     app.kubernetes.io/component: migration-test
     app.kubernetes.io/part-of: bluefin-test-suite
-  annotations:
-    description: |
-      Tests two-way bootc switch migration between legacy-rechunk ublue-os/bluefin
-      and chunkah projectbluefin/bluefin, including experimental unified storage
-      coverage and zstd-compression verification.
+  name: bluefin-migration-test
+  namespace: argo
 spec:
-  serviceAccountName: argo
-  entrypoint: migration-test
-  onExit: teardown
   arguments:
     parameters:
-      - name: image-tag
-        value: "latest"
-      - name: vm-name
-        value: "bluefin-migration-{{workflow.uid}}"
-      - name: namespace
-        value: "bluefin-test"
-      - name: ssh-user
-        value: "bluefin-test"
-      - name: ssh-key-secret
-        value: "bluefin-test-ssh-key"
-      - name: legacy-image
-        value: "ghcr.io/ublue-os/bluefin"
-      - name: chunkah-image
-        value: "ghcr.io/projectbluefin/bluefin"
-      # Separate tag — projectbluefin only publishes :latest currently; update when more tags land
-      - name: chunkah-image-tag
-        value: "latest"
-      - name: storage-variant
-        value: "default"
-      - name: golden-root
-        value: "/var/tmp/bluefin-golden"
-      - name: test-root
-        value: "/var/tmp/bluefin-test"
-      - name: evidence-root
-        value: "/tmp/migration-results"
-      - name: aggregate-path
-        value: "/tmp/migration-evidence.json"
-
+    - name: image-tag
+      value: latest
+    - name: vm-name
+      value: bluefin-migration-{{workflow.uid}}
+    - name: namespace
+      value: bluefin-test
+    - name: ssh-user
+      value: bluefin-test
+    - name: ssh-key-secret
+      value: bluefin-test-ssh-key
+    - name: legacy-image
+      value: ghcr.io/ublue-os/bluefin
+    - name: chunkah-image
+      value: ghcr.io/projectbluefin/bluefin
+    - name: chunkah-image-tag
+      value: latest
+    - name: storage-variant
+      value: default
+    - name: golden-root
+      value: /var/tmp/bluefin-golden
+    - name: test-root
+      value: /var/tmp/bluefin-test
+    - name: evidence-root
+      value: /tmp/migration-results
+    - name: aggregate-path
+      value: /tmp/migration-evidence.json
+  entrypoint: migration-test
+  onExit: teardown
+  serviceAccountName: argo
   templates:
-    - name: migration-test
-      steps:
-        - - name: provision
-            templateRef:
-              name: provision-bluefin-vm
-              template: provision-vm
-            arguments:
-              parameters:
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag}}"
-                - name: vm-name
-                  value: "{{workflow.parameters.vm-name}}"
-                - name: namespace
-                  value: "{{workflow.parameters.namespace}}"
-                - name: golden-root
-                  value: "{{workflow.parameters.golden-root}}"
-                - name: test-root
-                  value: "{{workflow.parameters.test-root}}"
-
-        - - name: migrate
-            template: migration-sequence
-            arguments:
-              parameters:
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag}}"
-                - name: vm-name
-                  value: "{{workflow.parameters.vm-name}}"
-                - name: vm-ip
-                  value: "{{steps.provision.outputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{workflow.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
-                - name: legacy-image
-                  value: "{{workflow.parameters.legacy-image}}"
-                - name: chunkah-image
-                  value: "{{workflow.parameters.chunkah-image}}"
-                - name: chunkah-image-tag
-                  value: "{{workflow.parameters.chunkah-image-tag}}"
-                - name: storage-variant
-                  value: "{{workflow.parameters.storage-variant}}"
-                - name: evidence-root
-                  value: "{{workflow.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{workflow.parameters.aggregate-path}}"
-
-    - name: migration-sequence
-      inputs:
-        parameters:
+  - name: migration-test
+    steps:
+    - - arguments:
+          parameters:
           - name: image-tag
+            value: '{{workflow.parameters.image-tag}}'
           - name: vm-name
+            value: '{{workflow.parameters.vm-name}}'
+          - name: namespace
+            value: '{{workflow.parameters.namespace}}'
+          - name: golden-root
+            value: '{{workflow.parameters.golden-root}}'
+          - name: test-root
+            value: '{{workflow.parameters.test-root}}'
+        name: provision
+        templateRef:
+          name: provision-bluefin-vm
+          template: provision-vm
+    - - arguments:
+          parameters:
+          - name: image-tag
+            value: '{{workflow.parameters.image-tag}}'
+          - name: vm-name
+            value: '{{workflow.parameters.vm-name}}'
           - name: vm-ip
+            value: '{{steps.provision.outputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{workflow.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{workflow.parameters.ssh-key-secret}}'
           - name: legacy-image
-            value: "ghcr.io/ublue-os/bluefin"
+            value: '{{workflow.parameters.legacy-image}}'
           - name: chunkah-image
-            value: "ghcr.io/projectbluefin/bluefin"
+            value: '{{workflow.parameters.chunkah-image}}'
           - name: chunkah-image-tag
-            value: "latest"
+            value: '{{workflow.parameters.chunkah-image-tag}}'
           - name: storage-variant
-            value: "default"
+            value: '{{workflow.parameters.storage-variant}}'
           - name: evidence-root
-            value: "/tmp/migration-results"
+            value: '{{workflow.parameters.evidence-root}}'
           - name: aggregate-path
-            value: "/tmp/migration-evidence.json"
-      dag:
-        failFast: false
-        tasks:
-          - name: compression-inspect
-            template: inspect-image-compression
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: legacy-image-ref
-                  value: "{{inputs.parameters.legacy-image}}:{{inputs.parameters.image-tag}}"
-                - name: chunkah-image-ref
-                  value: "{{inputs.parameters.chunkah-image}}:{{inputs.parameters.chunkah-image-tag}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: pre-switch
-            depends: "compression-inspect"
-            template: collect-evidence
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: step
-                  value: "pre-switch"
-                - name: expected-image
-                  value: "{{inputs.parameters.legacy-image}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: storage-prepare
-            depends: "pre-switch.Succeeded"
-            template: prepare-storage-backend
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: forward-switch
-            depends: "storage-prepare.Succeeded"
-            template: run-bootc-switch
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: direction
-                  value: "forward"
-                - name: image-ref
-                  value: "{{inputs.parameters.chunkah-image}}:{{inputs.parameters.chunkah-image-tag}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: reboot-forward
-            depends: "forward-switch.Succeeded"
-            template: reboot-and-wait
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-
-          - name: post-forward
-            depends: "reboot-forward.Succeeded"
-            template: collect-evidence
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: step
-                  value: "post-forward"
-                - name: expected-image
-                  value: "{{inputs.parameters.chunkah-image}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: verify-forward
-            depends: "post-forward.Succeeded"
-            template: verify-state
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: step
-                  value: "post-forward"
-                - name: expected-image
-                  value: "{{inputs.parameters.chunkah-image}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-
-          - name: backward-switch
-            depends: "verify-forward.Succeeded"
-            template: run-bootc-switch
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: direction
-                  value: "backward"
-                - name: image-ref
-                  value: "{{inputs.parameters.legacy-image}}:{{inputs.parameters.image-tag}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: reboot-backward
-            depends: "backward-switch.Succeeded"
-            template: reboot-and-wait
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-
-          - name: post-backward
-            depends: "reboot-backward.Succeeded"
-            template: collect-evidence
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: step
-                  value: "post-backward"
-                - name: expected-image
-                  value: "{{inputs.parameters.legacy-image}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-                - name: aggregate-path
-                  value: "{{inputs.parameters.aggregate-path}}"
-
-          - name: verify-backward
-            depends: "post-backward.Succeeded"
-            template: verify-state
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{inputs.parameters.vm-ip}}"
-                - name: ssh-user
-                  value: "{{inputs.parameters.ssh-user}}"
-                - name: ssh-key-secret
-                  value: "{{inputs.parameters.ssh-key-secret}}"
-                - name: storage-variant
-                  value: "{{inputs.parameters.storage-variant}}"
-                - name: step
-                  value: "post-backward"
-                - name: expected-image
-                  value: "{{inputs.parameters.legacy-image}}"
-                - name: output-root
-                  value: "{{inputs.parameters.evidence-root}}"
-
-    - name: inspect-image-compression
-      inputs:
-        parameters:
+            value: '{{workflow.parameters.aggregate-path}}'
+        name: migrate
+        template: migration-sequence
+  - dag:
+      failFast: false
+      tasks:
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{inputs.parameters.ssh-key-secret}}'
           - name: legacy-image-ref
+            value: '{{inputs.parameters.legacy-image}}:{{inputs.parameters.image-tag}}'
           - name: chunkah-image-ref
+            value: '{{inputs.parameters.chunkah-image}}:{{inputs.parameters.chunkah-image-tag}}'
           - name: output-root
-            value: "/tmp/migration-results"
+            value: '{{inputs.parameters.evidence-root}}'
           - name: aggregate-path
-            value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 900
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/skopeo/stable:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          pkgs=""
-          command -v jq     >/dev/null 2>&1 || pkgs="$pkgs jq"
-          command -v skopeo >/dev/null 2>&1 || pkgs="$pkgs skopeo"
-          command -v ssh    >/dev/null 2>&1 || pkgs="$pkgs openssh-clients"
-          if [[ -n "$pkgs" ]]; then
-            dnf install -y --quiet $pkgs 2>&1 | tail -3
-          fi
-
-          VM_IP="{{inputs.parameters.vm-ip}}"
-          SSH_USER="{{inputs.parameters.ssh-user}}"
-          KEY="/etc/ssh/test-key/id_ed25519"
-          LEGACY_IMAGE_REF="{{inputs.parameters.legacy-image-ref}}"
-          CHUNKAH_IMAGE_REF="{{inputs.parameters.chunkah-image-ref}}"
-          OUTPUT_ROOT="{{inputs.parameters.output-root}}"
-          AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
-
-          inspect_image() {
-            local image_ref="$1"
-            local inspect_json=""
-            local rc=0
-            if inspect_json=$(skopeo inspect --override-os linux --override-arch amd64 "docker://${image_ref}" 2>&1); then
-              printf '%s' "${inspect_json}" | jq --arg image_ref "${image_ref}" '{image_ref: $image_ref, layers: (.LayersData | length), compression: (.LayersData[0].MIMEType // null), zstd_chunked: (([.LayersData[]? | select(.Annotations["io.github.containers.zstd-chunked.manifest-checksum"] != null)] | length) > 0), ostree_chunked: ((.LayersData[1:] // []) | all(.Annotations["ostree.components"] != null))}'
-            else
-              rc=$?
-              jq -n --arg image_ref "${image_ref}" --arg stderr "${inspect_json}" --argjson rc "${rc}" '{image_ref: $image_ref, rc: $rc, error: $stderr}'
-            fi
-          }
-
-          mkdir -p compression-output
-          inspect_image "${LEGACY_IMAGE_REF}" > compression-output/legacy.json
-          inspect_image "${CHUNKAH_IMAGE_REF}" > compression-output/chunkah.json
-
-          jq -n \
-            --arg step "compression-state" \
-            --arg vm_ip "${VM_IP}" \
-            --arg legacy_ref "${LEGACY_IMAGE_REF}" \
-            --arg chunkah_ref "${CHUNKAH_IMAGE_REF}" \
-            --slurpfile legacy compression-output/legacy.json \
-            --slurpfile chunkah compression-output/chunkah.json \
-            '{step: $step, vm_ip: $vm_ip, legacy_image_ref: $legacy_ref, chunkah_image_ref: $chunkah_ref, legacy: $legacy[0], chunkah: $chunkah[0], step_pass: true}' > compression-state.json
-
-          echo "=== compression-state (${VM_IP}) ==="
-          cat compression-state.json
-
-          ssh -i "${KEY}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            -o LogLevel=ERROR \
-            "${SSH_USER}@${VM_IP}" "mkdir -p ${OUTPUT_ROOT}" 2>/dev/null || true
-
-          scp -i "${KEY}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            -o LogLevel=ERROR \
-            compression-state.json "${SSH_USER}@${VM_IP}:${OUTPUT_ROOT}/compression-state.json" || true
-
-          if scp -i "${KEY}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            -o LogLevel=ERROR \
-            "${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}" migration-evidence.json 2>/dev/null; then
-            :
-          else
-            printf '[]\n' > migration-evidence.json
-          fi
-
-          jq '. |= map(select(.step != "compression-state")) + [input]' migration-evidence.json compression-state.json > migration-evidence.updated.json
-          mv migration-evidence.updated.json migration-evidence.json
-          scp -i "${KEY}" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            -o LogLevel=ERROR \
-            migration-evidence.json "${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}" || true
-    - name: prepare-storage-backend
-      inputs:
-        parameters:
+            value: '{{inputs.parameters.aggregate-path}}'
+        name: compression-inspect
+        template: inspect-image-compression
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{inputs.parameters.ssh-key-secret}}'
           - name: storage-variant
-            value: "default"
+            value: '{{inputs.parameters.storage-variant}}'
+          - name: step
+            value: pre-switch
+          - name: expected-image
+            value: '{{inputs.parameters.legacy-image}}'
           - name: output-root
-            value: "/tmp/migration-results"
+            value: '{{inputs.parameters.evidence-root}}'
           - name: aggregate-path
-            value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 1800
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/fedora/fedora:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 250m
-            memory: 256Mi
-          limits:
-            cpu: "1"
-            memory: 512Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
-
-          export VM_IP="{{inputs.parameters.vm-ip}}"
-          export SSH_USER="{{inputs.parameters.ssh-user}}"
-          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
-          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
-          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
-          export AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
-
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import subprocess
-          import sys
-
-          vm_ip = os.environ["VM_IP"]
-          vm_user = os.environ["SSH_USER"]
-          key = os.environ["SSH_KEY"]
-          storage_variant = os.environ["STORAGE_VARIANT"]
-          output_root = os.environ["OUTPUT_ROOT"]
-          aggregate_path = os.environ["AGGREGATE_PATH"]
-          step = "storage-prepare"
-
-          ssh_base = [
-              "ssh", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-              f"{vm_user}@{vm_ip}",
-          ]
-          scp_base = [
-              "scp", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-          ]
-
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
-
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
-
-          if storage_variant == "experimental-unified-storage":
-              command = "sudo bootc image set-unified"
-              result = run_remote(command)
-          else:
-              command = "echo default-storage"
-              result = subprocess.CompletedProcess(command, 0, "default storage variant; skipping bootc image set-unified\n", "")
-
-          storage_info = run_remote("if [ -e /usr/lib/bootc/storage ]; then ls -ld /usr/lib/bootc/storage; readlink -f /usr/lib/bootc/storage || true; du -sh /usr/lib/bootc/storage 2>/dev/null || true; else echo '__BOOTC_STORAGE_MISSING__'; fi")
-          bootc_status = run_remote("sudo bootc status --json")
-
-          storage_ready = result.returncode == 0 and (
-              storage_variant != "experimental-unified-storage"
-              or "__BOOTC_STORAGE_MISSING__" not in storage_info.stdout
-          )
-
-          payload = {
-              "step": step,
-              "vm_ip": vm_ip,
-              "storage_variant": storage_variant,
-              "command": command,
-              "returncode": result.returncode,
-              "stdout": result.stdout.rstrip(),
-              "stderr": result.stderr.rstrip(),
-              "step_pass": storage_ready,
-              "storage_info": {
-                  "rc": storage_info.returncode,
-                  "stdout": storage_info.stdout.rstrip(),
-                  "stderr": storage_info.stderr.rstrip(),
-              },
-              "bootc_status": {
-                  "rc": bootc_status.returncode,
-                  "stdout": bootc_status.stdout.rstrip(),
-                  "stderr": bootc_status.stderr.rstrip(),
-              },
-          }
-
-          step_file = pathlib.Path(f"{step}.json")
-          step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
-
-          aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
-          aggregate = []
-          if fetch.returncode == 0:
-              try:
-                  loaded = json.loads(aggregate_file.read_text(encoding="utf-8"))
-                  if isinstance(loaded, list):
-                      aggregate = loaded
-              except Exception:
-                  aggregate = []
-          aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
-          aggregate.append(payload)
-          aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
-
-          print(f"=== {step} ({storage_variant}) ({vm_ip}) ===")
-          print(json.dumps(payload, indent=2))
-          sys.exit(0 if payload["step_pass"] else 1)
-          PY
-
-    - name: run-bootc-switch
-      inputs:
-        parameters:
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: compression-inspect
+        name: pre-switch
+        template: collect-evidence
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{inputs.parameters.ssh-key-secret}}'
           - name: storage-variant
-            value: "default"
+            value: '{{inputs.parameters.storage-variant}}'
+          - name: output-root
+            value: '{{inputs.parameters.evidence-root}}'
+          - name: aggregate-path
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: pre-switch.Succeeded
+        name: storage-prepare
+        template: prepare-storage-backend
+      - arguments:
+          parameters:
+          - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
+          - name: ssh-user
+            value: '{{inputs.parameters.ssh-user}}'
+          - name: ssh-key-secret
+            value: '{{inputs.parameters.ssh-key-secret}}'
+          - name: storage-variant
+            value: '{{inputs.parameters.storage-variant}}'
           - name: direction
+            value: forward
           - name: image-ref
+            value: '{{inputs.parameters.chunkah-image}}:{{inputs.parameters.chunkah-image-tag}}'
           - name: output-root
-            value: "/tmp/migration-results"
+            value: '{{inputs.parameters.evidence-root}}'
           - name: aggregate-path
-            value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 1800
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/fedora/fedora:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 250m
-            memory: 256Mi
-          limits:
-            cpu: "1"
-            memory: 512Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
-
-          export VM_IP="{{inputs.parameters.vm-ip}}"
-          export SSH_USER="{{inputs.parameters.ssh-user}}"
-          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
-          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
-          export DIRECTION="{{inputs.parameters.direction}}"
-          export IMAGE_REF="{{inputs.parameters.image-ref}}"
-          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
-          export AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
-
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import shlex
-          import subprocess
-          import sys
-
-          vm_ip = os.environ["VM_IP"]
-          vm_user = os.environ["SSH_USER"]
-          key = os.environ["SSH_KEY"]
-          storage_variant = os.environ["STORAGE_VARIANT"]
-          direction = os.environ["DIRECTION"]
-          image_ref = os.environ["IMAGE_REF"]
-          output_root = os.environ["OUTPUT_ROOT"]
-          aggregate_path = os.environ["AGGREGATE_PATH"]
-          step = f"switch-{direction}"
-
-          ssh_base = [
-              "ssh", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-              f"{vm_user}@{vm_ip}",
-          ]
-          scp_base = [
-              "scp", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-          ]
-
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
-
-          def parse_json(text: str):
-              try:
-                  return json.loads(text) if text else None
-              except json.JSONDecodeError:
-                  return None
-
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
-
-          flags = ["--enforce-container-sigpolicy"]
-          if storage_variant == "experimental-unified-storage":
-              flags.append("--experimental-unified-storage")
-          switch_cmd = "sudo bootc switch " + " ".join(flags) + f" {shlex.quote(image_ref)}"
-          switch_result = run_remote(switch_cmd)
-          bootc_status = run_remote("sudo bootc status --json")
-          ostree_status = run_remote("sudo ostree admin status")
-
-          payload = {
-              "step": step,
-              "direction": direction,
-              "storage_variant": storage_variant,
-              "image_ref": image_ref,
-              "vm_ip": vm_ip,
-              "switch_command": switch_cmd,
-              "returncode": switch_result.returncode,
-              "stdout": switch_result.stdout.rstrip(),
-              "stderr": switch_result.stderr.rstrip(),
-              "switch_pass": switch_result.returncode == 0,
-              "post_switch_bootc_status": {
-                  "rc": bootc_status.returncode,
-                  "json": parse_json(bootc_status.stdout),
-                  "raw": bootc_status.stdout.rstrip(),
-                  "stderr": bootc_status.stderr.rstrip(),
-              },
-              "post_switch_ostree_status": {
-                  "rc": ostree_status.returncode,
-                  "stdout": ostree_status.stdout.rstrip(),
-                  "stderr": ostree_status.stderr.rstrip(),
-              },
-          }
-
-          step_file = pathlib.Path(f"{step}.json")
-          step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
-
-          aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
-          aggregate = []
-          if fetch.returncode == 0:
-              try:
-                  loaded = json.loads(aggregate_file.read_text(encoding="utf-8"))
-                  if isinstance(loaded, list):
-                      aggregate = loaded
-              except Exception:
-                  aggregate = []
-          aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
-          aggregate.append(payload)
-          aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
-
-          print(f"=== {step} ({storage_variant}) ({vm_ip}) ===")
-          if payload["stdout"]:
-              print(payload["stdout"])
-          if payload["stderr"]:
-              print(payload["stderr"])
-          print(json.dumps(payload, indent=2))
-          sys.exit(switch_result.returncode)
-          PY
-
-    - name: reboot-and-wait
-      inputs:
-        parameters:
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: storage-prepare.Succeeded
+        name: forward-switch
+        template: run-bootc-switch
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 900
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/fedora/fedora:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
-
-          VM_IP="{{inputs.parameters.vm-ip}}"
-          SSH_USER="{{inputs.parameters.ssh-user}}"
-          KEY="/etc/ssh/test-key/id_ed25519"
-          SSH=(ssh -i "${KEY}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o LogLevel=ERROR "${SSH_USER}@${VM_IP}")
-
-          echo "Requesting reboot for ${VM_IP}..." >&2
-          set +e
-          "${SSH[@]}" sudo reboot >/dev/null 2>&1
-          REBOOT_RC=$?
-          set -e
-          echo "Initial reboot command exit: ${REBOOT_RC} (disconnect is expected)" >&2
-
-          SEEN_DOWN=0
-          for _ in $(seq 1 24); do
-            if ! "${SSH[@]}" true >/dev/null 2>&1; then
-              SEEN_DOWN=1
-              break
-            fi
-            sleep 5
-          done
-          if [[ "${SEEN_DOWN}" -eq 0 ]]; then
-            echo "WARNING: SSH never went down after reboot request; continuing to readiness wait" >&2
-          fi
-
-          echo "Waiting for SSH to return on ${VM_IP}..." >&2
-          for _ in $(seq 1 72); do
-            if "${SSH[@]}" true >/dev/null 2>&1; then
-              echo "SSH is back on ${VM_IP}" >&2
-              exit 0
-            fi
-            sleep 5
-          done
-
-          echo "ERROR: timed out waiting for ${VM_IP} after reboot" >&2
-          exit 1
-
-    - name: collect-evidence
-      inputs:
-        parameters:
+            value: '{{inputs.parameters.ssh-key-secret}}'
+        depends: forward-switch.Succeeded
+        name: reboot-forward
+        template: reboot-and-wait
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{inputs.parameters.ssh-key-secret}}'
           - name: storage-variant
-            value: "default"
+            value: '{{inputs.parameters.storage-variant}}'
           - name: step
+            value: post-forward
           - name: expected-image
-            value: ""
+            value: '{{inputs.parameters.chunkah-image}}'
           - name: output-root
-            value: "/tmp/migration-results"
+            value: '{{inputs.parameters.evidence-root}}'
           - name: aggregate-path
-            value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 900
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/fedora/fedora:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 250m
-            memory: 256Mi
-          limits:
-            cpu: "1"
-            memory: 512Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
-
-          export VM_IP="{{inputs.parameters.vm-ip}}"
-          export SSH_USER="{{inputs.parameters.ssh-user}}"
-          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
-          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
-          export STEP="{{inputs.parameters.step}}"
-          export EXPECTED_IMAGE="{{inputs.parameters.expected-image}}"
-          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
-          export AGGREGATE_PATH="{{inputs.parameters.aggregate-path}}"
-
-          python3 - <<'PY'
-          import json
-          import os
-          import pathlib
-          import subprocess
-          import sys
-
-          vm_ip = os.environ["VM_IP"]
-          vm_user = os.environ["SSH_USER"]
-          key = os.environ["SSH_KEY"]
-          storage_variant = os.environ["STORAGE_VARIANT"]
-          step = os.environ["STEP"]
-          expected_image = os.environ.get("EXPECTED_IMAGE", "")
-          output_root = os.environ["OUTPUT_ROOT"]
-          aggregate_path = os.environ["AGGREGATE_PATH"]
-
-          ssh_base = [
-              "ssh", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-              f"{vm_user}@{vm_ip}",
-          ]
-          scp_base = [
-              "scp", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-          ]
-
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
-
-          def capture(command: str):
-              result = run_remote(command)
-              return {
-                  "command": command,
-                  "rc": result.returncode,
-                  "stdout": result.stdout.rstrip(),
-                  "stderr": result.stderr.rstrip(),
-              }
-
-          def parse_json(text: str):
-              try:
-                  return json.loads(text) if text else None
-              except json.JSONDecodeError:
-                  return None
-
-          def parse_int(text: str):
-              try:
-                  return int((text or "").strip())
-              except ValueError:
-                  return None
-
-          def get_active_image(data):
-              if not isinstance(data, dict):
-                  return ""
-              booted = data.get("status", {}).get("booted", {})
-              image = booted.get("image") or {}
-              nested = image.get("image") if isinstance(image, dict) else None
-              candidates = []
-              if isinstance(nested, dict):
-                  candidates.append(nested.get("image"))
-              if isinstance(image, dict):
-                  candidates.append(image.get("image"))
-              candidates.append(booted.get("imageReference"))
-              for candidate in candidates:
-                  if isinstance(candidate, str) and candidate:
-                      return candidate
-              return ""
-
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
-
-          results = {
-              "bootc_status_json": capture("sudo bootc status --json"),
-              "ostree_admin_status": capture("sudo ostree admin status"),
-              "bootc_package": capture("rpm -q bootc"),
-              "journal_errors": capture("sudo journalctl -b -p err --no-pager -n 50"),
-              "rechunker_group_fix": capture("if systemctl list-unit-files rechunker-group-fix.service --no-legend 2>/dev/null | grep -q '^rechunker-group-fix.service'; then sudo journalctl -b -u rechunker-group-fix --no-pager; else echo '__SERVICE_NOT_PRESENT__'; fi"),
-              "group_count": capture("getent group | wc -l"),
-              "gshadow_count": capture("sudo cat /etc/gshadow | wc -l"),
-              "service_health": capture("systemctl is-active gdm sshd"),
-              "loginctl_status": capture("loginctl status || loginctl list-sessions"),
-              "storage_info": capture("if [ -e /usr/lib/bootc/storage ]; then ls -ld /usr/lib/bootc/storage; readlink -f /usr/lib/bootc/storage || true; du -sh /usr/lib/bootc/storage 2>/dev/null || true; else echo '__BOOTC_STORAGE_MISSING__'; fi"),
-            }
-
-          bootc_data = None
-          if results["bootc_status_json"]["rc"] == 0:
-              bootc_data = parse_json(results["bootc_status_json"]["stdout"])
-
-          active_image = get_active_image(bootc_data)
-          group_count = parse_int(results["group_count"]["stdout"])
-          gshadow_count = parse_int(results["gshadow_count"]["stdout"])
-          service_states = [line.strip() for line in results["service_health"]["stdout"].splitlines() if line.strip()]
-          storage_missing = "__BOOTC_STORAGE_MISSING__" in results["storage_info"]["stdout"]
-
-          checks = {
-              "bootc_status": {
-                  "pass": results["bootc_status_json"]["rc"] == 0 and bootc_data is not None,
-              },
-              "ostree_admin_status": {
-                  "pass": results["ostree_admin_status"]["rc"] == 0,
-              },
-              "bootc_package": {
-                  "pass": results["bootc_package"]["rc"] == 0,
-                  "package": results["bootc_package"]["stdout"],
-              },
-              "group_sync": {
-                  "pass": group_count is not None and gshadow_count is not None and group_count == gshadow_count,
-                  "group_count": group_count,
-                  "gshadow_count": gshadow_count,
-              },
-              "services": {
-                  "pass": bool(service_states) and all(state == "active" for state in service_states),
-                  "states": service_states,
-              },
-              "expected_image": {
-                  "pass": True if not expected_image else expected_image in active_image,
-                  "expected": expected_image,
-                  "actual": active_image,
-              },
-              "loginctl": {
-                  "pass": results["loginctl_status"]["rc"] == 0,
-              },
-              "storage_backend": {
-                  "pass": True if storage_variant == "default" else not storage_missing,
-                  "variant": storage_variant,
-                  "missing": storage_missing,
-              },
-          }
-
-          step_pass = all(
-              checks[name]["pass"]
-              for name in ("bootc_status", "ostree_admin_status", "bootc_package", "group_sync", "services", "expected_image", "storage_backend")
-          )
-
-          payload = {
-              "step": step,
-              "vm_ip": vm_ip,
-              "storage_variant": storage_variant,
-              "expected_image": expected_image,
-              "active_image": active_image,
-              "step_pass": step_pass,
-              "checks": checks,
-              "bootc_status": bootc_data,
-              "commands": results,
-          }
-
-          step_file = pathlib.Path(f"{step}.json")
-          step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
-
-          aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
-          aggregate = []
-          if fetch.returncode == 0:
-              try:
-                  loaded = json.loads(aggregate_file.read_text(encoding="utf-8"))
-                  if isinstance(loaded, list):
-                      aggregate = loaded
-              except Exception:
-                  aggregate = []
-          aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
-          aggregate.append(payload)
-          aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
-
-          print(f"=== {step} evidence ({storage_variant}) ({vm_ip}) ===")
-          print(json.dumps(payload, indent=2))
-          sys.exit(0 if step_pass else 1)
-          PY
-
-    - name: verify-state
-      inputs:
-        parameters:
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: reboot-forward.Succeeded
+        name: post-forward
+        template: collect-evidence
+      - arguments:
+          parameters:
           - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
           - name: ssh-user
-            value: "bluefin-test"
+            value: '{{inputs.parameters.ssh-user}}'
           - name: ssh-key-secret
-            value: "bluefin-test-ssh-key"
+            value: '{{inputs.parameters.ssh-key-secret}}'
           - name: storage-variant
-            value: "default"
+            value: '{{inputs.parameters.storage-variant}}'
           - name: step
+            value: post-forward
           - name: expected-image
-            value: ""
+            value: '{{inputs.parameters.chunkah-image}}'
           - name: output-root
-            value: "/tmp/migration-results"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      activeDeadlineSeconds: 600
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-      volumes:
-        - name: ssh-key
-          secret:
-            secretName: "{{inputs.parameters.ssh-key-secret}}"
-            defaultMode: 0400
-      script:
-        image: quay.io/fedora/fedora:latest
-        command: [bash]
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
-        volumeMounts:
-          - name: ssh-key
-            mountPath: /etc/ssh/test-key
-            readOnly: true
-        source: |
-          set -euo pipefail
-          if ! command -v ssh >/dev/null 2>&1; then
-            dnf install -y --quiet openssh-clients 2>&1 | tail -2
-          fi
+            value: '{{inputs.parameters.evidence-root}}'
+        depends: post-forward.Succeeded
+        name: verify-forward
+        template: verify-state
+      - arguments:
+          parameters:
+          - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
+          - name: ssh-user
+            value: '{{inputs.parameters.ssh-user}}'
+          - name: ssh-key-secret
+            value: '{{inputs.parameters.ssh-key-secret}}'
+          - name: storage-variant
+            value: '{{inputs.parameters.storage-variant}}'
+          - name: direction
+            value: backward
+          - name: image-ref
+            value: '{{inputs.parameters.legacy-image}}:{{inputs.parameters.image-tag}}'
+          - name: output-root
+            value: '{{inputs.parameters.evidence-root}}'
+          - name: aggregate-path
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: verify-forward.Succeeded
+        name: backward-switch
+        template: run-bootc-switch
+      - arguments:
+          parameters:
+          - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
+          - name: ssh-user
+            value: '{{inputs.parameters.ssh-user}}'
+          - name: ssh-key-secret
+            value: '{{inputs.parameters.ssh-key-secret}}'
+        depends: backward-switch.Succeeded
+        name: reboot-backward
+        template: reboot-and-wait
+      - arguments:
+          parameters:
+          - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
+          - name: ssh-user
+            value: '{{inputs.parameters.ssh-user}}'
+          - name: ssh-key-secret
+            value: '{{inputs.parameters.ssh-key-secret}}'
+          - name: storage-variant
+            value: '{{inputs.parameters.storage-variant}}'
+          - name: step
+            value: post-backward
+          - name: expected-image
+            value: '{{inputs.parameters.legacy-image}}'
+          - name: output-root
+            value: '{{inputs.parameters.evidence-root}}'
+          - name: aggregate-path
+            value: '{{inputs.parameters.aggregate-path}}'
+        depends: reboot-backward.Succeeded
+        name: post-backward
+        template: collect-evidence
+      - arguments:
+          parameters:
+          - name: vm-ip
+            value: '{{inputs.parameters.vm-ip}}'
+          - name: ssh-user
+            value: '{{inputs.parameters.ssh-user}}'
+          - name: ssh-key-secret
+            value: '{{inputs.parameters.ssh-key-secret}}'
+          - name: storage-variant
+            value: '{{inputs.parameters.storage-variant}}'
+          - name: step
+            value: post-backward
+          - name: expected-image
+            value: '{{inputs.parameters.legacy-image}}'
+          - name: output-root
+            value: '{{inputs.parameters.evidence-root}}'
+        depends: post-backward.Succeeded
+        name: verify-backward
+        template: verify-state
+    inputs:
+      parameters:
+      - name: image-tag
+      - name: vm-name
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: legacy-image
+        value: ghcr.io/ublue-os/bluefin
+      - name: chunkah-image
+        value: ghcr.io/projectbluefin/bluefin
+      - name: chunkah-image-tag
+        value: latest
+      - name: storage-variant
+        value: default
+      - name: evidence-root
+        value: /tmp/migration-results
+      - name: aggregate-path
+        value: /tmp/migration-evidence.json
+    name: migration-sequence
+  - activeDeadlineSeconds: 900
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: legacy-image-ref
+      - name: chunkah-image-ref
+      - name: output-root
+        value: /tmp/migration-results
+      - name: aggregate-path
+        value: /tmp/migration-evidence.json
+    name: inspect-image-compression
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
 
-          export VM_IP="{{inputs.parameters.vm-ip}}"
-          export SSH_USER="{{inputs.parameters.ssh-user}}"
-          export SSH_KEY="/etc/ssh/test-key/id_ed25519"
-          export STORAGE_VARIANT="{{inputs.parameters.storage-variant}}"
-          export STEP="{{inputs.parameters.step}}"
-          export EXPECTED_IMAGE="{{inputs.parameters.expected-image}}"
-          export OUTPUT_ROOT="{{inputs.parameters.output-root}}"
+      dnsPolicy: ClusterFirstWithHostNet
 
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          import sys
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/skopeo/stable:latest
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      source: "set -euo pipefail\npkgs=\"\"\ncommand -v jq     >/dev/null 2>&1 ||\
+        \ pkgs=\"$pkgs jq\"\ncommand -v skopeo >/dev/null 2>&1 || pkgs=\"$pkgs skopeo\"\
+        \ncommand -v ssh    >/dev/null 2>&1 || pkgs=\"$pkgs openssh-clients\"\nif\
+        \ [[ -n \"$pkgs\" ]]; then\n  dnf install -y --quiet $pkgs 2>&1 | tail -3\n\
+        fi\n\nVM_IP=\"{{inputs.parameters.vm-ip}}\"\nSSH_USER=\"{{inputs.parameters.ssh-user}}\"\
+        \nKEY=\"/etc/ssh/test-key/id_ed25519\"\nLEGACY_IMAGE_REF=\"{{inputs.parameters.legacy-image-ref}}\"\
+        \nCHUNKAH_IMAGE_REF=\"{{inputs.parameters.chunkah-image-ref}}\"\nOUTPUT_ROOT=\"\
+        {{inputs.parameters.output-root}}\"\nAGGREGATE_PATH=\"{{inputs.parameters.aggregate-path}}\"\
+        \n\ninspect_image() {\n  local image_ref=\"$1\"\n  local inspect_json=\"\"\
+        \n  local rc=0\n  if inspect_json=$(skopeo inspect --override-os linux --override-arch\
+        \ amd64 \"docker://${image_ref}\" 2>&1); then\n    printf '%s' \"${inspect_json}\"\
+        \ | jq --arg image_ref \"${image_ref}\" '{image_ref: $image_ref, layers: (.LayersData\
+        \ | length), compression: (.LayersData[0].MIMEType // null), zstd_chunked:\
+        \ (([.LayersData[]? | select(.Annotations[\"io.github.containers.zstd-chunked.manifest-checksum\"\
+        ] != null)] | length) > 0), ostree_chunked: ((.LayersData[1:] // []) | all(.Annotations[\"\
+        ostree.components\"] != null))}'\n  else\n    rc=$?\n    jq -n --arg image_ref\
+        \ \"${image_ref}\" --arg stderr \"${inspect_json}\" --argjson rc \"${rc}\"\
+        \ '{image_ref: $image_ref, rc: $rc, error: $stderr}'\n  fi\n}\n\nmkdir -p\
+        \ compression-output\ninspect_image \"${LEGACY_IMAGE_REF}\" > compression-output/legacy.json\n\
+        inspect_image \"${CHUNKAH_IMAGE_REF}\" > compression-output/chunkah.json\n\
+        \njq -n \\\n  --arg step \"compression-state\" \\\n  --arg vm_ip \"${VM_IP}\"\
+        \ \\\n  --arg legacy_ref \"${LEGACY_IMAGE_REF}\" \\\n  --arg chunkah_ref \"\
+        ${CHUNKAH_IMAGE_REF}\" \\\n  --slurpfile legacy compression-output/legacy.json\
+        \ \\\n  --slurpfile chunkah compression-output/chunkah.json \\\n  '{step:\
+        \ $step, vm_ip: $vm_ip, legacy_image_ref: $legacy_ref, chunkah_image_ref:\
+        \ $chunkah_ref, legacy: $legacy[0], chunkah: $chunkah[0], step_pass: true}'\
+        \ > compression-state.json\n\necho \"=== compression-state (${VM_IP}) ===\"\
+        \ncat compression-state.json\n\nssh -i \"${KEY}\" \\\n  -o StrictHostKeyChecking=no\
+        \ \\\n  -o UserKnownHostsFile=/dev/null \\\n  -o ConnectTimeout=10 \\\n  -o\
+        \ LogLevel=ERROR \\\n  \"${SSH_USER}@${VM_IP}\" \"mkdir -p ${OUTPUT_ROOT}\"\
+        \ 2>/dev/null || true\n\nscp -i \"${KEY}\" \\\n  -o StrictHostKeyChecking=no\
+        \ \\\n  -o UserKnownHostsFile=/dev/null \\\n  -o ConnectTimeout=10 \\\n  -o\
+        \ LogLevel=ERROR \\\n  compression-state.json \"${SSH_USER}@${VM_IP}:${OUTPUT_ROOT}/compression-state.json\"\
+        \ || true\n\nif scp -i \"${KEY}\" \\\n  -o StrictHostKeyChecking=no \\\n \
+        \ -o UserKnownHostsFile=/dev/null \\\n  -o ConnectTimeout=10 \\\n  -o LogLevel=ERROR\
+        \ \\\n  \"${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}\" migration-evidence.json\
+        \ 2>/dev/null; then\n  :\nelse\n  printf '[]\\n' > migration-evidence.json\n\
+        fi\n\njq '. |= map(select(.step != \"compression-state\")) + [input]' migration-evidence.json\
+        \ compression-state.json > migration-evidence.updated.json\nmv migration-evidence.updated.json\
+        \ migration-evidence.json\nscp -i \"${KEY}\" \\\n  -o StrictHostKeyChecking=no\
+        \ \\\n  -o UserKnownHostsFile=/dev/null \\\n  -o ConnectTimeout=10 \\\n  -o\
+        \ LogLevel=ERROR \\\n  migration-evidence.json \"${SSH_USER}@${VM_IP}:${AGGREGATE_PATH}\"\
+        \ || true\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - activeDeadlineSeconds: 1800
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: storage-variant
+        value: default
+      - name: output-root
+        value: /tmp/migration-results
+      - name: aggregate-path
+        value: /tmp/migration-evidence.json
+    name: prepare-storage-backend
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
 
-          vm_ip = os.environ["VM_IP"]
-          vm_user = os.environ["SSH_USER"]
-          key = os.environ["SSH_KEY"]
-          storage_variant = os.environ["STORAGE_VARIANT"]
-          step = os.environ["STEP"]
-          expected_image = os.environ.get("EXPECTED_IMAGE", "")
-          output_root = os.environ["OUTPUT_ROOT"]
+      dnsPolicy: ClusterFirstWithHostNet
 
-          ssh_base = [
-              "ssh", "-i", key,
-              "-o", "StrictHostKeyChecking=no",
-              "-o", "UserKnownHostsFile=/dev/null",
-              "-o", "ConnectTimeout=10",
-              "-o", "LogLevel=ERROR",
-              f"{vm_user}@{vm_ip}",
-          ]
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/fedora/fedora:latest
+      resources:
+        limits:
+          cpu: '1'
+          memory: 512Mi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+      source: "set -euo pipefail\nif ! command -v ssh >/dev/null 2>&1; then\n  dnf\
+        \ install -y --quiet openssh-clients 2>&1 | tail -2\nfi\n\nexport VM_IP=\"\
+        {{inputs.parameters.vm-ip}}\"\nexport SSH_USER=\"{{inputs.parameters.ssh-user}}\"\
+        \nexport SSH_KEY=\"/etc/ssh/test-key/id_ed25519\"\nexport STORAGE_VARIANT=\"\
+        {{inputs.parameters.storage-variant}}\"\nexport OUTPUT_ROOT=\"{{inputs.parameters.output-root}}\"\
+        \nexport AGGREGATE_PATH=\"{{inputs.parameters.aggregate-path}}\"\n\npython3\
+        \ - <<'PY'\nimport json\nimport os\nimport pathlib\nimport subprocess\nimport\
+        \ sys\n\nvm_ip = os.environ[\"VM_IP\"]\nvm_user = os.environ[\"SSH_USER\"\
+        ]\nkey = os.environ[\"SSH_KEY\"]\nstorage_variant = os.environ[\"STORAGE_VARIANT\"\
+        ]\noutput_root = os.environ[\"OUTPUT_ROOT\"]\naggregate_path = os.environ[\"\
+        AGGREGATE_PATH\"]\nstep = \"storage-prepare\"\n\nssh_base = [\n    \"ssh\"\
+        , \"-i\", key,\n    \"-o\", \"StrictHostKeyChecking=no\",\n    \"-o\", \"\
+        UserKnownHostsFile=/dev/null\",\n    \"-o\", \"ConnectTimeout=10\",\n    \"\
+        -o\", \"LogLevel=ERROR\",\n    f\"{vm_user}@{vm_ip}\",\n]\nscp_base = [\n\
+        \    \"scp\", \"-i\", key,\n    \"-o\", \"StrictHostKeyChecking=no\",\n  \
+        \  \"-o\", \"UserKnownHostsFile=/dev/null\",\n    \"-o\", \"ConnectTimeout=10\"\
+        ,\n    \"-o\", \"LogLevel=ERROR\",\n]\n\ndef run_remote(command: str) -> subprocess.CompletedProcess:\n\
+        \    return subprocess.run(ssh_base + [\"bash\", \"-lc\", command], text=True,\
+        \ capture_output=True)\n\nsubprocess.run(ssh_base + [\"mkdir\", \"-p\", output_root],\
+        \ check=True, text=True)\n\nif storage_variant == \"experimental-unified-storage\"\
+        :\n    command = \"sudo bootc image set-unified\"\n    result = run_remote(command)\n\
+        else:\n    command = \"echo default-storage\"\n    result = subprocess.CompletedProcess(command,\
+        \ 0, \"default storage variant; skipping bootc image set-unified\\n\", \"\"\
+        )\n\nstorage_info = run_remote(\"if [ -e /usr/lib/bootc/storage ]; then ls\
+        \ -ld /usr/lib/bootc/storage; readlink -f /usr/lib/bootc/storage || true;\
+        \ du -sh /usr/lib/bootc/storage 2>/dev/null || true; else echo '__BOOTC_STORAGE_MISSING__';\
+        \ fi\")\nbootc_status = run_remote(\"sudo bootc status --json\")\n\nstorage_ready\
+        \ = result.returncode == 0 and (\n    storage_variant != \"experimental-unified-storage\"\
+        \n    or \"__BOOTC_STORAGE_MISSING__\" not in storage_info.stdout\n)\n\npayload\
+        \ = {\n    \"step\": step,\n    \"vm_ip\": vm_ip,\n    \"storage_variant\"\
+        : storage_variant,\n    \"command\": command,\n    \"returncode\": result.returncode,\n\
+        \    \"stdout\": result.stdout.rstrip(),\n    \"stderr\": result.stderr.rstrip(),\n\
+        \    \"step_pass\": storage_ready,\n    \"storage_info\": {\n        \"rc\"\
+        : storage_info.returncode,\n        \"stdout\": storage_info.stdout.rstrip(),\n\
+        \        \"stderr\": storage_info.stderr.rstrip(),\n    },\n    \"bootc_status\"\
+        : {\n        \"rc\": bootc_status.returncode,\n        \"stdout\": bootc_status.stdout.rstrip(),\n\
+        \        \"stderr\": bootc_status.stderr.rstrip(),\n    },\n}\n\nstep_file\
+        \ = pathlib.Path(f\"{step}.json\")\nstep_file.write_text(json.dumps(payload,\
+        \ indent=2) + \"\\n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(step_file),\
+        \ f\"{vm_user}@{vm_ip}:{output_root}/{step}.json\"], check=True, text=True)\n\
+        \naggregate_file = pathlib.Path(\"migration-evidence.json\")\nfetch = subprocess.run(scp_base\
+        \ + [f\"{vm_user}@{vm_ip}:{aggregate_path}\", str(aggregate_file)], text=True,\
+        \ capture_output=True)\naggregate = []\nif fetch.returncode == 0:\n    try:\n\
+        \        loaded = json.loads(aggregate_file.read_text(encoding=\"utf-8\"))\n\
+        \        if isinstance(loaded, list):\n            aggregate = loaded\n  \
+        \  except Exception:\n        aggregate = []\naggregate = [item for item in\
+        \ aggregate if not (isinstance(item, dict) and item.get(\"step\") == step)]\n\
+        aggregate.append(payload)\naggregate_file.write_text(json.dumps(aggregate,\
+        \ indent=2) + \"\\n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(aggregate_file),\
+        \ f\"{vm_user}@{vm_ip}:{aggregate_path}\"], check=True, text=True)\n\nprint(f\"\
+        === {step} ({storage_variant}) ({vm_ip}) ===\")\nprint(json.dumps(payload,\
+        \ indent=2))\nsys.exit(0 if payload[\"step_pass\"] else 1)\nPY\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - activeDeadlineSeconds: 1800
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: storage-variant
+        value: default
+      - name: direction
+      - name: image-ref
+      - name: output-root
+        value: /tmp/migration-results
+      - name: aggregate-path
+        value: /tmp/migration-evidence.json
+    name: run-bootc-switch
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
 
-          result = subprocess.run(ssh_base + ["cat", f"{output_root}/{step}.json"], text=True, capture_output=True)
-          if result.returncode != 0:
-              print(result.stderr.rstrip(), file=sys.stderr)
-              sys.exit(result.returncode)
+      dnsPolicy: ClusterFirstWithHostNet
 
-          payload = json.loads(result.stdout)
-          checks = payload.get("checks", {})
-          failures = []
-          if not payload.get("step_pass"):
-              failures.append("step_pass=false")
-          if expected_image and not checks.get("expected_image", {}).get("pass"):
-              failures.append(f"expected image mismatch: {checks.get('expected_image', {}).get('actual', '')}")
-          if not checks.get("services", {}).get("pass"):
-              failures.append("services unhealthy")
-          if not checks.get("group_sync", {}).get("pass"):
-              failures.append("group/gshadow mismatch")
-          if storage_variant == "experimental-unified-storage" and not checks.get("storage_backend", {}).get("pass"):
-              failures.append("experimental unified storage not detected")
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/fedora/fedora:latest
+      resources:
+        limits:
+          cpu: '1'
+          memory: 512Mi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+      source: "set -euo pipefail\nif ! command -v ssh >/dev/null 2>&1; then\n  dnf\
+        \ install -y --quiet openssh-clients 2>&1 | tail -2\nfi\n\nexport VM_IP=\"\
+        {{inputs.parameters.vm-ip}}\"\nexport SSH_USER=\"{{inputs.parameters.ssh-user}}\"\
+        \nexport SSH_KEY=\"/etc/ssh/test-key/id_ed25519\"\nexport STORAGE_VARIANT=\"\
+        {{inputs.parameters.storage-variant}}\"\nexport DIRECTION=\"{{inputs.parameters.direction}}\"\
+        \nexport IMAGE_REF=\"{{inputs.parameters.image-ref}}\"\nexport OUTPUT_ROOT=\"\
+        {{inputs.parameters.output-root}}\"\nexport AGGREGATE_PATH=\"{{inputs.parameters.aggregate-path}}\"\
+        \n\npython3 - <<'PY'\nimport json\nimport os\nimport pathlib\nimport shlex\n\
+        import subprocess\nimport sys\n\nvm_ip = os.environ[\"VM_IP\"]\nvm_user =\
+        \ os.environ[\"SSH_USER\"]\nkey = os.environ[\"SSH_KEY\"]\nstorage_variant\
+        \ = os.environ[\"STORAGE_VARIANT\"]\ndirection = os.environ[\"DIRECTION\"\
+        ]\nimage_ref = os.environ[\"IMAGE_REF\"]\noutput_root = os.environ[\"OUTPUT_ROOT\"\
+        ]\naggregate_path = os.environ[\"AGGREGATE_PATH\"]\nstep = f\"switch-{direction}\"\
+        \n\nssh_base = [\n    \"ssh\", \"-i\", key,\n    \"-o\", \"StrictHostKeyChecking=no\"\
+        ,\n    \"-o\", \"UserKnownHostsFile=/dev/null\",\n    \"-o\", \"ConnectTimeout=10\"\
+        ,\n    \"-o\", \"LogLevel=ERROR\",\n    f\"{vm_user}@{vm_ip}\",\n]\nscp_base\
+        \ = [\n    \"scp\", \"-i\", key,\n    \"-o\", \"StrictHostKeyChecking=no\"\
+        ,\n    \"-o\", \"UserKnownHostsFile=/dev/null\",\n    \"-o\", \"ConnectTimeout=10\"\
+        ,\n    \"-o\", \"LogLevel=ERROR\",\n]\n\ndef run_remote(command: str) -> subprocess.CompletedProcess:\n\
+        \    return subprocess.run(ssh_base + [\"bash\", \"-lc\", command], text=True,\
+        \ capture_output=True)\n\ndef parse_json(text: str):\n    try:\n        return\
+        \ json.loads(text) if text else None\n    except json.JSONDecodeError:\n \
+        \       return None\n\nsubprocess.run(ssh_base + [\"mkdir\", \"-p\", output_root],\
+        \ check=True, text=True)\n\nflags = [\"--enforce-container-sigpolicy\"]\n\
+        if storage_variant == \"experimental-unified-storage\":\n    flags.append(\"\
+        --experimental-unified-storage\")\nswitch_cmd = \"sudo bootc switch \" + \"\
+        \ \".join(flags) + f\" {shlex.quote(image_ref)}\"\nswitch_result = run_remote(switch_cmd)\n\
+        bootc_status = run_remote(\"sudo bootc status --json\")\nostree_status = run_remote(\"\
+        sudo ostree admin status\")\n\npayload = {\n    \"step\": step,\n    \"direction\"\
+        : direction,\n    \"storage_variant\": storage_variant,\n    \"image_ref\"\
+        : image_ref,\n    \"vm_ip\": vm_ip,\n    \"switch_command\": switch_cmd,\n\
+        \    \"returncode\": switch_result.returncode,\n    \"stdout\": switch_result.stdout.rstrip(),\n\
+        \    \"stderr\": switch_result.stderr.rstrip(),\n    \"switch_pass\": switch_result.returncode\
+        \ == 0,\n    \"post_switch_bootc_status\": {\n        \"rc\": bootc_status.returncode,\n\
+        \        \"json\": parse_json(bootc_status.stdout),\n        \"raw\": bootc_status.stdout.rstrip(),\n\
+        \        \"stderr\": bootc_status.stderr.rstrip(),\n    },\n    \"post_switch_ostree_status\"\
+        : {\n        \"rc\": ostree_status.returncode,\n        \"stdout\": ostree_status.stdout.rstrip(),\n\
+        \        \"stderr\": ostree_status.stderr.rstrip(),\n    },\n}\n\nstep_file\
+        \ = pathlib.Path(f\"{step}.json\")\nstep_file.write_text(json.dumps(payload,\
+        \ indent=2) + \"\\n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(step_file),\
+        \ f\"{vm_user}@{vm_ip}:{output_root}/{step}.json\"], check=True, text=True)\n\
+        \naggregate_file = pathlib.Path(\"migration-evidence.json\")\nfetch = subprocess.run(scp_base\
+        \ + [f\"{vm_user}@{vm_ip}:{aggregate_path}\", str(aggregate_file)], text=True,\
+        \ capture_output=True)\naggregate = []\nif fetch.returncode == 0:\n    try:\n\
+        \        loaded = json.loads(aggregate_file.read_text(encoding=\"utf-8\"))\n\
+        \        if isinstance(loaded, list):\n            aggregate = loaded\n  \
+        \  except Exception:\n        aggregate = []\naggregate = [item for item in\
+        \ aggregate if not (isinstance(item, dict) and item.get(\"step\") == step)]\n\
+        aggregate.append(payload)\naggregate_file.write_text(json.dumps(aggregate,\
+        \ indent=2) + \"\\n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(aggregate_file),\
+        \ f\"{vm_user}@{vm_ip}:{aggregate_path}\"], check=True, text=True)\n\nprint(f\"\
+        === {step} ({storage_variant}) ({vm_ip}) ===\")\nif payload[\"stdout\"]:\n\
+        \    print(payload[\"stdout\"])\nif payload[\"stderr\"]:\n    print(payload[\"\
+        stderr\"])\nprint(json.dumps(payload, indent=2))\nsys.exit(switch_result.returncode)\n\
+        PY\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - activeDeadlineSeconds: 900
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+    name: reboot-and-wait
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
 
-          if failures:
-              print(json.dumps(payload, indent=2))
-              print("Verification failures: " + ", ".join(failures), file=sys.stderr)
-              sys.exit(1)
+      dnsPolicy: ClusterFirstWithHostNet
 
-          print(
-              f"Verified {step}: active_image={payload.get('active_image', '')} "
-              f"storage={storage_variant} services={checks.get('services', {}).get('states', [])} "
-              f"group_count={checks.get('group_sync', {}).get('group_count')}"
-          )
-          PY
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/fedora/fedora:latest
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      source: "set -euo pipefail\nif ! command -v ssh >/dev/null 2>&1; then\n  dnf\
+        \ install -y --quiet openssh-clients 2>&1 | tail -2\nfi\n\nVM_IP=\"{{inputs.parameters.vm-ip}}\"\
+        \nSSH_USER=\"{{inputs.parameters.ssh-user}}\"\nKEY=\"/etc/ssh/test-key/id_ed25519\"\
+        \nSSH=(ssh -i \"${KEY}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\
+        \ -o ConnectTimeout=5 -o LogLevel=ERROR \"${SSH_USER}@${VM_IP}\")\n\necho\
+        \ \"Requesting reboot for ${VM_IP}...\" >&2\nset +e\n\"${SSH[@]}\" sudo reboot\
+        \ >/dev/null 2>&1\nREBOOT_RC=$?\nset -e\necho \"Initial reboot command exit:\
+        \ ${REBOOT_RC} (disconnect is expected)\" >&2\n\nSEEN_DOWN=0\nfor _ in $(seq\
+        \ 1 24); do\n  if ! \"${SSH[@]}\" true >/dev/null 2>&1; then\n    SEEN_DOWN=1\n\
+        \    break\n  fi\n  sleep 5\ndone\nif [[ \"${SEEN_DOWN}\" -eq 0 ]]; then\n\
+        \  echo \"WARNING: SSH never went down after reboot request; continuing to\
+        \ readiness wait\" >&2\nfi\n\necho \"Waiting for SSH to return on ${VM_IP}...\"\
+        \ >&2\nfor _ in $(seq 1 72); do\n  if \"${SSH[@]}\" true >/dev/null 2>&1;\
+        \ then\n    echo \"SSH is back on ${VM_IP}\" >&2\n    exit 0\n  fi\n  sleep\
+        \ 5\ndone\n\necho \"ERROR: timed out waiting for ${VM_IP} after reboot\" >&2\n\
+        exit 1\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - activeDeadlineSeconds: 900
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: storage-variant
+        value: default
+      - name: step
+      - name: expected-image
+        value: ''
+      - name: output-root
+        value: /tmp/migration-results
+      - name: aggregate-path
+        value: /tmp/migration-evidence.json
+    name: collect-evidence
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
 
-    - name: teardown
-      steps:
-        - - name: teardown-vm
-            templateRef:
-              name: teardown-bluefin-vm
-              template: teardown-vm
-            arguments:
-              parameters:
-                - name: vm-name
-                  value: "{{workflow.parameters.vm-name}}"
-                - name: namespace
-                  value: "{{workflow.parameters.namespace}}"
-                - name: test-root
-                  value: "{{workflow.parameters.test-root}}"
+      dnsPolicy: ClusterFirstWithHostNet
+
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/fedora/fedora:latest
+      resources:
+        limits:
+          cpu: '1'
+          memory: 512Mi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+      source: "set -euo pipefail\nif ! command -v ssh >/dev/null 2>&1; then\n  dnf\
+        \ install -y --quiet openssh-clients 2>&1 | tail -2\nfi\n\nexport VM_IP=\"\
+        {{inputs.parameters.vm-ip}}\"\nexport SSH_USER=\"{{inputs.parameters.ssh-user}}\"\
+        \nexport SSH_KEY=\"/etc/ssh/test-key/id_ed25519\"\nexport STORAGE_VARIANT=\"\
+        {{inputs.parameters.storage-variant}}\"\nexport STEP=\"{{inputs.parameters.step}}\"\
+        \nexport EXPECTED_IMAGE=\"{{inputs.parameters.expected-image}}\"\nexport OUTPUT_ROOT=\"\
+        {{inputs.parameters.output-root}}\"\nexport AGGREGATE_PATH=\"{{inputs.parameters.aggregate-path}}\"\
+        \n\npython3 - <<'PY'\nimport json\nimport os\nimport pathlib\nimport subprocess\n\
+        import sys\n\nvm_ip = os.environ[\"VM_IP\"]\nvm_user = os.environ[\"SSH_USER\"\
+        ]\nkey = os.environ[\"SSH_KEY\"]\nstorage_variant = os.environ[\"STORAGE_VARIANT\"\
+        ]\nstep = os.environ[\"STEP\"]\nexpected_image = os.environ.get(\"EXPECTED_IMAGE\"\
+        , \"\")\noutput_root = os.environ[\"OUTPUT_ROOT\"]\naggregate_path = os.environ[\"\
+        AGGREGATE_PATH\"]\n\nssh_base = [\n    \"ssh\", \"-i\", key,\n    \"-o\",\
+        \ \"StrictHostKeyChecking=no\",\n    \"-o\", \"UserKnownHostsFile=/dev/null\"\
+        ,\n    \"-o\", \"ConnectTimeout=10\",\n    \"-o\", \"LogLevel=ERROR\",\n \
+        \   f\"{vm_user}@{vm_ip}\",\n]\nscp_base = [\n    \"scp\", \"-i\", key,\n\
+        \    \"-o\", \"StrictHostKeyChecking=no\",\n    \"-o\", \"UserKnownHostsFile=/dev/null\"\
+        ,\n    \"-o\", \"ConnectTimeout=10\",\n    \"-o\", \"LogLevel=ERROR\",\n]\n\
+        \ndef run_remote(command: str) -> subprocess.CompletedProcess:\n    return\
+        \ subprocess.run(ssh_base + [\"bash\", \"-lc\", command], text=True, capture_output=True)\n\
+        \ndef capture(command: str):\n    result = run_remote(command)\n    return\
+        \ {\n        \"command\": command,\n        \"rc\": result.returncode,\n \
+        \       \"stdout\": result.stdout.rstrip(),\n        \"stderr\": result.stderr.rstrip(),\n\
+        \    }\n\ndef parse_json(text: str):\n    try:\n        return json.loads(text)\
+        \ if text else None\n    except json.JSONDecodeError:\n        return None\n\
+        \ndef parse_int(text: str):\n    try:\n        return int((text or \"\").strip())\n\
+        \    except ValueError:\n        return None\n\ndef get_active_image(data):\n\
+        \    if not isinstance(data, dict):\n        return \"\"\n    booted = data.get(\"\
+        status\", {}).get(\"booted\", {})\n    image = booted.get(\"image\") or {}\n\
+        \    nested = image.get(\"image\") if isinstance(image, dict) else None\n\
+        \    candidates = []\n    if isinstance(nested, dict):\n        candidates.append(nested.get(\"\
+        image\"))\n    if isinstance(image, dict):\n        candidates.append(image.get(\"\
+        image\"))\n    candidates.append(booted.get(\"imageReference\"))\n    for\
+        \ candidate in candidates:\n        if isinstance(candidate, str) and candidate:\n\
+        \            return candidate\n    return \"\"\n\nsubprocess.run(ssh_base\
+        \ + [\"mkdir\", \"-p\", output_root], check=True, text=True)\n\nresults =\
+        \ {\n    \"bootc_status_json\": capture(\"sudo bootc status --json\"),\n \
+        \   \"ostree_admin_status\": capture(\"sudo ostree admin status\"),\n    \"\
+        bootc_package\": capture(\"rpm -q bootc\"),\n    \"journal_errors\": capture(\"\
+        sudo journalctl -b -p err --no-pager -n 50\"),\n    \"rechunker_group_fix\"\
+        : capture(\"if systemctl list-unit-files rechunker-group-fix.service --no-legend\
+        \ 2>/dev/null | grep -q '^rechunker-group-fix.service'; then sudo journalctl\
+        \ -b -u rechunker-group-fix --no-pager; else echo '__SERVICE_NOT_PRESENT__';\
+        \ fi\"),\n    \"group_count\": capture(\"getent group | wc -l\"),\n    \"\
+        gshadow_count\": capture(\"sudo cat /etc/gshadow | wc -l\"),\n    \"service_health\"\
+        : capture(\"systemctl is-active gdm sshd\"),\n    \"loginctl_status\": capture(\"\
+        loginctl status || loginctl list-sessions\"),\n    \"storage_info\": capture(\"\
+        if [ -e /usr/lib/bootc/storage ]; then ls -ld /usr/lib/bootc/storage; readlink\
+        \ -f /usr/lib/bootc/storage || true; du -sh /usr/lib/bootc/storage 2>/dev/null\
+        \ || true; else echo '__BOOTC_STORAGE_MISSING__'; fi\"),\n  }\n\nbootc_data\
+        \ = None\nif results[\"bootc_status_json\"][\"rc\"] == 0:\n    bootc_data\
+        \ = parse_json(results[\"bootc_status_json\"][\"stdout\"])\n\nactive_image\
+        \ = get_active_image(bootc_data)\ngroup_count = parse_int(results[\"group_count\"\
+        ][\"stdout\"])\ngshadow_count = parse_int(results[\"gshadow_count\"][\"stdout\"\
+        ])\nservice_states = [line.strip() for line in results[\"service_health\"\
+        ][\"stdout\"].splitlines() if line.strip()]\nstorage_missing = \"__BOOTC_STORAGE_MISSING__\"\
+        \ in results[\"storage_info\"][\"stdout\"]\n\nchecks = {\n    \"bootc_status\"\
+        : {\n        \"pass\": results[\"bootc_status_json\"][\"rc\"] == 0 and bootc_data\
+        \ is not None,\n    },\n    \"ostree_admin_status\": {\n        \"pass\":\
+        \ results[\"ostree_admin_status\"][\"rc\"] == 0,\n    },\n    \"bootc_package\"\
+        : {\n        \"pass\": results[\"bootc_package\"][\"rc\"] == 0,\n        \"\
+        package\": results[\"bootc_package\"][\"stdout\"],\n    },\n    \"group_sync\"\
+        : {\n        \"pass\": group_count is not None and gshadow_count is not None\
+        \ and group_count == gshadow_count,\n        \"group_count\": group_count,\n\
+        \        \"gshadow_count\": gshadow_count,\n    },\n    \"services\": {\n\
+        \        \"pass\": bool(service_states) and all(state == \"active\" for state\
+        \ in service_states),\n        \"states\": service_states,\n    },\n    \"\
+        expected_image\": {\n        \"pass\": True if not expected_image else expected_image\
+        \ in active_image,\n        \"expected\": expected_image,\n        \"actual\"\
+        : active_image,\n    },\n    \"loginctl\": {\n        \"pass\": results[\"\
+        loginctl_status\"][\"rc\"] == 0,\n    },\n    \"storage_backend\": {\n   \
+        \     \"pass\": True if storage_variant == \"default\" else not storage_missing,\n\
+        \        \"variant\": storage_variant,\n        \"missing\": storage_missing,\n\
+        \    },\n}\n\nstep_pass = all(\n    checks[name][\"pass\"]\n    for name in\
+        \ (\"bootc_status\", \"ostree_admin_status\", \"bootc_package\", \"group_sync\"\
+        , \"services\", \"expected_image\", \"storage_backend\")\n)\n\npayload = {\n\
+        \    \"step\": step,\n    \"vm_ip\": vm_ip,\n    \"storage_variant\": storage_variant,\n\
+        \    \"expected_image\": expected_image,\n    \"active_image\": active_image,\n\
+        \    \"step_pass\": step_pass,\n    \"checks\": checks,\n    \"bootc_status\"\
+        : bootc_data,\n    \"commands\": results,\n}\n\nstep_file = pathlib.Path(f\"\
+        {step}.json\")\nstep_file.write_text(json.dumps(payload, indent=2) + \"\\\
+        n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(step_file), f\"{vm_user}@{vm_ip}:{output_root}/{step}.json\"\
+        ], check=True, text=True)\n\naggregate_file = pathlib.Path(\"migration-evidence.json\"\
+        )\nfetch = subprocess.run(scp_base + [f\"{vm_user}@{vm_ip}:{aggregate_path}\"\
+        , str(aggregate_file)], text=True, capture_output=True)\naggregate = []\n\
+        if fetch.returncode == 0:\n    try:\n        loaded = json.loads(aggregate_file.read_text(encoding=\"\
+        utf-8\"))\n        if isinstance(loaded, list):\n            aggregate = loaded\n\
+        \    except Exception:\n        aggregate = []\naggregate = [item for item\
+        \ in aggregate if not (isinstance(item, dict) and item.get(\"step\") == step)]\n\
+        aggregate.append(payload)\naggregate_file.write_text(json.dumps(aggregate,\
+        \ indent=2) + \"\\n\", encoding=\"utf-8\")\nsubprocess.run(scp_base + [str(aggregate_file),\
+        \ f\"{vm_user}@{vm_ip}:{aggregate_path}\"], check=True, text=True)\n\nprint(f\"\
+        === {step} evidence ({storage_variant}) ({vm_ip}) ===\")\nprint(json.dumps(payload,\
+        \ indent=2))\nsys.exit(0 if step_pass else 1)\nPY\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - activeDeadlineSeconds: 600
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: ssh-user
+        value: bluefin-test
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: storage-variant
+        value: default
+      - name: step
+      - name: expected-image
+        value: ''
+      - name: output-root
+        value: /tmp/migration-results
+    name: verify-state
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    podSpecPatch: 'hostNetwork: true
+
+      dnsPolicy: ClusterFirstWithHostNet
+
+      '
+    script:
+      command:
+      - bash
+      image: quay.io/fedora/fedora:latest
+      resources:
+        limits:
+          cpu: 500m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      source: "set -euo pipefail\nif ! command -v ssh >/dev/null 2>&1; then\n  dnf\
+        \ install -y --quiet openssh-clients 2>&1 | tail -2\nfi\n\nexport VM_IP=\"\
+        {{inputs.parameters.vm-ip}}\"\nexport SSH_USER=\"{{inputs.parameters.ssh-user}}\"\
+        \nexport SSH_KEY=\"/etc/ssh/test-key/id_ed25519\"\nexport STORAGE_VARIANT=\"\
+        {{inputs.parameters.storage-variant}}\"\nexport STEP=\"{{inputs.parameters.step}}\"\
+        \nexport EXPECTED_IMAGE=\"{{inputs.parameters.expected-image}}\"\nexport OUTPUT_ROOT=\"\
+        {{inputs.parameters.output-root}}\"\n\npython3 - <<'PY'\nimport json\nimport\
+        \ os\nimport subprocess\nimport sys\n\nvm_ip = os.environ[\"VM_IP\"]\nvm_user\
+        \ = os.environ[\"SSH_USER\"]\nkey = os.environ[\"SSH_KEY\"]\nstorage_variant\
+        \ = os.environ[\"STORAGE_VARIANT\"]\nstep = os.environ[\"STEP\"]\nexpected_image\
+        \ = os.environ.get(\"EXPECTED_IMAGE\", \"\")\noutput_root = os.environ[\"\
+        OUTPUT_ROOT\"]\n\nssh_base = [\n    \"ssh\", \"-i\", key,\n    \"-o\", \"\
+        StrictHostKeyChecking=no\",\n    \"-o\", \"UserKnownHostsFile=/dev/null\"\
+        ,\n    \"-o\", \"ConnectTimeout=10\",\n    \"-o\", \"LogLevel=ERROR\",\n \
+        \   f\"{vm_user}@{vm_ip}\",\n]\n\nresult = subprocess.run(ssh_base + [\"cat\"\
+        , f\"{output_root}/{step}.json\"], text=True, capture_output=True)\nif result.returncode\
+        \ != 0:\n    print(result.stderr.rstrip(), file=sys.stderr)\n    sys.exit(result.returncode)\n\
+        \npayload = json.loads(result.stdout)\nchecks = payload.get(\"checks\", {})\n\
+        failures = []\nif not payload.get(\"step_pass\"):\n    failures.append(\"\
+        step_pass=false\")\nif expected_image and not checks.get(\"expected_image\"\
+        , {}).get(\"pass\"):\n    failures.append(f\"expected image mismatch: {checks.get('expected_image',\
+        \ {}).get('actual', '')}\")\nif not checks.get(\"services\", {}).get(\"pass\"\
+        ):\n    failures.append(\"services unhealthy\")\nif not checks.get(\"group_sync\"\
+        , {}).get(\"pass\"):\n    failures.append(\"group/gshadow mismatch\")\nif\
+        \ storage_variant == \"experimental-unified-storage\" and not checks.get(\"\
+        storage_backend\", {}).get(\"pass\"):\n    failures.append(\"experimental\
+        \ unified storage not detected\")\n\nif failures:\n    print(json.dumps(payload,\
+        \ indent=2))\n    print(\"Verification failures: \" + \", \".join(failures),\
+        \ file=sys.stderr)\n    sys.exit(1)\n\nprint(\n    f\"Verified {step}: active_image={payload.get('active_image',\
+        \ '')} \"\n    f\"storage={storage_variant} services={checks.get('services',\
+        \ {}).get('states', [])} \"\n    f\"group_count={checks.get('group_sync',\
+        \ {}).get('group_count')}\"\n)\nPY\n"
+      volumeMounts:
+      - mountPath: /etc/ssh/test-key
+        name: ssh-key
+        readOnly: true
+    volumes:
+    - name: ssh-key
+      secret:
+        defaultMode: 256
+        secretName: '{{inputs.parameters.ssh-key-secret}}'
+  - name: teardown
+    steps:
+    - - arguments:
+          parameters:
+          - name: vm-name
+            value: '{{workflow.parameters.vm-name}}'
+          - name: namespace
+            value: '{{workflow.parameters.namespace}}'
+          - name: test-root
+            value: '{{workflow.parameters.test-root}}'
+        name: teardown-vm
+        templateRef:
+          name: teardown-bluefin-vm
+          template: teardown-vm
+

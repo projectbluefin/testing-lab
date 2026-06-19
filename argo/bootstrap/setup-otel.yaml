@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: setup-otel
+  namespace: argo
+spec:
+  arguments:
+    parameters:
+    - name: host
+      value: jorge@192.168.1.102
+  entrypoint: deploy
+  templates:
+  - inputs:
+      parameters:
+      - name: host
+    name: deploy
+    script:
+      command:
+      - sh
+      image: alpine:latest
+      source: "set -euo pipefail\necho \"\u2192 Deploying observability stack to {{inputs.parameters.host}}...\"\
+        \nsh /workspace/otel/deploy.sh {{inputs.parameters.host}}\necho \"\u2713 Observability\
+        \ stack deployed to {{inputs.parameters.host}}\"\n"
+

@@ -113,13 +113,12 @@ run-tests-matrix:
         -n {{ argo_ns }} \
         --watch
 
-# Run rechunk-to-chunkah migration validation against latest + stable in parallel.
+# Run migration validation (bootc switch: ublue-os/bluefin → projectbluefin/bluefin)
 # Usage: just run-migration-test
-# Usage: just run-migration-test stable=stable latest=latest
-run-migration-test latest="latest" stable="stable":
-    argo submit argo/rechunk-to-chunkah-migration.yaml \
-        -p image-tag-latest="{{ latest }}" \
-        -p image-tag-stable="{{ stable }}" \
+# Usage: just run-migration-test lts
+run-migration-test tag=image_tag:
+    argo submit --from workflowtemplate/bluefin-migration-test \
+        -p image-tag="{{ tag }}" \
         -n {{ argo_ns }} \
         --watch
 
@@ -130,105 +129,18 @@ setup-ghost-ssh-banner:
         -n {{ argo_ns }} \
         --wait --log
 
-# One-time fixture setup for titan VMs: installs Firefox Flatpak and sets default browser.
-# Run this before smoke tests that cover xdg-settings (#107).
+# —— [REMOVED] titan VM recipes ——
+# run-titan-smoke, run-titan-system, run-titan-developer, run-titan-software,
+# setup-titan-fixtures, run-titan-disk-cleanup
+# Titan persistent VMs are no longer GitOps-managed. See argo/deprecated/ for history.
+
+# PLACEHOLDER for removed recipes (kept to avoid recipe renaming surprises)
+_titan-removed:
+    @echo "Titan VM recipes removed. See argo/deprecated/README.md"
+
+# DEPRECATED placeholder — slot reserved
 setup-titan-fixtures:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
-    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
-    echo "Setting up titan-bluefin (${IP_LATEST})..."
-    argo submit --from workflowtemplate/setup-titan-fixtures \
-        -p vm-ip="${IP_LATEST}" \
-        -p variant=latest \
-        -n {{ argo_ns }} \
-        --wait --log
-    echo "Setting up titan-lts (${IP_LTS})..."
-    argo submit --from workflowtemplate/setup-titan-fixtures \
-        -p vm-ip="${IP_LTS}" \
-        -p variant=lts \
-        -n {{ argo_ns }} \
-        --wait --log
-
-# DEPRECATED: persistent titan VMs are no longer GitOps-managed in this repo.
-# This recipe only works if titan-bluefin and titan-lts were created manually.
-run-titan-smoke:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
-    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
-    echo "titan-bluefin: ${IP_LATEST}"
-    echo "titan-lts:     ${IP_LTS}"
-    argo submit --from workflowtemplate/bluefin-titan-smoke \
-        -p vm-ip-latest="${IP_LATEST}" \
-        -p vm-ip-lts="${IP_LTS}" \
-        -n {{ argo_ns }} \
-        --watch
-
-# One-shot cleanup of titan VM disk files after ArgoCD prunes the VMs.
-# dry-run=true by default — pass false to actually delete.
-run-titan-disk-cleanup dry-run="true":
-    argo submit --from workflowtemplate/titan-disk-cleanup \
-      -p dry-run={{ dry-run }} \
-      -n {{ argo_ns }} --watch
-
-# Run system (atomic OS contract) tests on persistent titan VMs (fast path).
-run-titan-system:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    LATEST_IP=$(kubectl get vmi titan-bluefin -n bluefin-test -o jsonpath='{.status.interfaces[0].ipAddress}')
-    LTS_IP=$(kubectl get vmi titan-lts -n bluefin-lts-test -o jsonpath='{.status.interfaces[0].ipAddress}')
-    argo submit --from workflowtemplate/bluefin-titan-smoke \
-      --parameter vm-ip-latest="${LATEST_IP}" \
-      --parameter vm-ip-lts="${LTS_IP}" \
-      --parameter suite=system \
-      -n {{ argo_ns }} --wait --log
-
-# Run developer suite tests on persistent titan VMs.
-run-titan-developer:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
-    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
-    echo "titan-bluefin: ${IP_LATEST}"
-    echo "titan-lts:     ${IP_LTS}"
-    argo submit --from workflowtemplate/bluefin-titan-smoke \
-        -p vm-ip-latest="${IP_LATEST}" \
-        -p vm-ip-lts="${IP_LTS}" \
-        -p suite=developer \
-        -n {{ argo_ns }} \
-        --watch
-
-# Run software suite tests on persistent titan VMs.
-run-titan-software:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    IP_LATEST=$(kubectl get vmi titan-bluefin -n bluefin-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    IP_LTS=$(kubectl get vmi titan-lts -n bluefin-lts-test \
-        -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-    : "${IP_LATEST:?titan-bluefin VMI not found or has no IP}"
-    : "${IP_LTS:?titan-lts VMI not found or has no IP}"
-    echo "titan-bluefin: ${IP_LATEST}"
-    echo "titan-lts:     ${IP_LTS}"
-    argo submit --from workflowtemplate/bluefin-titan-smoke \
-        -p vm-ip-latest="${IP_LATEST}" \
-        -p vm-ip-lts="${IP_LTS}" \
-        -p suite=software \
-        -n {{ argo_ns }} \
-        --watch
+    @echo "Titan fixtures removed — titan VMs are no longer used"
 
 # Run Flatcar smoke tests
 run-flatcar-smoke:
@@ -331,6 +243,15 @@ lab-report pr_number status workflow:
     gh pr edit {{ pr_number }} --repo "${REPO}" \
         --add-label "${LABEL}" --remove-label "${REMOVE}" 2>/dev/null || true
 
+# Run a BST build for a variant and push to local zot registry
+# Usage: just run-bst-build dakota
+run-bst-build variant="dakota" tag="latest":
+    argo submit --from workflowtemplate/bst-build \
+        -p variant={{ variant }} \
+        -p image-tag={{ tag }} \
+        -n {{ argo_ns }} \
+        --watch
+
 # Validate dakota element graph (bst show, no build — fast)
 # ref_type: branch | pr | sha   ref_value: branch name, PR number, or commit SHA
 run-dakota-validate ref_type="branch" ref_value="main":
@@ -371,6 +292,11 @@ run-dakota-qa variant="default" ref_type="branch" ref_value="main":
 
 # ── Validation ───────────────────────────────────────────────────────────────
 
+# Apply bootstrap WorkflowTemplates to the cluster (run once during initial setup)
+apply-bootstrap:
+    kubectl apply -f argo/bootstrap/ -n {{ argo_ns }}
+    @echo "✓ Bootstrap templates applied — run individual templates with: argo submit --from workflowtemplate/<name> -n argo --wait --log"
+
 # Lint all Argo YAML manifests.
 # WorkflowTemplates are linted together (--offline) so cross-file templateRef
 # references (e.g. dakota-qa-pipeline → dakota-bst) resolve without needing
@@ -381,6 +307,9 @@ lint:
     @echo "Linting argo/workflow-templates/ (offline, cross-file refs)..."
     @argo lint --offline argo/workflow-templates/
     @echo "✔ workflow-templates: no linting errors found!"
+    @echo "Linting argo/bootstrap/ (offline)..."
+    @argo lint --offline argo/bootstrap/
+    @echo "✔ bootstrap: no linting errors found!"
     @for f in argo/*.yaml; do \
         echo "Linting $f..."; \
         argo lint "$f" || exit 1; \

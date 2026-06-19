@@ -33,9 +33,9 @@ spec:
     arguments:
       parameters:
         - name: image
-          value: "ghcr.io/ublue-os/bluefin:lts"
+          value: "ghcr.io/projectbluefin/bluefin-lts:testing"
         - name: image-tag
-          value: "lts"
+          value: "lts-testing"
         - name: namespace
           value: "bluefin-lts-test"
         - name: suites

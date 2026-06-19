@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: install-kubevirt-manager
+  namespace: argo
+spec:
+  entrypoint: install
+  templates:
+  - name: install
+    script:
+      command:
+      - bash
+      image: bitnami/kubectl:latest
+      source: "set -euo pipefail\necho \"\u2192 Installing KubeVirt Manager...\"\n\
+        kubectl apply -f https://raw.githubusercontent.com/kubevirt-manager/kubevirt-manager/main/kubernetes/bundled.yaml\n\
+        kubectl -n kubevirt-manager wait deploy/kubevirt-manager --for=condition=Available\
+        \ --timeout=120s\nkubectl -n kubevirt-manager patch svc kubevirt-manager \\\
+        \n  --type=merge \\\n  --patch '{\"spec\":{\"type\":\"NodePort\",\"ports\"\
+        :[{\"port\":8080,\"nodePort\":30180}]}}'\necho \"\u2713 KubeVirt Manager ready\
+        \ at :30180\"\n"
+
