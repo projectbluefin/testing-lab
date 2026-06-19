@@ -1,0 +1,104 @@
+# WorkflowTemplate: collect-vm-logs
+#
+# Reusable log-collection step for KubeVirt test VMs on ghost.
+#
+# Lessons learned the hard way (2026-06-19):
+#   - pods MUST run on ghost (nodeSelector) — masquerade NAT iptables rules live
+#     in the virt-launcher pod netns, not the host netns
+#   - pods MUST use hostNetwork:true (podSpecPatch) — the VM IP is only reachable
+#     via the host network stack; pod-network pods on exo-1 get "No route to host"
+#   - journalctl requires sudo — bluefin-test is not in systemd-journal group
+#
+# Usage: reference from a workflow DAG or steps block:
+#
+#   - name: collect-logs
+#     templateRef:
+#       name: collect-vm-logs
+#       template: collect-vm-logs
+#     arguments:
+#       parameters:
+#       - name: vm-ip
+#         value: "{{tasks.provision.outputs.parameters.vm-ip}}"
+#       - name: variant
+#         value: "bluefin:testing"        # label only — shown in output header
+#       - name: ssh-key-secret
+#         value: bluefin-test-ssh-key     # optional, default: bluefin-test-ssh-key
+#       - name: ssh-user
+#         value: bluefin-test             # optional, default: bluefin-test
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: collect-vm-logs
+  namespace: argo
+  labels:
+    app.kubernetes.io/component: log-collection
+    app.kubernetes.io/part-of: bluefin-test-suite
+  annotations:
+    description: |
+      SSH into a running KubeVirt test VM and collect:
+        - kernel version + OS release
+        - systemctl --failed
+        - sudo journalctl -p warning (last 500 lines)
+        - systemd-analyze blame (top 20)
+      Outputs are printed to the workflow pod log.
+spec:
+  templates:
+  - name: collect-vm-logs
+    inputs:
+      parameters:
+      - name: vm-ip
+      - name: variant
+        value: "unknown"
+      - name: ssh-key-secret
+        value: bluefin-test-ssh-key
+      - name: ssh-user
+        value: bluefin-test
+    # REQUIRED: must run on ghost — VM masquerade NAT is not reachable cross-node.
+    nodeSelector:
+      kubernetes.io/hostname: ghost
+    # REQUIRED: host network — pod-network pods cannot reach virt-launcher pod IPs.
+    podSpecPatch: |
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+    volumes:
+    - name: ssh-key
+      secret:
+        secretName: "{{inputs.parameters.ssh-key-secret}}"
+        defaultMode: 0400
+    container:
+      image: fedora:41
+      command: [bash, -c]
+      args:
+      - |
+        set -uo pipefail
+        dnf install -y --quiet openssh-clients 2>&1 | tail -2
+
+        KEY=/etc/ssh/test-key/id_ed25519
+        OPTS="-i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=30 -o LogLevel=ERROR"
+        SSH="ssh $OPTS {{inputs.parameters.ssh-user}}@{{inputs.parameters.vm-ip}}"
+
+        echo "=== VARIANT: {{inputs.parameters.variant}} ==="
+        $SSH "uname -r && grep PRETTY /etc/os-release" 2>&1
+
+        echo "=== FAILED UNITS ==="
+        $SSH "systemctl --failed --no-pager" 2>&1
+
+        echo "=== JOURNAL WARNINGS+ (last 500) ==="
+        $SSH "sudo journalctl -p warning -b --no-pager -n 500 2>&1 \
+              || journalctl -p warning -b --no-pager -n 500 2>&1"
+
+        echo "=== BOOT BLAME (top 20) ==="
+        $SSH "systemd-analyze blame --no-pager 2>/dev/null | head -20" 2>&1
+
+        echo "=== DONE ==="
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      volumeMounts:
+      - name: ssh-key
+        mountPath: /etc/ssh/test-key
