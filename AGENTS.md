@@ -103,6 +103,7 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 |---|---|---|---|
 | ghost | k3s control-plane + KubeVirt compute | 192.168.1.102 | Ryzen AI MAX+ 395, 16c/32t, 64GB RAM |
 | exo-1 | k3s worker (workflow pods only) | 192.168.1.239 | — |
+| bazzite | k3s worker (on demand) | 192.168.1.223 | Gaming machine — taint `node-role.kubernetes.io/gaming:NoSchedule`; k3s disabled at boot |
 | Argo UI | — | http://192.168.1.102:32746 | NodePort; also http://192.168.1.102:2746 on host |
 | Loki | log aggregation | http://192.168.1.102:30100 | Scrapes pods labeled `app.kubernetes.io/part-of=bluefin-test-suite` |
 | ArgoCD | GitOps controller | https://192.168.1.102 (argocd NS) | Two Applications: `testing-lab` + `testing-lab-infra` |
@@ -178,7 +179,40 @@ SECURITY.md                      Accepted homelab trade-offs and risks
 Justfile                         Repo-owner convenience wrappers (require kubectl/argo access; agents use MCP)
 ```
 
-## Image Variants
+## ARC Runners (GitHub Actions on ghost)
+
+Self-hosted GitHub Actions runners via Actions Runner Controller (ARC).
+
+| Resource | Value |
+|---|---|
+| Runner label | `ghost-runners` |
+| GitHub config URL | `https://github.com/projectbluefin` |
+| Min runners | 0 (idle — `arc-runners` namespace empty when no jobs; correct) |
+| Max runners | 4 |
+| GitHub App | `bluefin-ghost-arc` (ID 4099840, Installation 141458121) |
+| Credentials secret | `arc-github-secret` in `arc-runners` namespace |
+| ArgoCD Applications | `argocd/arc-controller-app.yaml`, `argocd/arc-runners-app.yaml` |
+
+**Use in a workflow:** `runs-on: ghost-runners`
+
+**Never replace the GitHub App credentials with a PAT.**
+
+If the listener is missing from `arc-systems`: check controller logs. Most likely cause
+is the controller landing on bazzite (broken DNS). Delete the controller pod — it
+reschedules to ghost.
+
+## Zot Registry Cache
+
+Pull-through OCI cache for container images. Transparent to all pods on ghost via
+containerd `hosts.toml` (written by `registry-mirror-config` DaemonSet — no k3s restart needed).
+
+| Instance | Upstream | NodePort | Storage |
+|---|---|---|---|
+| `zot-ghcr` | `https://ghcr.io` | 30501 | `/var/mnt/ghost-data/zot-ghcr` |
+| `zot-docker` | `https://registry-1.docker.io` | 30502 | `/var/mnt/ghost-data/zot-docker` |
+
+Both instances are pinned to ghost (hostPath storage requirement) and managed by
+ArgoCD `testing-lab-infra` via `manifests/zot-cache.yaml`.
 
 | Tag (image-tag / disk dir) | Image | Golden disk on ghost | Nightly |
 |---|---|---|---|
@@ -234,6 +268,9 @@ Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](
 | bluefin-lts-test | lts variant test VMs |
 | flatcar-test | Flatcar test VMs |
 | llm-d | LLM inference hive node (Qwen3.6-35B-A3B Q4_K_M GGUF via llama.cpp on ROCm) |
+| local-registry | OCI registry: BIB push target (port 30500), Zot pull-through caches — zot-ghcr (30501), zot-docker (30502) |
+| arc-systems | ARC controller + listener pods |
+| arc-runners | ARC ephemeral runner pods — **empty when no jobs queued; that is correct** |
 | mcp | Kubernetes MCP server |
 
 **Never delete VMs or resources in namespaces outside this list.**

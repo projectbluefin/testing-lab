@@ -284,6 +284,45 @@ Expected steady state:
 
 ---
 
+## 13. ARC runners (GitHub Actions on ghost)
+
+ARC (Actions Runner Controller) provides self-hosted GitHub Actions runners.
+When no jobs are queued, `arc-runners` namespace is empty — that is correct.
+Runners are ephemeral and only exist while a job is running.
+
+**Check ARC is healthy:**
+```text
+kubernetes-mcp-pods_list namespace=arc-systems
+```
+Expected: `arc-systems-gha-rs-controller-*` Running + `ghost-runners-*-listener` Running.
+
+**Check a runner set is registered:**
+```text
+kubernetes-mcp-resources_list apiVersion=actions.github.com/v1alpha1 kind=AutoscalingRunnerSet namespace=arc-runners
+```
+Expected: `ghost-runners` with MINIMUM=0 MAXIMUM=4.
+
+**If listener is missing** (arc-systems has only the controller pod, no listener):
+1. Check controller logs: `kubernetes-mcp-pods_log namespace=arc-systems <controller-pod>`
+2. If error is `no route to host` / DNS failure: the controller landed on bazzite.
+   Delete the controller pod — it will reschedule to ghost where DNS works.
+3. If error is GitHub API auth failure: check `arc-github-secret` exists in `arc-runners`.
+
+**Trigger a workflow using ARC:**
+Add `runs-on: ghost-runners` to any projectbluefin workflow. A listener pod and
+ephemeral runner pod will appear in `arc-systems` and `arc-runners` respectively
+for the duration of the job.
+
+**ArgoCD Applications for ARC** (stored in `argocd/`, applied manually once):
+- `arc-systems` — controller (gha-runner-scale-set-controller 0.9.3)
+- `arc-runners` — scale set pointing at `https://github.com/projectbluefin`
+
+**GitHub App:** `bluefin-ghost-arc` (App ID 4099840, Installation 141458121)
+installed on the `projectbluefin` org. Credentials in `arc-github-secret`
+(namespace `arc-runners`) — never replace with a PAT.
+
+---
+
 ## 11. Discover live cluster facts — do not trust stale docs
 
 | Fact | Command |

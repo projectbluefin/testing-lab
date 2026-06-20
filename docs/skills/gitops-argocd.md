@@ -125,7 +125,45 @@ If a template change is in git but not yet live:
 2. If OutOfSync, run `just argocd-sync`
 3. If sync fails, check ArgoCD logs: `kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller`
 
-### 7. Reconciling orphan templates (cluster-only → git)
+### 7. OCI Helm chart Applications (arc-systems, arc-runners)
+
+ArgoCD can deploy OCI Helm charts directly. These Applications live under `argocd/`
+and are applied once as control-plane resources (not GitOps-managed by ArgoCD itself).
+
+```bash
+# Apply ARC ArgoCD Applications (one-time, or after cluster rebuild)
+kubectl apply -f argocd/arc-controller-app.yaml -n argocd
+kubectl apply -f argocd/arc-runners-app.yaml -n argocd
+```
+
+**CRD annotation size limit** — Large CRDs (e.g. `autoscalingrunnersets.actions.github.com`)
+exceed ArgoCD's 262KB client-side annotation limit. Fix: `ServerSideApply=true` in
+`syncOptions`. Already set in `argocd/arc-controller-app.yaml`.
+
+**Stuck retry loop** — if ArgoCD retries a failed sync with stale syncOptions:
+```bash
+kubectl patch application <name> -n argocd \
+  --type=json -p='[{"op":"remove","path":"/operation"}]'
+kubectl annotate application <name> -n argocd \
+  argocd.argoproj.io/refresh=hard --overwrite
+```
+
+**Controller service account discovery** — `gha-runner-scale-set` discovers the
+controller SA by label lookup. Fails when controller and runners are in different
+namespaces. Always set explicitly in helm values:
+```yaml
+controllerServiceAccount:
+  namespace: arc-systems
+  name: arc-systems-gha-rs-controller
+```
+
+**bazzite taint** — bazzite carries `node-role.kubernetes.io/gaming:NoSchedule`
+(persisted in `manifests/bazzite-node-taint.yaml`). Infra pods landing there fail
+DNS resolution (`no route to host` to CoreDNS) because bazzite's CNI may not be
+fully initialised on join. If a pod lands on bazzite and fails, delete it — it will
+reschedule to ghost automatically.
+
+### 8. Reconciling orphan templates (cluster-only → git)
 
 When a template exists in the cluster but not in git:
 ```bash
