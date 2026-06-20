@@ -21,19 +21,12 @@ spec:
         controllerServiceAccount:
           namespace: arc-systems
           name: arc-systems-gha-rs-controller
-        containerMode:
-          type: kubernetes
-          kubernetesModeWorkVolumeClaim:
-            accessModes: ["ReadWriteOnce"]
-            storageClassName: local-path
-            resources:
-              requests:
-                storage: 10Gi
         template:
           spec:
             containers:
               - name: runner
                 image: ghcr.io/actions/actions-runner:latest
+                command: ["/home/runner/run.sh"]
                 resources:
                   requests:
                     cpu: "2"
