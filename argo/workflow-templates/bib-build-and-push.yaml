@@ -50,6 +50,8 @@ spec:
               parameters:
                 - name: image
                   value: "{{inputs.parameters.image}}"
+                - name: image-tag
+                  value: "{{inputs.parameters.image-tag}}"
 
           - name: build
             depends: "pull-image.Succeeded"
@@ -92,9 +94,10 @@ spec:
             path: "{{inputs.parameters.golden-root}}"
             type: DirectoryOrCreate
       script:
-        # podman/stable already cached on ghost for bib-img-pull; ships skopeo
-        # so we avoid a per-run `dnf install` from a Fedora mirror.
-        image: quay.io/podman/stable:latest
+        # quay.io/skopeo/stable ships skopeo. quay.io/podman/stable was used
+        # previously but dropped skopeo from its image; using it caused silent
+        # command-not-found failures that always returned "stale" (testing-lab#222).
+        image: quay.io/skopeo/stable:latest
         command: [bash]
         resources:
           requests:
@@ -165,6 +168,7 @@ spec:
       inputs:
         parameters:
           - name: image
+          - name: image-tag
       nodeSelector:
         kubernetes.io/hostname: ghost
       volumes:
@@ -191,6 +195,12 @@ spec:
           - |
             set -euo pipefail
             IMAGE="{{inputs.parameters.image}}"
+            TAG="{{inputs.parameters.image-tag}}"
+            # Append tag if image ref has none (e.g. ghcr.io/projectbluefin/bluefin).
+            # `*:*` distinguishes a tag from a host:port/ prefix.
+            if [[ "${IMAGE}" != *:* ]]; then
+              IMAGE="${IMAGE}:${TAG}"
+            fi
             PULL_ARGS=()
             if [[ "${IMAGE}" == 192.168.1.102:30500/* ]]; then
               PULL_ARGS+=(--tls-verify=false)
