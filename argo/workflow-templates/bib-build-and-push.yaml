@@ -131,9 +131,17 @@ spec:
           if [[ "${IMAGE_REF}" == 192.168.1.102:5000/* ]]; then
             SKOPEO_TLS_ARGS+=(--tls-verify=false)
           fi
-          REMOTE=$(skopeo inspect "${SKOPEO_TLS_ARGS[@]}" --no-tags --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
+          # Retry with exponential backoff — GHCR rate-limits anonymous skopeo
+          # inspects, returning empty output that is misread as stale (testing-lab#222).
+          REMOTE=""
+          for _attempt in 1 2 3; do
+            REMOTE=$(skopeo inspect "${SKOPEO_TLS_ARGS[@]}" --no-tags --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
+            [[ -n "${REMOTE}" ]] && break
+            echo "skopeo inspect attempt ${_attempt}/3 failed for ${IMAGE_REF}; retrying in $(( _attempt * 15 ))s..." >&2
+            sleep $(( _attempt * 15 ))
+          done
           if [[ -z "${REMOTE}" ]]; then
-            echo "skopeo inspect failed for ${IMAGE_REF}; treating as stale to force rebuild" >&2
+            echo "skopeo inspect failed after 3 attempts for ${IMAGE_REF}; treating as stale to force rebuild" >&2
             echo -n "stale"
             exit 0
           fi
@@ -241,6 +249,19 @@ spec:
             if [[ -f "${OUT}/image/disk.raw" ]]; then
               echo "disk.raw already exists at ${OUT}/image/disk.raw, skipping BIB build"
               exit 0
+            fi
+            # Preflight: report PCRE2 version for diagnostics (testing-lab#220).
+            # bluefin-lts and dakota require setfiles PCRE2 >= 10.46 (2025-08-27).
+            # centos-stream9 bootc-image-builder ships 10.44 — org.osbuild.selinux will
+            # fail for those images. Fix: update this image to one with PCRE2 >= 10.46.
+            PCRE2_PKG=$(rpm -q --queryformat '%{VERSION}' pcre2 2>/dev/null || echo "unknown")
+            echo "PCRE2 in BIB container: ${PCRE2_PKG}" >&2
+            if [[ "${PCRE2_PKG}" != "unknown" ]]; then
+              PCRE2_MAJ=${PCRE2_PKG%%.*}; PCRE2_MIN=${PCRE2_PKG#*.}; PCRE2_MIN=${PCRE2_MIN%%.*}
+              if (( PCRE2_MAJ < 10 || (PCRE2_MAJ == 10 && PCRE2_MIN < 46) )); then
+                echo "WARNING: PCRE2 ${PCRE2_PKG} < 10.46 in this BIB container." >&2
+                echo "  org.osbuild.selinux will fail for bluefin-lts/dakota. See testing-lab#220." >&2
+              fi
             fi
             # Request 40GB minimum root filesystem so bootc unified-storage
             # can pull a second copy (~5GB) alongside the live OS (~7GB).

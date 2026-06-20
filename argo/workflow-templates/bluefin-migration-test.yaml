@@ -31,9 +31,10 @@ spec:
         value: "ghcr.io/ublue-os/bluefin"
       - name: chunkah-image
         value: "ghcr.io/projectbluefin/bluefin"
-      # Separate tag — projectbluefin only publishes :latest currently; update when more tags land
+      # Separate tag — projectbluefin publishes :stable (bluefin) and :lts (bluefin-lts).
+      # :latest does not exist on any projectbluefin image. See testing-lab#221.
       - name: chunkah-image-tag
-        value: "latest"
+        value: "stable"
       - name: storage-variant
         value: "default"
       - name: golden-root
@@ -107,7 +108,7 @@ spec:
           - name: chunkah-image
             value: "ghcr.io/projectbluefin/bluefin"
           - name: chunkah-image-tag
-            value: "latest"
+            value: "stable"
           - name: storage-variant
             value: "default"
           - name: evidence-root
@@ -525,10 +526,10 @@ spec:
               "-o", "LogLevel=ERROR",
           ]
 
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
+          def run_remote(command: str, timeout: int = 60) -> subprocess.CompletedProcess:
+              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True, timeout=timeout)
 
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
+          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True, timeout=30)
 
           if storage_variant == "experimental-unified-storage":
               command = "sudo bootc image set-unified"
@@ -568,10 +569,10 @@ spec:
 
           step_file = pathlib.Path(f"{step}.json")
           step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
+          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True, timeout=120)
 
           aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
+          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True, timeout=60)
           aggregate = []
           if fetch.returncode == 0:
               try:
@@ -583,7 +584,7 @@ spec:
           aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
           aggregate.append(payload)
           aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
+          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True, timeout=120)
 
           print(f"=== {step} ({storage_variant}) ({vm_ip}) ===")
           print(json.dumps(payload, indent=2))
@@ -678,8 +679,8 @@ spec:
               "-o", "LogLevel=ERROR",
           ]
 
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
+          def run_remote(command: str, timeout: int = 60) -> subprocess.CompletedProcess:
+              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True, timeout=timeout)
 
           def parse_json(text: str):
               try:
@@ -687,7 +688,7 @@ spec:
               except json.JSONDecodeError:
                   return None
 
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
+          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True, timeout=30)
 
           flags = ["--enforce-container-sigpolicy"]
           if storage_variant == "experimental-unified-storage":
@@ -723,10 +724,10 @@ spec:
 
           step_file = pathlib.Path(f"{step}.json")
           step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
+          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True, timeout=120)
 
           aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
+          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True, timeout=60)
           aggregate = []
           if fetch.returncode == 0:
               try:
@@ -738,7 +739,7 @@ spec:
           aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
           aggregate.append(payload)
           aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
+          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True, timeout=120)
 
           print(f"=== {step} ({storage_variant}) ({vm_ip}) ===")
           if payload["stdout"]:
@@ -909,8 +910,8 @@ spec:
               "-o", "LogLevel=ERROR",
           ]
 
-          def run_remote(command: str) -> subprocess.CompletedProcess:
-              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True)
+          def run_remote(command: str, timeout: int = 60) -> subprocess.CompletedProcess:
+              return subprocess.run(ssh_base + ["bash", "-lc", command], text=True, capture_output=True, timeout=timeout)
 
           def capture(command: str):
               result = run_remote(command)
@@ -950,7 +951,7 @@ spec:
                       return candidate
               return ""
 
-          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True)
+          subprocess.run(ssh_base + ["mkdir", "-p", output_root], check=True, text=True, timeout=30)
 
           results = {
               "bootc_status_json": capture("sudo bootc status --json"),
@@ -1029,10 +1030,10 @@ spec:
 
           step_file = pathlib.Path(f"{step}.json")
           step_file.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True)
+          subprocess.run(scp_base + [str(step_file), f"{vm_user}@{vm_ip}:{output_root}/{step}.json"], check=True, text=True, timeout=120)
 
           aggregate_file = pathlib.Path("migration-evidence.json")
-          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True)
+          fetch = subprocess.run(scp_base + [f"{vm_user}@{vm_ip}:{aggregate_path}", str(aggregate_file)], text=True, capture_output=True, timeout=60)
           aggregate = []
           if fetch.returncode == 0:
               try:
@@ -1044,7 +1045,7 @@ spec:
           aggregate = [item for item in aggregate if not (isinstance(item, dict) and item.get("step") == step)]
           aggregate.append(payload)
           aggregate_file.write_text(json.dumps(aggregate, indent=2) + "\n", encoding="utf-8")
-          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True)
+          subprocess.run(scp_base + [str(aggregate_file), f"{vm_user}@{vm_ip}:{aggregate_path}"], check=True, text=True, timeout=120)
 
           print(f"=== {step} evidence ({storage_variant}) ({vm_ip}) ===")
           print(json.dumps(payload, indent=2))
@@ -1126,7 +1127,7 @@ spec:
               f"{vm_user}@{vm_ip}",
           ]
 
-          result = subprocess.run(ssh_base + ["cat", f"{output_root}/{step}.json"], text=True, capture_output=True)
+          result = subprocess.run(ssh_base + ["cat", f"{output_root}/{step}.json"], text=True, capture_output=True, timeout=15)
           if result.returncode != 0:
               print(result.stderr.rstrip(), file=sys.stderr)
               sys.exit(result.returncode)
