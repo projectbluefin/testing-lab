@@ -279,6 +279,9 @@ spec:
 - Templates annotated `DEPRECATED` that haven't been deleted from git
 - Two CronWorkflows with the same schedule covering overlapping namespaces
 - A `steps` template with the same `when` condition on 3+ sequential steps (convert to `dag` + `depends` chain)
+- A CronWorkflow that has a `dry-run` parameter defaulting to `"true"` — it will log `KEEP`/`DELETE` decisions and then do nothing; disk fills silently
+- Any `image:` in `argo/` or `manifests/` referencing `:5000` for the local OCI registry — `:5000` is the container-internal Zot port; use the NodePort `192.168.1.102:30500` so non-hostNetwork pods can reach it
+- Any `image:` referencing a registry not in the allowlist (`ghcr.io`, `quay.io`, `registry.fedoraproject.org`, `192.168.1.102`, `localhost`) — enforce with the lint gate in `.github/workflows/lint.yaml`
 
 ## Verification
 
@@ -293,3 +296,6 @@ Before marking any WorkflowTemplate change done:
 - [ ] File name matches `metadata.name` (e.g. `provision-bluefin-vm.yaml` for `name: provision-bluefin-vm`)
 - [ ] No DEPRECATED templates left in git
 - [ ] `kubectl get workflowtemplate -n argo` shows no cluster-only templates (not in git) unless they're intentional bootstrap one-shots
+- [ ] No CronWorkflow with a `dry-run` parameter whose default is `"true"` — verify GC jobs actually delete
+- [ ] All local OCI registry references use `:30500` (NodePort), not `:5000` (container-internal)
+- [ ] `grep -rn 'image:' argo/ manifests/` shows only allowlisted registries: `ghcr.io`, `quay.io`, `registry.fedoraproject.org`, `192.168.1.102`, `localhost`
