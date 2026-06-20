@@ -29,6 +29,12 @@ spec:
               - key: node-role.kubernetes.io/gaming
                 operator: Exists
                 effect: NoSchedule
+            volumes:
+              - name: buildah-cache
+                hostPath:
+                  # ponytail: per-node cache; persists across jobs; Zot deduplicates cross-node
+                  path: /var/tmp/arc-buildah-cache
+                  type: DirectoryOrCreate
             containers:
               - name: runner
                 image: ghcr.io/actions/actions-runner:latest
@@ -40,6 +46,9 @@ spec:
                   limits:
                     cpu: "8"
                     memory: 16Gi
+                volumeMounts:
+                  - name: buildah-cache
+                    mountPath: /home/runner/.local/share/containers/storage
   destination:
     server: https://kubernetes.default.svc
     namespace: arc-runners

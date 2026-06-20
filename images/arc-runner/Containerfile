@@ -1,0 +1,35 @@
+# ARC runner image — hummingbird base + bluefin CI toolchain
+# Extend ghcr.io/actions/actions-runner rather than base OS so ARC lifecycle scripts stay intact.
+# ponytail: no custom OS layer — just add missing tools on top of upstream runner
+
+FROM ghcr.io/actions/actions-runner:latest
+
+USER root
+
+# Install bluefin CI toolchain: buildah, skopeo, cosign, oras, argo CLI
+# Using apt (actions-runner base is Ubuntu); these are the tools currently installed per-job.
+RUN apt-get update -qq && \
+    apt-get install -y --no-install-recommends \
+      buildah \
+      skopeo \
+      curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# cosign (no apt package in Ubuntu LTS)
+RUN curl -sSfL \
+      https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 \
+      -o /usr/local/bin/cosign && \
+    chmod +x /usr/local/bin/cosign
+
+# oras (OCI registry push/pull for GGUF artifacts and PR images)
+RUN curl -sSfL \
+      https://github.com/oras-project/oras/releases/latest/download/oras_$(curl -sSf https://api.github.com/repos/oras-project/oras/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | tr -d v)_linux_amd64.tar.gz \
+    | tar xz -C /usr/local/bin oras
+
+# argo CLI (fire-and-forget workflow submission from ARC runner jobs)
+RUN curl -sSfL \
+      https://github.com/argoproj/argo-workflows/releases/latest/download/argo-linux-amd64.gz \
+    | gunzip -c > /usr/local/bin/argo && \
+    chmod +x /usr/local/bin/argo
+
+USER runner

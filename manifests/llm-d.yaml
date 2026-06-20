@@ -57,9 +57,9 @@ spec:
         app.kubernetes.io/name: llm-d-modelserver
         llm-d.ai/model: gemma-4-31B-it
     spec:
-      # Pinned to ghost — only node with AMD Strix Halo GPU.
-      nodeSelector:
-        kubernetes.io/hostname: ghost
+      # ponytail: nodeSelector removed — llm-d floats to any node with 48Gi free RAM.
+      # Strix Halo ROCm env vars are required on every Strix Halo node in the pool.
+      # Re-add nodeSelector if a non-Strix-Halo node joins without /dev/kfd + /dev/dri.
       # Required for ROCm IPC and shared memory across processes.
       hostNetwork: true
       hostIPC: true
@@ -145,7 +145,7 @@ spec:
           resources:
             requests:
               cpu: "8"
-              memory: 40Gi
+              memory: 48Gi  # scheduler float: pod only lands on node with 48Gi free
               amd.com/gpu: "1"
             limits:
               cpu: "16"

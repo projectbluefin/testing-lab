@@ -1,0 +1,117 @@
+# PR image GC — delete bluefin-pr-* tags from writable Zot older than 7 days,
+# or whose PR is closed/merged (uses github-token secret from argo namespace).
+#
+# Runs daily at 03:00 UTC (after golden-disk-gc at 04:00 UTC and nightly smoke at 02:00 UTC).
+# No workflowTemplateRef — inline is fine here since the logic is self-contained.
+# ponytail: no separate WorkflowTemplate, no Helm chart; CronWorkflow is already the scheduler.
+#
+# Prerequisite: github-token secret must exist in argo namespace with key "token".
+# Create: kubectl create secret generic github-token --from-literal=token=<PAT> -n argo
+#
+# ArgoCD: testing-lab-infra syncs this
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: pr-image-gc
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: gc
+spec:
+  schedules:
+    - "0 3 * * *"
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  workflowSpec:
+    serviceAccountName: argo
+    ttlStrategy:
+      secondsAfterSuccess: 86400      # 1 day
+      secondsAfterFailure: 604800     # 7 days
+    entrypoint: gc
+    templates:
+      - name: gc
+        nodeSelector:
+          kubernetes.io/hostname: ghost
+        script:
+          image: quay.io/fedora/fedora:latest
+          command: [bash]
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token
+                  key: token
+                  optional: true      # skip PR-state check if secret absent; still GC by age
+            - name: REGISTRY
+              value: "192.168.1.102:30500"
+            - name: REPO
+              value: "bluefin-pr"
+            - name: MAX_AGE_DAYS
+              value: "7"
+          source: |
+            set -euo pipefail
+            dnf install -y --quiet oras jq 2>&1 | tail -3
+
+            echo "=== PR image GC: ${REGISTRY}/${REPO} ==="
+
+            # List all tags matching bluefin-pr-*
+            TAGS=$(oras repo tags "${REGISTRY}/${REPO}" --plain-http 2>/dev/null || true)
+            if [[ -z "$TAGS" ]]; then
+              echo "No tags found in ${REGISTRY}/${REPO} — nothing to clean."
+              exit 0
+            fi
+
+            NOW_EPOCH=$(date +%s)
+            DELETED=0
+            KEPT=0
+
+            while IFS= read -r TAG; do
+              [[ "$TAG" == bluefin-pr-* ]] || continue
+
+              # Extract PR number from tag name (bluefin-pr-NNN:sha or bluefin-pr-NNN)
+              PR_NUM=$(echo "$TAG" | grep -oP '(?<=bluefin-pr-)\d+' || true)
+
+              # Check age via manifest created timestamp
+              CREATED=$(oras manifest fetch "${REGISTRY}/${REPO}:${TAG}" --plain-http \
+                | jq -r '.annotations["org.opencontainers.image.created"] // empty' 2>/dev/null || true)
+
+              if [[ -n "$CREATED" ]]; then
+                CREATED_EPOCH=$(date -d "$CREATED" +%s 2>/dev/null || echo 0)
+                AGE_DAYS=$(( (NOW_EPOCH - CREATED_EPOCH) / 86400 ))
+              else
+                AGE_DAYS=999  # unknown age → treat as old
+              fi
+
+              DELETE=false
+
+              # Delete if older than MAX_AGE_DAYS
+              if (( AGE_DAYS >= MAX_AGE_DAYS )); then
+                echo "DELETE ${TAG} (age: ${AGE_DAYS}d >= ${MAX_AGE_DAYS}d)"
+                DELETE=true
+              fi
+
+              # Delete if PR is closed/merged (requires github-token)
+              if [[ -n "${PR_NUM:-}" && -n "${GITHUB_TOKEN:-}" && "$DELETE" == "false" ]]; then
+                PR_STATE=$(curl -sf \
+                  -H "Authorization: token $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/projectbluefin/bluefin/pulls/${PR_NUM}" \
+                  | jq -r '.state // empty' 2>/dev/null || true)
+                if [[ "$PR_STATE" == "closed" ]]; then
+                  echo "DELETE ${TAG} (PR #${PR_NUM} is closed)"
+                  DELETE=true
+                fi
+              fi
+
+              if [[ "$DELETE" == "true" ]]; then
+                oras manifest delete "${REGISTRY}/${REPO}:${TAG}" --plain-http --force 2>&1 && \
+                  DELETED=$((DELETED + 1)) || \
+                  echo "WARNING: failed to delete ${TAG} (non-fatal)"
+              else
+                KEPT=$((KEPT + 1))
+              fi
+            done <<< "$TAGS"
+
+            echo "=== Done: deleted ${DELETED} tag(s), kept ${KEPT} tag(s) ==="

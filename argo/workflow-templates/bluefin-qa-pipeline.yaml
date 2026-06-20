@@ -12,7 +12,8 @@ spec:
   entrypoint: pipeline
 
   # ── cleanup VM + hostDisk on any exit (success, failure, timeout) ──────────
-  onExit: teardown
+  # Also posts GitHub commit status when sha/repo params are supplied (PR runs).
+  onExit: cleanup-and-report
 
   # ── parameters ──────────────────────────────────────────────────────────────
   arguments:
@@ -35,6 +36,14 @@ spec:
       # override to test a PR branch end-to-end without merging.
       - name: branch
         value: "main"
+      # Optional: supplied by ARC runner on PR runs; empty on nightly CronWorkflow runs.
+      # When sha is non-empty, the onExit handler posts a GitHub commit status.
+      - name: pr-number
+        value: ""
+      - name: sha
+        value: ""
+      - name: repo
+        value: ""
 
   # ── pipeline DAG ─────────────────────────────────────────────────────────────
   templates:
@@ -150,7 +159,47 @@ spec:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
 
-    # ── onExit handler: stop VM → wait VMI gone → delete hostDisk ──────────────
+    # ── onExit handler: teardown + optional GitHub commit status ──────────────
+    # cleanup-and-report calls teardown unconditionally, then posts GitHub commit
+    # status when sha is non-empty (PR runs). Nightly runs leave sha empty → skip.
+    - name: cleanup-and-report
+      dag:
+        tasks:
+          - name: teardown
+            template: teardown
+          - name: post-status
+            template: post-github-status
+            when: "'{{workflow.parameters.sha}}' != ''"
+
+    # ── post-github-status: posts commit status to GitHub API ──────────────────
+    - name: post-github-status
+      script:
+        image: quay.io/fedora/fedora:latest
+        command: [bash]
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
+        source: |
+          STATE=$([ "{{workflow.status}}" = "Succeeded" ] && echo success || echo failure)
+          PAYLOAD=$(jq -n \
+            --arg state "$STATE" \
+            --arg ctx  "ghost-lab" \
+            --arg desc "Bluefin lab test $STATE" \
+            --arg url  "http://192.168.1.102:32746/workflows/argo/{{workflow.name}}" \
+            '{state:$state,context:$ctx,description:$desc,target_url:$url}')
+          curl -sf -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/{{workflow.parameters.repo}}/statuses/{{workflow.parameters.sha}}" \
+            -d "$PAYLOAD" \
+          && echo "Posted $STATE to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}" \
+          || echo "WARNING: failed to post commit status (non-fatal)"
+
+    # ── teardown: stop VM → wait VMI gone → delete hostDisk ──────────────────
     - name: teardown
       dag:
         tasks:
