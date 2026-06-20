@@ -17,7 +17,7 @@ spec:
         githubConfigSecret: arc-github-secret
         runnerScaleSetName: ghost-runners
         minRunners: 0
-        maxRunners: 4
+        maxRunners: 6
         controllerServiceAccount:
           namespace: arc-systems
           name: arc-systems-gha-rs-controller

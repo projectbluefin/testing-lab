@@ -19,11 +19,12 @@
 
 | Situation | Run |
 |---|---|
-| Validate a smoke test or step change | `just run-tests-tag latest` |
+| Validate a smoke test or step change | `just run-tests-tag testing` |
 | Validate atomic OS contract checks | Use Argo MCP to submit `bluefin-qa-pipeline` with `suites=system` |
 | Validate developer or software suites | Use Argo MCP to submit `bluefin-qa-pipeline` with `suites=developer` or `suites=software` |
 | Pre-merge gate / promote a passing matrix run | `just run-tests-matrix` |
-| Validate a single Bluefin tag end-to-end | `just run-tests-tag <latest\|lts>` |
+| Validate a single Bluefin tag end-to-end | `just run-tests-tag <testing\|lts-testing>` |
+| Validate released (stable) image | `just run-tests-tag stable` or `just run-tests-tag lts-stable` |
 | Validate a golden-disk or image change | `just ensure-disk <tag>` then `just run-tests-tag <tag>` |
 | Validate the Flatcar lane | `just run-flatcar-smoke` |
 | Validate the dakota BST element graph (fast, no build) | `just run-dakota-validate` |
@@ -173,8 +174,8 @@ Backfill / run now:
 
 | Name | Schedule (UTC) | Purpose |
 |---|---|---|
-| `nightly-smoke` | 02:00 | `bluefin-qa-pipeline` (`latest`) |
-| `nightly-smoke-lts` | 02:30 | `bluefin-qa-pipeline` (`lts`) |
+| `nightly-smoke` | 02:00 | `bluefin-qa-pipeline` (`testing`) |
+| `nightly-smoke-lts` | 02:30 | `bluefin-qa-pipeline` (`lts-testing`) |
 | `orphan-vm-cleanup` | every 2h | Clean orphan test VMs |
 
 Any patch that must survive beyond a short debug session also needs a matching git change under `manifests/`.
@@ -198,12 +199,12 @@ kubectl create secret generic bluefin-test-ssh-key \
 shred -u "${ssh_key}" "${ssh_key}.pub"
 
 # 3. Patch every existing golden disk:
-just patch-disk latest
-just patch-disk lts
+just patch-disk testing
+just patch-disk lts-testing
 
 # 4. Confirm via real runs:
-just run-tests-tag latest
-just run-tests-tag lts
+just run-tests-tag testing
+just run-tests-tag lts-testing
 
 # 5. Verify the new fingerprint:
 kubectl get secret bluefin-test-ssh-key -n argo \
@@ -220,7 +221,7 @@ If `patch-disk` succeeds but fresh workflows still fail SSH, file an issue with 
 
 Mandatory gate for `knuckle`, `dakota`, and this repo's PRs.
 
-1. Run the lab loop end-to-end — `just run-tests-tag latest` minimum, `just run-tests-matrix` for high-risk changes.
+1. Run the lab loop end-to-end — `just run-tests-tag testing` minimum, `just run-tests-matrix` for high-risk changes.
 2. Collect **real evidence** using **MCP tools only** — not bash `argo`/`kubectl` commands:
    - Workflow status/steps → `argo-mcp-get_workflow` / `argo-mcp-list_workflows`
    - Log output → `argo-mcp-logs_workflow`
@@ -260,8 +261,8 @@ Use `kubernetes-mcp-resources_delete` with `apiVersion: kubevirt.io/v1`, `kind: 
 just setup-ssh-secret
 just setup-argocd
 just argocd-sync
-just ensure-disk latest
-just run-tests-tag latest
+just ensure-disk testing
+just run-tests-tag testing
 ```
 
 ---
@@ -273,7 +274,7 @@ just run-tests-tag latest
 2. argo-mcp-list_cron_workflows namespace=argo
 3. just list-vms
 4. just list-workflows
-5. just run-tests-tag latest
+5. just run-tests-tag testing
 ```
 
 Expected steady state:

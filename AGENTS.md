@@ -188,7 +188,7 @@ Self-hosted GitHub Actions runners via Actions Runner Controller (ARC).
 | Runner label | `ghost-runners` |
 | GitHub config URL | `https://github.com/projectbluefin` |
 | Min runners | 0 (idle — `arc-runners` namespace empty when no jobs; correct) |
-| Max runners | 4 |
+| Max runners | 6 |
 | GitHub App | `bluefin-ghost-arc` (ID 4099840, Installation 141458121) |
 | Credentials secret | `arc-github-secret` in `arc-runners` namespace |
 | ArgoCD Applications | `argocd/arc-controller-app.yaml`, `argocd/arc-runners-app.yaml` |
@@ -231,8 +231,10 @@ distro-specific replacements when an upstream image exists.
 |---|---|---|---|
 | `testing` | `ghcr.io/projectbluefin/bluefin:testing` | `/var/tmp/bluefin-golden/testing/disk.raw` | 02:00 UTC |
 | `lts-testing` | `ghcr.io/projectbluefin/bluefin-lts:testing` | `/var/tmp/bluefin-golden/lts-testing/disk.raw` | 02:30 UTC |
+| `stable` | `ghcr.io/projectbluefin/bluefin:stable` | `/var/tmp/bluefin-golden/stable/disk.raw` | — |
+| `lts-stable` | `ghcr.io/projectbluefin/bluefin-lts:stable` | `/var/tmp/bluefin-golden/lts-stable/disk.raw` | — |
 
-> **There is no `:latest` tag.** Bluefin publishes `:testing` (pre-promotion) and `:stable` (released). LTS publishes `:testing`, `:lts`, and `:stable`. Source: `execute-release.yml` in each repo.
+> **`:stable` and `:testing` are the only production branches.** All other tags (`:latest`, `:lts`, `:gts`, date tags, stream tags) are developer-facing conveniences — never use them in automation, manifests, or docs. `bluefin-lts` has no `:latest` tag at all; `skopeo inspect` returns `manifest unknown` and will fail any workflow that tries it.
 
 ## VM Lifecycle
 
