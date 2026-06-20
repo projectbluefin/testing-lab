@@ -38,8 +38,6 @@ spec:
         dnsPolicy: ClusterFirstWithHostNet
         securityContext:
           runAsUser: 0
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       # NOTE: No output artifacts declared — artifact repository is not configured.
       # Results are captured via stdout (pod logs / Loki). Same pattern as run-gnome-tests.
       container:
