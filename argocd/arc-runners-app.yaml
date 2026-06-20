@@ -23,6 +23,12 @@ spec:
           name: arc-systems-gha-rs-controller
         template:
           spec:
+            nodeSelector:
+              node-location: lan
+            tolerations:
+              - key: node-role.kubernetes.io/gaming
+                operator: Exists
+                effect: NoSchedule
             containers:
               - name: runner
                 image: ghcr.io/actions/actions-runner:latest
