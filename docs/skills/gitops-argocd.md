@@ -181,6 +181,22 @@ print(yaml.dump(d,default_flow_style=False,sort_keys=False))" \
 
 Then lint, commit, push. ArgoCD will adopt the resource on next sync.
 
+### 9. Taking GitOps ownership of unmanaged Deployments/Services
+
+When a Deployment or Service exists in the cluster but has no manifest in git (e.g. was created
+with `kubectl apply` or a Helm one-shot and then forgotten), ArgoCD will not manage or prune it
+unless you add a manifest.
+
+Pattern:
+1. Inspect the running resource: `kubectl get deploy <name> -n <ns> -o yaml`
+2. Strip generated fields (`resourceVersion`, `uid`, `creationTimestamp`, `managedFields`, `status`)
+3. Write the clean manifest to `manifests/<name>.yaml`
+4. Commit and push. ArgoCD SSA will take ownership on next sync without restarting the pod (if the spec is identical).
+5. **Name the Deployment and Service identically to the existing resource** — SSA patches in place rather than recreating.
+
+> ⚠️ If you change the image or spec while adopting, ArgoCD will roll the pod. Safe for stateless
+> workloads; for stateful ones (writable registries, DBs) verify data path continuity first.
+
 ## Common Rationalizations
 
 | Rationalization | Reality |
@@ -192,6 +208,7 @@ Then lint, commit, push. ArgoCD will adopt the resource on next sync.
 
 ## Red Flags
 
+- A Deployment or Service running in the cluster with no corresponding manifest in `manifests/` — it is invisible to ArgoCD, will not be pruned or healed, and drifts silently (e.g. `registry:2` ran unmanaged for 18+ days)
 - A WorkflowTemplate in `argo/workflow-templates/` that exists only in the cluster (not in git) — ArgoCD will prune it on next sync
 - `generateName:` in any file under `manifests/`
 - A template that was `kubectl apply`d and is showing as OutOfSync in ArgoCD
@@ -202,6 +219,7 @@ Then lint, commit, push. ArgoCD will adopt the resource on next sync.
 
 Before merging a GitOps change:
 
+- [ ] No Deployment or Service in `local-registry`, `argo`, or other managed namespaces exists only in the cluster — verify with `kubectl get deploy,svc -n <ns>` vs git
 - [ ] New WorkflowTemplate is in the correct path (`workflow-templates/` vs `bootstrap/`)
 - [ ] `argo lint --offline argo/workflow-templates/` passes
 - [ ] No `generateName:` in `manifests/`

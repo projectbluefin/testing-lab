@@ -208,11 +208,24 @@ containerd `hosts.toml` (written by `registry-mirror-config` DaemonSet — no k3
 
 | Instance | Upstream | NodePort | Storage |
 |---|---|---|---|
+| `registry` (writable) | — write target, no upstream | 30500 | `/var/mnt/ghost-data/zot-local` |
 | `zot-ghcr` | `https://ghcr.io` | 30501 | `/var/mnt/ghost-data/zot-ghcr` |
 | `zot-docker` | `https://registry-1.docker.io` | 30502 | `/var/mnt/ghost-data/zot-docker` |
+| `zot-quay` | `https://quay.io` | 30503 | `/var/mnt/ghost-data/zot-quay` |
+| `zot-fedora` | `https://registry.fedoraproject.org` | 30504 | `/var/mnt/ghost-data/zot-fedora` |
+| `zot-redhat-access` | `https://registry.access.redhat.com` | 30505 | `/var/mnt/ghost-data/zot-redhat-access` |
+| `zot-k8s` | `https://registry.k8s.io` | 30506 | `/var/mnt/ghost-data/zot-k8s` |
 
-Both instances are pinned to ghost (hostPath storage requirement) and managed by
-ArgoCD `testing-lab-infra` via `manifests/zot-cache.yaml`.
+All instances pinned to ghost (hostPath storage) and managed by ArgoCD `testing-lab-infra`
+via `manifests/zot-cache.yaml` (pull-through) and `manifests/zot-writable.yaml` (write target).
+
+**Image policy:** all `image:` references in `argo/` and `manifests/` must use a cached registry.
+Enforced by the registry allowlist lint step in `.github/workflows/lint.yaml`.
+Allowlist: `ghcr.io`, `quay.io`, `registry.fedoraproject.org`, `registry.access.redhat.com`,
+`registry.k8s.io`, `192.168.1.102`, `localhost`.
+Exception: `docker.io/rocm/k8s-device-plugin` — annotate `# registry-lint-ignore`.
+**Rule:** upstream k8s/CNCF registries (`registry.k8s.io`, `quay.io`) always preferred over
+distro-specific replacements when an upstream image exists.
 
 | Tag (image-tag / disk dir) | Image | Golden disk on ghost | Nightly |
 |---|---|---|---|
@@ -268,7 +281,7 @@ Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](
 | bluefin-lts-test | lts variant test VMs |
 | flatcar-test | Flatcar test VMs |
 | llm-d | LLM inference hive node (Qwen3.6-35B-A3B Q4_K_M GGUF via llama.cpp on ROCm) |
-| local-registry | OCI registry: BIB push target (port 30500), Zot pull-through caches — zot-ghcr (30501), zot-docker (30502) |
+| local-registry | OCI registry: writable Zot (port 30500), pull-through caches — zot-ghcr (30501), zot-docker (30502), zot-quay (30503), zot-fedora (30504), zot-redhat-access (30505), zot-k8s (30506) |
 | arc-systems | ARC controller + listener pods |
 | arc-runners | ARC ephemeral runner pods — **empty when no jobs queued; that is correct** |
 | mcp | Kubernetes MCP server |

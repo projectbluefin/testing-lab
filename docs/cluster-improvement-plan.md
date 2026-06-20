@@ -42,12 +42,12 @@ Argo workflow (independent lifecycle):
 
 ---
 
-## Phase 0 — Pre-flight bug fixes
+## Phase 0 — Pre-flight bug fixes ✅ DONE 2026-06-20
 
 These are existing bugs found during the design review. Fix them before anything else —
 any one can cause silent test failures independent of the improvements below.
 
-### 0a — Unlock `golden-disk-gc` from dry-run mode
+### 0a — Unlock `golden-disk-gc` from dry-run mode ✅
 
 `manifests/golden-disk-gc.yaml` line 25 has `value: "true"` as the `dry-run` argument
 default. The CronWorkflow runs daily at 04:00 UTC, logs every `KEEP` and `DELETE`
@@ -73,9 +73,13 @@ Keep the `dry-run` parameter so you can still pass `true` for a manual inspectio
   disk space is reclaimed: `df -h /var/tmp`.
 - Confirm the daily CronWorkflow at 04:00 UTC actually frees space the next morning.
 
-### 0b — Audit and fix the `192.168.1.102:5000` registry references
+### 0b — Audit and fix the `192.168.1.102:5000` registry references ✅
 
-### 0c — Verify and document what is running on port 30500
+### 0c — Verify and document what is running on port 30500 ✅
+
+**Finding:** port 30500 = plain `registry:2` Docker registry, running unmanaged outside GitOps for 18 days.
+Port `:5000` in bib-build-and-push.yaml was container-internal hostNetwork access to the same registry.
+**Fix applied:** `manifests/zot-writable.yaml` added — writable Zot replacing `registry:2` under ArgoCD control.
 
 Phases 4, 5, and 6 all assume a writable, OCI-compliant Zot instance at
 `192.168.1.102:30500`. `AGENTS.md` documents port 30500 as the "BIB push target" but
@@ -125,7 +129,7 @@ references `:5000`.
 
 ---
 
-## Phase 1 — Fill Zot coverage gaps
+## Phase 1 — Fill Zot coverage gaps ✅ DONE 2026-06-20
 
 **Why first:** `quay.io/kubevirt/virt-launcher` is pulled on every single test VM launch.
 Every BIB build also hits `quay.io/centos-bootc/bootc-image-builder`. These are the hottest
@@ -173,7 +177,10 @@ uncached paths in the cluster right now.
 
 ---
 
-## Phase 2 — Hummingbird image migration
+## Phase 2 — Hummingbird image migration ✅ DONE 2026-06-20
+
+**kubectl decision:** Option A — upstream `registry.k8s.io/kubectl:v1.32.0` kept.
+Upstream k8s/CNCF registries always preferred over distro-specific alternatives.
 
 **Why second:** Eliminates `cgr.dev` from the image footprint, simplifies the Zot inventory,
 and gives workflow steps a consistent Red Hat toolchain.
@@ -245,7 +252,7 @@ Two options — pick one before starting Phase 2:
 
 ---
 
-## Phase 3 — CI lint gate for uncached registries
+## Phase 3 — CI lint gate for uncached registries ✅ DONE 2026-06-20
 
 **Why after Phase 2:** The lint gate enforces the clean post-migration state. Adding it before
 Phase 2 is complete would fail on every current PR.
@@ -557,7 +564,12 @@ jobs:
 
 ---
 
-## Phase 7 — System contract tests in the nightly pipeline
+## Phase 7 — System contract tests in the nightly pipeline ✅ PARTIALLY DONE 2026-06-20
+
+**Finding:** `run-gnome-tests` WorkflowTemplate already handles `suite=system` natively (behave only,
+no qecore-headless). No new WorkflowTemplate needed.
+**Done:** `run-system` task added to `bluefin-qa-pipeline.yaml` DAG.
+**Remaining:** `tests/system/features/` does not exist yet — write the .feature files.
 
 > **Note:** `ghost-kernel-args` WorkflowTemplate is referenced in the node join
 > checklist below. Verify it exists in `argo/workflow-templates/` before the first
