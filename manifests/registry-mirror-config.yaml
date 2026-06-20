@@ -1,0 +1,85 @@
+# Registry mirror config DaemonSet
+# Writes containerd hosts.toml to each node's certs.d path.
+# containerd v2.0 (k3s v1.32+) hot-reloads these — no k3s restart needed.
+#
+# Mirrors configured:
+#   ghcr.io  → ghost:30501 (zot-ghcr)
+#   docker.io → ghost:30502 (zot-docker)
+#
+# To update mirrors: edit ConfigMap below, then:
+#   kubectl rollout restart daemonset/registry-mirror-config -n local-registry
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-mirror-hosts
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  ghcr.io.hosts.toml: |
+    server = "https://ghcr.io"
+
+    [host."http://192.168.1.102:30501"]
+      capabilities = ["pull", "resolve"]
+  docker.io.hosts.toml: |
+    server = "https://registry-1.docker.io"
+
+    [host."http://192.168.1.102:30502"]
+      capabilities = ["pull", "resolve"]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: registry-mirror-config
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: registry-cache
+spec:
+  selector:
+    matchLabels:
+      app: registry-mirror-config
+  template:
+    metadata:
+      labels:
+        app: registry-mirror-config
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      initContainers:
+        - name: write-hosts
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /certs.d/ghcr.io /certs.d/docker.io
+              cp /config/ghcr.io.hosts.toml  /certs.d/ghcr.io/hosts.toml
+              cp /config/docker.io.hosts.toml /certs.d/docker.io/hosts.toml
+              echo "Mirror hosts written:"
+              cat /certs.d/ghcr.io/hosts.toml
+              cat /certs.d/docker.io/hosts.toml
+          volumeMounts:
+            - name: certs-d
+              mountPath: /certs.d
+            - name: config
+              mountPath: /config
+      containers:
+        - name: pause
+          # ponytail: sleep loop, this pod only exists to keep the DaemonSet alive
+          # so that config is re-applied on pod restart / rollout restart
+          image: busybox:latest
+          command: ["sh", "-c", "while true; do sleep 3600; done"]
+          resources:
+            requests: { cpu: "1m", memory: "4Mi" }
+            limits: { cpu: "10m", memory: "16Mi" }
+      volumes:
+        - name: certs-d
+          hostPath:
+            path: /var/lib/rancher/k3s/agent/etc/containerd/certs.d
+            type: DirectoryOrCreate
+        - name: config
+          configMap:
+            name: registry-mirror-hosts
+      tolerations:
+        - operator: Exists
