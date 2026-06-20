@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-runners
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/actions/actions-runner-controller-charts
+    chart: gha-runner-scale-set
+    targetRevision: 0.9.3
+    helm:
+      values: |
+        githubConfigUrl: "https://github.com/projectbluefin"
+        githubConfigSecret: arc-github-secret
+        runnerScaleSetName: ghost-runners
+        minRunners: 0
+        maxRunners: 4
+        controllerServiceAccount:
+          namespace: arc-systems
+          name: arc-systems-gha-rs-controller
+        containerMode:
+          type: kubernetes
+          kubernetesModeWorkVolumeClaim:
+            accessModes: ["ReadWriteOnce"]
+            storageClassName: local-path
+            resources:
+              requests:
+                storage: 10Gi
+        template:
+          spec:
+            containers:
+              - name: runner
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: 4Gi
+                  limits:
+                    cpu: "8"
+                    memory: 16Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

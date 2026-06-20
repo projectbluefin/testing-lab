@@ -23,9 +23,9 @@ to be reachable. If the extensions show `offline`, run `/argo-reconnect` and
 
 | Node | Role | Schedulable | Notes |
 |---|---|---|---|
-| `ghost` | control-plane + master | Yes (all workloads) | — |
-| `exo-1` | worker | Yes (workflow pods only — no critical system pods) | — |
-| `bazzite` | worker | Yes (on demand) | Gaming machine — k3s disabled at boot; `ujust toggle-k8s` to start/stop |
+| `ghost` | control-plane + master | Yes | Taint: none — general scheduling allowed |
+| `exo-1` | worker | Yes | Taint: none — general scheduling allowed |
+| `bazzite` | worker | On demand only | Taint: `node-role.kubernetes.io/gaming:NoSchedule` — gaming machine, k3s disabled at boot; `ujust toggle-k8s` to start/stop. Only pods with matching toleration land here. |
 
 `/etc/rancher/k3s/config.yaml` on ghost:
 
@@ -47,19 +47,55 @@ exo-1 are evicted within ~90s and rescheduled on ghost.
 in `Unknown` state for 2+ minutes when exo-1 went offline, blocking cluster
 recovery. Reduced to 90s on 2026-06-20.
 
-## What runs where
+## Scheduling model
 
-**Must run on ghost** (control-plane-critical or MCP-facing):
-- `coredns` — DNS for all pods; if on exo-1 and exo-1 dies, DNS breaks
-- `local-path-provisioner` — PVC provisioning
-- `kubernetes-mcp-server` (namespace `mcp`) — already pinned via `nodeSelector: kubernetes.io/hostname: ghost` in `mcp-kubernetes-mcp-server.yaml`
-- All KubeVirt virt-* components — pinned by KubeVirt operator
-- Argo Workflow controller — runs on ghost
+### Rule: only use nodeSelector/nodeAffinity when hardware requires it
 
-**May run on exo-1** (workflow compute pods only):
-- BST build pods
-- BIB build pods
-- Any Argo workflow step pod without a ghost nodeSelector
+Do **not** pin pods to specific nodes to "be safe" or "reduce load on the control
+plane". The k8s scheduler is correct by default. Hard placement constraints
+create fragility and waste capacity.
+
+**Valid reasons to pin a pod to a node:**
+- Pod needs a hostPath on ghost's local disk (KubeVirt disks, Zot cache, local registry)
+- Pod needs the AMD GPU on ghost (ROCm / llm-d)
+- Pod is a DaemonSet component (by definition runs everywhere)
+
+**Not valid reasons to pin:**
+- "The control plane is on ghost" — schedulable nodes handle all workloads
+- "I want to be safe" — use resource requests and let the scheduler decide
+- "exo-1 is a worker" — ghost is also schedulable; treat them equivalently
+
+### What requires a nodeSelector
+
+| Workload | Node | Reason |
+|---|---|---|
+| KubeVirt virt-* components | ghost | KubeVirt operator pins these |
+| KubeVirt VMs (VirtualMachineInstance) | ghost | hostPath disk on ghost's local storage |
+| `kubernetes-mcp-server` | ghost | nodeSelector in manifest (MCP socket dependency) |
+| `zot-ghcr`, `zot-docker` (registry cache) | ghost | hostPath cache at `/var/mnt/ghost-data/zot-*` |
+| `local-registry` (registry:2) | ghost | hostPath at `/var/mnt/ghost-data/dist-registry` |
+| `llm-d` model server | ghost | AMD GPU (amd.com/gpu resource) |
+
+### What schedules freely (no nodeSelector)
+
+- Argo Workflow step pods (BIB builds, BST builds, test runners)
+- ARC runner pods and listener (`arc-systems`, `arc-runners`)
+- ArgoCD components
+- Argo controller and server
+- All other stateless workloads
+
+### Bazzite taint
+
+bazzite carries taint `node-role.kubernetes.io/gaming:NoSchedule` — persisted via
+`manifests/bazzite-node-taint.yaml`. Critical infra pods never land there.
+Workloads that opt in via `tolerations` can use bazzite's capacity when it is online.
+bazzite's k3s is disabled at boot; enable with `ujust toggle-k8s`.
+
+**Why this matters:** bazzite's CNI/network may not be fully initialised when it
+first joins. Pods landing on bazzite before networking is ready will fail DNS
+resolution (`no route to host` to CoreDNS). The taint prevents this for infra workloads.
+
+### CoreDNS placement
 
 **CoreDNS is NOT pinned via manifest** — k3s overwrites its own manifests on
 every restart. CoreDNS is kept on ghost by the `node-monitor-grace-period=90s`
