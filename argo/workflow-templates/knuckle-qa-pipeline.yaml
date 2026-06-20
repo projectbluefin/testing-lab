@@ -784,7 +784,7 @@ spec:
             path: /var/tmp/knuckle-test
             type: DirectoryOrCreate
       script:
-        image: cgr.dev/chainguard/bash:latest
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
         command: [bash]
         securityContext:
           runAsUser: 0

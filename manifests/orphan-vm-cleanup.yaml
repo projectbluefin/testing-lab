@@ -27,7 +27,7 @@ spec:
         nodeSelector:
           kubernetes.io/hostname: ghost
         script:
-          image: cgr.dev/chainguard/kubectl:latest-dev
+          image: registry.k8s.io/kubectl:v1.32.0
           command: [bash]
           resources:
             requests:

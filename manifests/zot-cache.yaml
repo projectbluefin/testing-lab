@@ -1,11 +1,15 @@
 # Zot pull-through cache instances — one per upstream registry
-# ghcr.io  → zot-ghcr  NodePort 30501
-# docker.io → zot-docker NodePort 30502
+# ghcr.io                    → zot-ghcr           NodePort 30501
+# docker.io                  → zot-docker          NodePort 30502
+# quay.io                    → zot-quay            NodePort 30503
+# registry.fedoraproject.org → zot-fedora          NodePort 30504
+# registry.access.redhat.com → zot-redhat-access   NodePort 30505
+# registry.k8s.io            → zot-k8s             NodePort 30506
 #
 # containerd on each node routes pulls through these via
 # manifests/registry-mirror-config.yaml (hosts.toml DaemonSet, no k3s restart needed)
 #
-# Storage: hostPath on ghost at /var/mnt/ghost-data/zot-{ghcr,docker}/
+# Storage: hostPath on ghost at /var/mnt/ghost-data/zot-{ghcr,docker,quay,fedora,redhat,k8s}/
 # ArgoCD: testing-lab-infra syncs this
 ---
 apiVersion: v1
@@ -207,3 +211,379 @@ spec:
     - port: 5000
       targetPort: 5000
       nodePort: 30502
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-quay-config
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  config.json: |
+    {
+      "distSpecVersion": "1.1.0",
+      "storage": { "rootDirectory": "/var/lib/registry", "gc": true },
+      "http": { "address": "0.0.0.0", "port": "5000" },
+      "log": { "level": "warn" },
+      "extensions": {
+        "sync": {
+          "enable": true,
+          "registries": [{
+            "urls": ["https://quay.io"],
+            "onDemand": true,
+            "tlsVerify": true,
+            "content": [{ "prefix": "**" }]
+          }]
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot-quay
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: registry-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zot-quay
+  template:
+    metadata:
+      labels:
+        app: zot-quay
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot-linux-amd64:v2.1.1
+          args: ["serve", "/etc/zot/config.json"]
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot/config.json
+              subPath: config.json
+            - name: data
+              mountPath: /var/lib/registry
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: zot-quay-config
+        - name: data
+          hostPath:
+            path: /var/mnt/ghost-data/zot-quay
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot-quay
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  type: NodePort
+  selector:
+    app: zot-quay
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30503
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-fedora-config
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  config.json: |
+    {
+      "distSpecVersion": "1.1.0",
+      "storage": { "rootDirectory": "/var/lib/registry", "gc": true },
+      "http": { "address": "0.0.0.0", "port": "5000" },
+      "log": { "level": "warn" },
+      "extensions": {
+        "sync": {
+          "enable": true,
+          "registries": [{
+            "urls": ["https://registry.fedoraproject.org"],
+            "onDemand": true,
+            "tlsVerify": true,
+            "content": [{ "prefix": "**" }]
+          }]
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot-fedora
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: registry-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zot-fedora
+  template:
+    metadata:
+      labels:
+        app: zot-fedora
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot-linux-amd64:v2.1.1
+          args: ["serve", "/etc/zot/config.json"]
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot/config.json
+              subPath: config.json
+            - name: data
+              mountPath: /var/lib/registry
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: zot-fedora-config
+        - name: data
+          hostPath:
+            path: /var/mnt/ghost-data/zot-fedora
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot-fedora
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  type: NodePort
+  selector:
+    app: zot-fedora
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30504
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-redhat-access-config
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  config.json: |
+    {
+      "distSpecVersion": "1.1.0",
+      "storage": { "rootDirectory": "/var/lib/registry", "gc": true },
+      "http": { "address": "0.0.0.0", "port": "5000" },
+      "log": { "level": "warn" },
+      "extensions": {
+        "sync": {
+          "enable": true,
+          "registries": [{
+            "urls": ["https://registry.access.redhat.com"],
+            "onDemand": true,
+            "tlsVerify": true,
+            "content": [{ "prefix": "**" }]
+          }]
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot-redhat-access
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: registry-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zot-redhat-access
+  template:
+    metadata:
+      labels:
+        app: zot-redhat-access
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot-linux-amd64:v2.1.1
+          args: ["serve", "/etc/zot/config.json"]
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot/config.json
+              subPath: config.json
+            - name: data
+              mountPath: /var/lib/registry
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: zot-redhat-access-config
+        - name: data
+          hostPath:
+            path: /var/mnt/ghost-data/zot-redhat-access
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot-redhat-access
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  type: NodePort
+  selector:
+    app: zot-redhat-access
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30505
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-k8s-config
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  config.json: |
+    {
+      "distSpecVersion": "1.1.0",
+      "storage": { "rootDirectory": "/var/lib/registry", "gc": true },
+      "http": { "address": "0.0.0.0", "port": "5000" },
+      "log": { "level": "warn" },
+      "extensions": {
+        "sync": {
+          "enable": true,
+          "registries": [{
+            "urls": ["https://registry.k8s.io"],
+            "onDemand": true,
+            "tlsVerify": true,
+            "content": [{ "prefix": "**" }]
+          }]
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot-k8s
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    app.kubernetes.io/component: registry-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zot-k8s
+  template:
+    metadata:
+      labels:
+        app: zot-k8s
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot-linux-amd64:v2.1.1
+          args: ["serve", "/etc/zot/config.json"]
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot/config.json
+              subPath: config.json
+            - name: data
+              mountPath: /var/lib/registry
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits: { cpu: "1", memory: "2Gi" }
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: zot-k8s-config
+        - name: data
+          hostPath:
+            path: /var/mnt/ghost-data/zot-k8s
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot-k8s
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  type: NodePort
+  selector:
+    app: zot-k8s
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 30506

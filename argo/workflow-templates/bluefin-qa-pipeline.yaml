@@ -128,6 +128,28 @@ spec:
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
 
+              # 3d. Phase 4 — atomic OS contract tests (no Wayland session needed)
+          # Runs after all GUI suites to avoid bootc reboot colliding with live Wayland session.
+          # run-gnome-tests handles suite=system natively (behave only, no qecore-headless).
+          - name: run-system
+            depends: "(run-software.Succeeded || run-software.Skipped)"
+            when: "'{{workflow.parameters.suites}}' =~ 'system'"
+            templateRef:
+              name: run-gnome-tests
+              template: run-gnome-tests
+            arguments:
+              parameters:
+                - name: vm-ip
+                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
+                - name: suite
+                  value: "system"
+                - name: variant
+                  value: "{{workflow.parameters.variant}}"
+                - name: ssh-key-secret
+                  value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
     # ── onExit handler: stop VM → wait VMI gone → delete hostDisk ──────────────
     - name: teardown
       dag:

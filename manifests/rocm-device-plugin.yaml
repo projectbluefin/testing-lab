@@ -41,7 +41,7 @@ spec:
           operator: Exists
       containers:
         - name: amdgpu-dp
-          image: docker.io/rocm/k8s-device-plugin:1.31.0.10
+          image: docker.io/rocm/k8s-device-plugin:1.31.0.10 # registry-lint-ignore: no upstream k8s/CNCF equivalent
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true

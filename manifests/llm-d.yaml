@@ -74,7 +74,7 @@ spec:
       # the hostPath volume and pass the local path to vllm serve instead.
       initContainers:
         - name: download-gguf
-          image: docker.io/alpine:3
+          image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
           command: ["sh", "-c"]
           args:
             - |

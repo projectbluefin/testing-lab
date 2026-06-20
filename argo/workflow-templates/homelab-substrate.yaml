@@ -76,7 +76,7 @@ spec:
           - name: namespace
           - name: lane
       script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
+        image: registry.k8s.io/kubectl:v1.32.0
         command: [bash, -c]
         source: |
           set -euo pipefail
@@ -106,7 +106,7 @@ spec:
               spec:
                 containers:
                   - name: nginx
-                    image: docker.io/library/nginx:1.27.5-alpine
+                    image: registry.access.redhat.com/hi/nginx:1.30.0
                     ports:
                       - containerPort: 80
           ---
@@ -130,7 +130,7 @@ spec:
 
     - name: cleanup
       script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
+        image: registry.k8s.io/kubectl:v1.32.0
         command: [bash, -c]
         source: |
           set -euo pipefail

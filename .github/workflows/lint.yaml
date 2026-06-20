@@ -40,6 +40,25 @@ jobs:
             argo lint --offline "$f" || echo "WARNING: $f needs server-side template resolution"
           done
 
+      - name: Registry allowlist check
+        run: |
+          # Fail if any image: reference uses a registry not in the cluster cache.
+          # Add '# registry-lint-ignore' to a line to exempt it (e.g. ROCm device plugin).
+          FAIL=0
+          while IFS= read -r line; do
+            echo "$line" | grep -q 'registry-lint-ignore' && continue
+            imgref=$(echo "$line" | sed 's/.*image:[[:space:]]*//' | awk '{print $1}' | tr -d '"'"'"')
+            [[ -z "$imgref" || "${imgref:0:1}" == "#" ]] && continue
+            registry=$(echo "$imgref" | cut -d/ -f1)
+            # skip bare names (no dot or colon = implicit docker.io, handled by zot-docker)
+            echo "$registry" | grep -qE '[.:]' || continue
+            case "$registry" in
+              ghcr.io|quay.io|registry.fedoraproject.org|registry.access.redhat.com|registry.k8s.io|192.168.1.102|localhost) ;;
+              *) echo "FAIL: uncached registry '$registry' in $(echo "$line" | cut -d: -f1-2): $imgref"; FAIL=1 ;;
+            esac
+          done < <(grep -rn 'image:' argo/ manifests/)
+          exit "$FAIL"
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:

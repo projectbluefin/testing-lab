@@ -79,7 +79,7 @@ spec:
         parameters:
           - name: namespace
       script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
+        image: registry.k8s.io/kubectl:v1.32.0
         command: [bash, -c]
         source: |
           set -euo pipefail
@@ -141,7 +141,7 @@ spec:
 
     - name: cleanup
       script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
+        image: registry.k8s.io/kubectl:v1.32.0
         command: [bash, -c]
         source: |
           set -euo pipefail

@@ -3,8 +3,12 @@
 # containerd v2.0 (k3s v1.32+) hot-reloads these — no k3s restart needed.
 #
 # Mirrors configured:
-#   ghcr.io  → ghost:30501 (zot-ghcr)
-#   docker.io → ghost:30502 (zot-docker)
+#   ghcr.io                    → ghost:30501 (zot-ghcr)
+#   docker.io                  → ghost:30502 (zot-docker)
+#   quay.io                    → ghost:30503 (zot-quay)
+#   registry.fedoraproject.org → ghost:30504 (zot-fedora)
+#   registry.access.redhat.com → ghost:30505 (zot-redhat-access)
+#   registry.k8s.io            → ghost:30506 (zot-k8s)
 #
 # To update mirrors: edit ConfigMap below, then:
 #   kubectl rollout restart daemonset/registry-mirror-config -n local-registry
@@ -27,6 +31,26 @@ data:
 
     [host."http://192.168.1.102:30502"]
       capabilities = ["pull", "resolve"]
+  quay.io.hosts.toml: |
+    server = "https://quay.io"
+
+    [host."http://192.168.1.102:30503"]
+      capabilities = ["pull", "resolve"]
+  registry.fedoraproject.org.hosts.toml: |
+    server = "https://registry.fedoraproject.org"
+
+    [host."http://192.168.1.102:30504"]
+      capabilities = ["pull", "resolve"]
+  registry.access.redhat.com.hosts.toml: |
+    server = "https://registry.access.redhat.com"
+
+    [host."http://192.168.1.102:30505"]
+      capabilities = ["pull", "resolve"]
+  registry.k8s.io.hosts.toml: |
+    server = "https://registry.k8s.io"
+
+    [host."http://192.168.1.102:30506"]
+      capabilities = ["pull", "resolve"]
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -48,17 +72,25 @@ spec:
     spec:
       initContainers:
         - name: write-hosts
-          image: busybox:latest
+          image: registry.access.redhat.com/ubi9/ubi-micro:9.5
           command:
             - sh
             - -c
             - |
-              mkdir -p /certs.d/ghcr.io /certs.d/docker.io
-              cp /config/ghcr.io.hosts.toml  /certs.d/ghcr.io/hosts.toml
-              cp /config/docker.io.hosts.toml /certs.d/docker.io/hosts.toml
-              echo "Mirror hosts written:"
-              cat /certs.d/ghcr.io/hosts.toml
-              cat /certs.d/docker.io/hosts.toml
+              mkdir -p \
+                /certs.d/ghcr.io \
+                /certs.d/docker.io \
+                /certs.d/quay.io \
+                /certs.d/registry.fedoraproject.org \
+                /certs.d/registry.access.redhat.com \
+                /certs.d/registry.k8s.io
+              cp /config/ghcr.io.hosts.toml                    /certs.d/ghcr.io/hosts.toml
+              cp /config/docker.io.hosts.toml                  /certs.d/docker.io/hosts.toml
+              cp /config/quay.io.hosts.toml                    /certs.d/quay.io/hosts.toml
+              cp /config/registry.fedoraproject.org.hosts.toml /certs.d/registry.fedoraproject.org/hosts.toml
+              cp /config/registry.access.redhat.com.hosts.toml /certs.d/registry.access.redhat.com/hosts.toml
+              cp /config/registry.k8s.io.hosts.toml            /certs.d/registry.k8s.io/hosts.toml
+              echo "Mirror hosts written."
           volumeMounts:
             - name: certs-d
               mountPath: /certs.d
@@ -68,7 +100,7 @@ spec:
         - name: pause
           # ponytail: sleep loop, this pod only exists to keep the DaemonSet alive
           # so that config is re-applied on pod restart / rollout restart
-          image: busybox:latest
+          image: registry.access.redhat.com/ubi9/ubi-micro:9.5
           command: ["sh", "-c", "while true; do sleep 3600; done"]
           resources:
             requests: { cpu: "1m", memory: "4Mi" }

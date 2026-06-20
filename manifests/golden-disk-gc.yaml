@@ -22,7 +22,7 @@ spec:
     arguments:
       parameters:
         - name: dry-run
-          value: "true"
+          value: "false"   # was "true" — GC was never actually deleting anything
     podGC:
       strategy: OnWorkflowCompletion
     ttlStrategy:
@@ -40,7 +40,7 @@ spec:
         nodeSelector:
           kubernetes.io/hostname: ghost
         script:
-          image: alpine:3.20
+          image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
           command: [sh]
           env:
             - name: DRY_RUN

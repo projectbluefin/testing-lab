@@ -11,7 +11,7 @@ metadata:
       Flow:
         1. bst-validate      — fast element graph check (no build)
         2. bst-build-export-push — BST build, export to containers-storage,
-                               push to 192.168.1.102:5000/dakota:<tag>
+                               push to 192.168.1.102:30500/dakota:<tag>
         3. ensure-disk       — BIB builds a raw disk.raw from the zot image
                                (skipped if golden disk is fresh)
         4. provision         — btrfs reflink clone + KubeVirt VM boot

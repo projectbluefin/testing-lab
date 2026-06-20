@@ -128,7 +128,7 @@ spec:
           fi
 
           SKOPEO_TLS_ARGS=()
-          if [[ "${IMAGE_REF}" == 192.168.1.102:5000/* ]]; then
+          if [[ "${IMAGE_REF}" == 192.168.1.102:30500/* ]]; then
             SKOPEO_TLS_ARGS+=(--tls-verify=false)
           fi
           # Retry with exponential backoff — GHCR rate-limits anonymous skopeo
@@ -192,7 +192,7 @@ spec:
             set -euo pipefail
             IMAGE="{{inputs.parameters.image}}"
             PULL_ARGS=()
-            if [[ "${IMAGE}" == 192.168.1.102:5000/* ]]; then
+            if [[ "${IMAGE}" == 192.168.1.102:30500/* ]]; then
               PULL_ARGS+=(--tls-verify=false)
             fi
             podman pull "${PULL_ARGS[@]}" "${IMAGE}"

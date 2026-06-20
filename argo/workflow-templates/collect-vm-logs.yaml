@@ -66,7 +66,7 @@ spec:
         secretName: "{{inputs.parameters.ssh-key-secret}}"
         defaultMode: 0400
     container:
-      image: fedora:41
+      image: registry.fedoraproject.org/fedora:41
       command: [bash, -c]
       args:
       - |
