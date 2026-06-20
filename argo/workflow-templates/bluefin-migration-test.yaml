@@ -342,8 +342,6 @@ spec:
             value: "/tmp/migration-results"
           - name: aggregate-path
             value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 900
       podSpecPatch: |
         hostNetwork: true
@@ -460,8 +458,6 @@ spec:
             value: "/tmp/migration-results"
           - name: aggregate-path
             value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 1800
       podSpecPatch: |
         hostNetwork: true
@@ -610,8 +606,6 @@ spec:
             value: "/tmp/migration-results"
           - name: aggregate-path
             value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 1800
       podSpecPatch: |
         hostNetwork: true
@@ -763,8 +757,6 @@ spec:
             value: "bluefin-test"
           - name: ssh-key-secret
             value: "bluefin-test-ssh-key"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 900
       podSpecPatch: |
         hostNetwork: true
@@ -847,8 +839,6 @@ spec:
             value: "/tmp/migration-results"
           - name: aggregate-path
             value: "/tmp/migration-evidence.json"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 900
       podSpecPatch: |
         hostNetwork: true
@@ -1076,8 +1066,6 @@ spec:
             value: ""
           - name: output-root
             value: "/tmp/migration-results"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       activeDeadlineSeconds: 600
       podSpecPatch: |
         hostNetwork: true
