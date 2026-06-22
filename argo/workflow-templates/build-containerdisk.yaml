@@ -292,8 +292,16 @@ spec:
 
           # bootc install to-disk creates: p1=BIOS(1M) p2=EFI(512M) p3=btrfs-root
           # There is NO separate /boot partition; /boot lives inside the btrfs root.
-          mkdir -p /mnt/btroot
-          mount -o subvol=root "${LOOP}p3" /mnt/btroot
+          mkdir -p /mnt/btroot /mnt/btraw
+          # Diagnostics: confirm p3 is a block device with btrfs filesystem
+          stat "${LOOP}p3" && blkid "${LOOP}p3" || true
+          # Mount without subvol first to inspect available subvolumes
+          mount -t btrfs "${LOOP}p3" /mnt/btraw && {
+            echo "btrfs subvolumes:"
+            ls /mnt/btraw
+            umount /mnt/btraw
+          } || echo "raw btrfs mount failed too"
+          mount -t btrfs -o subvol=root "${LOOP}p3" /mnt/btroot
 
           # Locate the active ostree deploy directory (stateroot varies by image)
           DEPLOY=$(find /mnt/btroot/ostree/deploy/*/deploy/ \
