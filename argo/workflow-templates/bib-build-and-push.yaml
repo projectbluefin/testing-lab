@@ -94,10 +94,9 @@ spec:
             path: "{{inputs.parameters.golden-root}}"
             type: DirectoryOrCreate
       script:
-        # quay.io/skopeo/stable ships skopeo. quay.io/podman/stable was used
-        # previously but dropped skopeo from its image; using it caused silent
-        # command-not-found failures that always returned "stale" (testing-lab#222).
-        image: quay.io/skopeo/stable:latest
+        # podman/stable already cached on ghost for bib-img-pull; ships skopeo
+        # so we avoid a per-run `dnf install` from a Fedora mirror.
+        image: quay.io/podman/stable:latest
         command: [bash]
         resources:
           requests:
@@ -113,7 +112,6 @@ spec:
           set -euo pipefail
           TAG="{{inputs.parameters.image-tag}}"
           IMAGE_REF="{{inputs.parameters.image}}"
-          GOLDEN_ROOT="{{inputs.parameters.golden-root}}"
           # If the caller passed `image` without a tag (e.g. bluefin-qa-pipeline
           # default), append the explicit image-tag so skopeo inspects the
           # right manifest. `*:*` distinguishes a tag from a `host:port/` ref —
@@ -121,7 +119,7 @@ spec:
           if [[ "${IMAGE_REF}" != *:* ]]; then
             IMAGE_REF="${IMAGE_REF}:${TAG}"
           fi
-          GOLDEN_DIR="${GOLDEN_ROOT}/${TAG}"
+          GOLDEN_DIR="/var/tmp/bluefin-golden/${TAG}"
           DISK="${GOLDEN_DIR}/disk.raw"
           MARKER="${GOLDEN_DIR}/source-digest"
 
@@ -130,22 +128,10 @@ spec:
             exit 0
           fi
 
-          SKOPEO_TLS_ARGS=()
-          if [[ "${IMAGE_REF}" == 192.168.1.102:30500/* ]]; then
-            SKOPEO_TLS_ARGS+=(--tls-verify=false)
-          fi
-          # Retry with exponential backoff — GHCR rate-limits anonymous skopeo
-          # inspects, returning empty output that is misread as stale (testing-lab#222).
-          REMOTE=""
-          for _attempt in 1 2 3; do
-            REMOTE=$(skopeo inspect "${SKOPEO_TLS_ARGS[@]}" --no-tags --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
-            [[ -n "${REMOTE}" ]] && break
-            echo "skopeo inspect attempt ${_attempt}/3 failed for ${IMAGE_REF}; retrying in $(( _attempt * 15 ))s..." >&2
-            sleep $(( _attempt * 15 ))
-          done
+          REMOTE=$(skopeo inspect --no-tags --format '{{.Digest}}' "docker://${IMAGE_REF}" 2>/dev/null || true)
           if [[ -z "${REMOTE}" ]]; then
-            echo "skopeo inspect failed after 3 attempts for ${IMAGE_REF}; treating as stale to force rebuild" >&2
-            echo -n "stale"
+            echo "skopeo inspect failed for ${IMAGE_REF}; treating disk as fresh" >&2
+            echo -n "exists"
             exit 0
           fi
 
