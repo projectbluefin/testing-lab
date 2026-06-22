@@ -267,7 +267,7 @@ spec:
             mountPath: /mnt/staging
         source: |
           set -euo pipefail
-          dnf install -y util-linux btrfs-progs
+          # util-linux (losetup) is pre-installed in ubi9; btrfs mount needs no extra packages.
 
           TAG="{{inputs.parameters.containerdisk-tag}}"
           DISK="/mnt/staging/${TAG}/disk.raw"
