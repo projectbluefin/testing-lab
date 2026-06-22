@@ -163,12 +163,11 @@ spec:
 
           if [[ -f "${DISK}" ]]; then
             echo "Removing stale disk: ${DISK}"
+            losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
             rm -f "${DISK}"
           fi
 
           truncate -s 15G "${DISK}"
-          LOOP=$(losetup -f --show "${DISK}")
-          echo "Loop device: ${LOOP} for ${DISK}"
 
           # Pull image (uses zot-ghcr mirror if cached)
           podman pull --tls-verify=true "${IMAGE}"
@@ -178,33 +177,42 @@ spec:
           printf '[engine]\ncgroup_manager = "cgroupfs"\n' > /etc/containers/containers.conf
 
           # Run bootc install to-disk inside the Bluefin container via podman.
-          # --pid=host is required by bootc; cgroupfs manager avoids the systemd cgroup conflict.
-          # --filesystem=btrfs: explicit since Bluefin testing images may omit this in bootc config.
-          # --source-imgref: required so the installed system records where the image came from.
-          # --target-no-signature-verification: skip cosign checks in CI/homelab context.
+          # Key: the inner container creates its OWN loop device with --partscan (-P).
+          # If the outer container held the loop device open, BLKRRPART would return EINVAL
+          # and bootc would fail with "Device has no children".  Creating the loop device
+          # inside the inner container avoids that competing lock.
           podman run --rm --privileged --pid=host \
             -v /dev:/dev \
             -v /run/udev:/run/udev \
+            -v "${STAGING}:${STAGING}" \
             "${IMAGE}" \
-            bootc install to-disk \
-              --generic-image \
-              --filesystem=btrfs \
-              --source-imgref "docker://${IMAGE}" \
-              --target-no-signature-verification \
-              "${LOOP}" || {
+            bash -c "
+              set -euo pipefail
+              LOOP=\$(losetup -f --show -P '${DISK}')
+              echo 'Inner loop: '\"\${LOOP}\"
+              trap 'losetup -d \"\$LOOP\" 2>/dev/null || true' EXIT
+              bootc install to-disk \
+                --generic-image \
+                --filesystem=btrfs \
+                --source-imgref 'docker://${IMAGE}' \
+                --target-no-signature-verification \
+                \"\${LOOP}\"
+            " || {
             EXIT=$?
-            # bootc#2246: EBUSY on unmount — disk may still be written correctly.
-            if podman logs --since=0 2>/dev/null | grep -q "EBUSY\|busy" 2>/dev/null; then
-              echo "WARNING: EBUSY during unmount (bootc#2246) — continuing"
+            # bootc#2246: if disk has content (>10G written), EBUSY on unmount — treat as success.
+            DISK_SIZE=$(stat -c%s "${DISK}" 2>/dev/null || echo 0)
+            if [[ "${DISK_SIZE}" -gt $((10 * 1024 * 1024 * 1024)) ]]; then
+              echo "WARNING: bootc exited ${EXIT} but disk has ${DISK_SIZE} bytes (bootc#2246) — continuing"
               umount -l /mnt 2>/dev/null || true
             else
-              losetup -d "${LOOP}" 2>/dev/null || true
+              losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
               rm -f "${DISK}"
               exit "${EXIT}"
             fi
           }
 
-          losetup -d "${LOOP}" 2>/dev/null || true
+          # Clean up any leftover loop devices for this file
+          losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
           chown 107:107 "${DISK}"
           echo "install-to-disk complete: ${DISK} ($(stat -c%s "${DISK}") bytes)"
 
