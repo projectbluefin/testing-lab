@@ -33,16 +33,16 @@ spec:
           effect: NoExecute
       initContainers:
         - name: set-inotify
-          image: quay.io/fedora/fedora:latest
+          image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
           securityContext:
             privileged: true
           command:
             - /bin/sh
             - -c
             - |
-              sysctl -w fs.inotify.max_user_watches=1048576
-              sysctl -w fs.inotify.max_user_instances=512
-              sysctl -w fs.inotify.max_queued_events=16384
+              echo 1048576 > /proc/sys/fs/inotify/max_user_watches
+              echo 512 > /proc/sys/fs/inotify/max_user_instances
+              echo 16384 > /proc/sys/fs/inotify/max_queued_events
           resources:
             requests:
               cpu: 10m
