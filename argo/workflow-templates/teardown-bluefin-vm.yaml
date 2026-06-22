@@ -3,6 +3,8 @@ kind: WorkflowTemplate
 metadata:
   name: teardown-bluefin-vm
   namespace: argo
+  annotations:
+    description: "Deletes a Bluefin test VM. No disk cleanup needed — containerDisk volumes are ephemeral."
 spec:
   serviceAccountName: argo
   templates:
@@ -12,9 +14,6 @@ spec:
           - name: vm-name
           - name: namespace
             value: "bluefin-test"
-          # Must match the test-root used in provision-vm to locate the disk.
-          - name: test-root
-            value: "/var/tmp/bluefin-test"
       steps:
         - - name: delete-vm
             template: delete-vm
@@ -24,14 +23,6 @@ spec:
                   value: "{{inputs.parameters.vm-name}}"
                 - name: namespace
                   value: "{{inputs.parameters.namespace}}"
-        - - name: delete-hostdisk
-            template: delete-hostdisk
-            arguments:
-              parameters:
-                - name: vm-name
-                  value: "{{inputs.parameters.vm-name}}"
-                - name: test-root
-                  value: "{{inputs.parameters.test-root}}"
 
     - name: delete-vm
       inputs:
@@ -47,34 +38,3 @@ spec:
             name: "{{inputs.parameters.vm-name}}"
             namespace: "{{inputs.parameters.namespace}}"
 
-    - name: delete-hostdisk
-      inputs:
-        parameters:
-          - name: vm-name
-          - name: test-root
-            value: "/var/tmp/bluefin-test"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      volumes:
-        - name: test-disks
-          hostPath:
-            path: "{{inputs.parameters.test-root}}"
-      script:
-        image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
-        securityContext:
-          runAsUser: 0
-        command: [bash]
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 200m
-            memory: 128Mi
-        volumeMounts:
-          - name: test-disks
-            mountPath: "{{inputs.parameters.test-root}}"
-        source: |
-          DISK="{{inputs.parameters.test-root}}/{{inputs.parameters.vm-name}}.raw"
-          rm -f "${DISK}"
-          echo "Cleaned: ${DISK}"

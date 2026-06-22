@@ -6,19 +6,19 @@ metadata:
   annotations:
     description: |
       End-to-end Dakota QA pipeline: BST validate → BST build+export+push →
-      BIB golden disk → ephemeral KubeVirt VM → behave/dogtail test suite.
+      build-containerdisk → provision (containerDisk VM) → run-tests → teardown.
 
       Flow:
-        1. bst-validate      — fast element graph check (no build)
+        1. bst-validate          — fast element graph check (no build)
         2. bst-build-export-push — BST build, export to containers-storage,
-                               push to 192.168.1.102:30500/dakota:<tag>
-        3. ensure-disk       — BIB builds a raw disk.raw from the zot image
-                               (skipped if golden disk is fresh)
-        4. provision         — btrfs reflink clone + KubeVirt VM boot
-        5. run-tests         — behave/dogtail smoke suite
-        6. teardown (onExit) — VM delete + hostDisk cleanup
+                                   push to 192.168.1.102:30500/dakota:<tag>
+        3. build-containerdisk   — install bootc image to disk, configure, convert
+                                   to qcow2, push to Zot as containerDisk OCI image
+        4. provision             — KubeVirt VM boot from containerDisk
+        5. run-tests             — behave/dogtail smoke suite
+        6. teardown (onExit)     — VM delete (no disk cleanup needed)
 
-      All heavy build steps (BST, BIB) are serialised by the ghost-heavy-compute
+      All heavy build steps (BST, disk build) are serialised by the ghost-heavy-compute
       mutex so concurrent pipelines queue rather than race on ghost storage.
   labels:
     app.kubernetes.io/component: qa-pipeline
@@ -99,39 +99,35 @@ spec:
                 - name: clone_ref
                   value: "{{tasks.resolve-source.outputs.parameters.clone_ref}}"
 
-          # 3. BIB golden disk from zot image (skipped if current)
-          - name: ensure-disk
+          # 3. Build containerDisk OCI image from the BST-pushed zot image
+          - name: build-cd
             depends: "bst-build-export-push.Succeeded"
             templateRef:
-              name: bib-build-and-push
-              template: ensure-disk
+              name: build-containerdisk
+              template: build-containerdisk
             arguments:
               parameters:
                 - name: image
                   value: "{{tasks.bst-build-export-push.outputs.parameters.image-ref}}"
                 - name: image-tag
                   value: "{{workflow.parameters.variant}}"
-                - name: golden-root
-                  value: "/var/tmp/dakota-golden"
+                - name: containerdisk-tag
+                  value: "dakota-{{workflow.parameters.variant}}"
 
-          # 4. btrfs reflink clone + KubeVirt VM boot
+          # 4. KubeVirt VM boot from containerDisk
           - name: provision
-            depends: "ensure-disk.Succeeded"
+            depends: "build-cd.Succeeded"
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
             arguments:
               parameters:
                 - name: image-tag
-                  value: "{{workflow.parameters.variant}}"
+                  value: "dakota-{{workflow.parameters.variant}}"
                 - name: vm-name
                   value: "dakota-test-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.namespace}}"
-                - name: golden-root
-                  value: "/var/tmp/dakota-golden"
-                - name: test-root
-                  value: "/var/tmp/dakota-test"
 
           # 5. Run smoke test suite against the provisioned Dakota VM
           - name: run-smoke
@@ -167,5 +163,3 @@ spec:
                   value: "dakota-test-{{workflow.uid}}"
                 - name: namespace
                   value: "{{workflow.parameters.namespace}}"
-                - name: test-root
-                  value: "/var/tmp/dakota-test"

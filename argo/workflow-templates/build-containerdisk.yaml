@@ -1,0 +1,399 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: build-containerdisk
+  namespace: argo
+  annotations:
+    description: |
+      Build a KubeVirt containerDisk from a bootc image.
+      Flow: check (zot existence) → install-to-disk → configure-disk → convert-and-push
+      Replaces bib-build-and-push + golden-disk hostDisk approach.
+      All build steps are pinned to ghost (loop devices + /var/mnt/ghost-data staging).
+spec:
+  serviceAccountName: argo
+  templates:
+
+    # ─── Top-level DAG ────────────────────────────────────────────────────────
+
+    - name: build-containerdisk
+      inputs:
+        parameters:
+          - name: image          # e.g. ghcr.io/projectbluefin/bluefin
+          - name: image-tag      # e.g. testing, lts-testing
+          - name: containerdisk-tag  # tag to push: 192.168.1.102:30500/bluefin-containerdisk:<tag>
+      dag:
+        tasks:
+          - name: check
+            template: check
+            arguments:
+              parameters:
+                - name: containerdisk-tag
+                  value: "{{inputs.parameters.containerdisk-tag}}"
+
+          # Skipped when check=exists; skipped → everything downstream skips too.
+          - name: install-to-disk
+            depends: check.Succeeded
+            when: "'{{tasks.check.outputs.result}}' != 'exists'"
+            template: install-to-disk
+            arguments:
+              parameters:
+                - name: image
+                  value: "{{inputs.parameters.image}}"
+                - name: image-tag
+                  value: "{{inputs.parameters.image-tag}}"
+                - name: containerdisk-tag
+                  value: "{{inputs.parameters.containerdisk-tag}}"
+
+          - name: configure-disk
+            depends: install-to-disk.Succeeded
+            template: configure-disk
+            arguments:
+              parameters:
+                - name: containerdisk-tag
+                  value: "{{inputs.parameters.containerdisk-tag}}"
+
+          - name: convert-and-push
+            depends: configure-disk.Succeeded
+            template: convert-and-push
+            arguments:
+              parameters:
+                - name: image
+                  value: "{{inputs.parameters.image}}"
+                - name: image-tag
+                  value: "{{inputs.parameters.image-tag}}"
+                - name: containerdisk-tag
+                  value: "{{inputs.parameters.containerdisk-tag}}"
+
+    # ─── check ────────────────────────────────────────────────────────────────
+    # Checks whether the containerDisk image already exists in the local Zot registry.
+    # Outputs: "exists" | "missing"
+
+    - name: check
+      inputs:
+        parameters:
+          - name: containerdisk-tag
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
+      script:
+        image: quay.io/skopeo/stable:latest
+        command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        source: |
+          set -euo pipefail
+          TAG="{{inputs.parameters.containerdisk-tag}}"
+          CD_IMAGE="192.168.1.102:30500/bluefin-containerdisk:${TAG}"
+          EXISTS=$(skopeo inspect --tls-verify=false "docker://${CD_IMAGE}" 2>/dev/null \
+            | jq -r '.Digest' || echo "")
+          if [[ -n "$EXISTS" ]]; then
+            echo "exists"
+          else
+            echo "missing"
+          fi
+
+    # ─── install-to-disk ──────────────────────────────────────────────────────
+    # Runs bootc install to-disk from within the Bluefin image itself.
+    # Produces disk.raw in /var/mnt/ghost-data/bluefin-cd-build/<tag>/.
+
+    - name: install-to-disk
+      inputs:
+        parameters:
+          - name: image
+          - name: image-tag
+          - name: containerdisk-tag
+      synchronization:
+        mutexes:
+          - name: ghost-heavy-compute
+            namespace: argo
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: staging
+          hostPath:
+            path: /var/mnt/ghost-data/bluefin-cd-build
+            type: DirectoryOrCreate
+      script:
+        image: "{{inputs.parameters.image}}:{{inputs.parameters.image-tag}}"
+        command: [bash]
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "4"
+            memory: 8Gi
+          limits:
+            cpu: "8"
+            memory: 16Gi
+        volumeMounts:
+          - name: dev
+            mountPath: /dev
+          - name: staging
+            mountPath: /mnt/staging
+        source: |
+          set -euo pipefail
+          TAG="{{inputs.parameters.containerdisk-tag}}"
+          STAGING="/mnt/staging/${TAG}"
+          DISK="${STAGING}/disk.raw"
+
+          mkdir -p "${STAGING}"
+
+          if [[ -f "${DISK}" ]]; then
+            echo "Removing stale disk: ${DISK}"
+            rm -f "${DISK}"
+          fi
+
+          truncate -s 15G "${DISK}"
+          LOOP=$(losetup -f --show "${DISK}")
+          echo "Loop device: ${LOOP}"
+
+          bootc install to-disk --generic-image "${LOOP}" 2>&1 | tee /proc/self/fd/2 || {
+            EXIT=$?
+            # bootc#2246: EBUSY on unmount of large images — disk may still be intact.
+            LAST_LOG=$(tail -20 /proc/self/fd/2 2>/dev/null || true)
+            if echo "${LAST_LOG}" | grep -q "EBUSY\|busy"; then
+              echo "WARNING: EBUSY during unmount (bootc#2246) — disk written, continuing"
+              umount -l /mnt 2>/dev/null || true
+            else
+              losetup -d "${LOOP}" 2>/dev/null || true
+              rm -f "${DISK}"
+              exit "${EXIT}"
+            fi
+          }
+
+          losetup -d "${LOOP}" 2>/dev/null || true
+          chown 107:107 "${DISK}"
+          echo "install-to-disk complete: ${DISK} ($(stat -c%s "${DISK}") bytes)"
+
+    # ─── configure-disk ───────────────────────────────────────────────────────
+    # Loop-mounts the raw disk and injects test user, SSH, GDM autologin, sudoers,
+    # and selinux=0 into the ostree deploy. gnome-ponytail-daemon is NOT injected
+    # here — run-gnome-tests installs it at runtime via ostree admin unlock.
+
+    - name: configure-disk
+      inputs:
+        parameters:
+          - name: containerdisk-tag
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: staging
+          hostPath:
+            path: /var/mnt/ghost-data/bluefin-cd-build
+            type: DirectoryOrCreate
+      script:
+        image: registry.access.redhat.com/ubi9/ubi:9.5
+        command: [bash]
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        env:
+          - name: SSH_AUTHORIZED_KEYS
+            valueFrom:
+              secretKeyRef:
+                name: bluefin-test-ssh-key
+                key: id_ed25519.pub
+        volumeMounts:
+          - name: staging
+            mountPath: /mnt/staging
+        source: |
+          set -euo pipefail
+          dnf install -y --quiet util-linux btrfs-progs >/dev/null 2>&1
+
+          TAG="{{inputs.parameters.containerdisk-tag}}"
+          DISK="/mnt/staging/${TAG}/disk.raw"
+
+          if [[ ! -f "${DISK}" ]]; then
+            echo "ERROR: disk not found: ${DISK}" >&2
+            exit 1
+          fi
+
+          LOOP=$(losetup -f -P --show "${DISK}")
+          echo "Loop: ${LOOP} for ${DISK}"
+
+          cleanup() {
+            umount /mnt/btroot 2>/dev/null || true
+            umount /mnt/btboot 2>/dev/null || true
+            losetup -d "${LOOP}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          mkdir -p /mnt/btroot /mnt/btboot
+          mount -o subvol=root "${LOOP}p4" /mnt/btroot
+          mount "${LOOP}p3" /mnt/btboot
+
+          # Locate the active ostree deploy directory
+          DEPLOY=$(find /mnt/btroot/ostree/deploy/*/deploy/ \
+            -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+          if [[ -z "${DEPLOY}" ]]; then
+            echo "ERROR: ostree deploy path not found under /mnt/btroot/ostree/deploy/" >&2
+            exit 1
+          fi
+          echo "Deploy: ${DEPLOY}"
+
+          ETC="${DEPLOY}/etc"
+
+          # ── User: bluefin-test (uid/gid 1001) ────────────────────────────
+          if ! grep -q "^bluefin-test:" "${ETC}/passwd" 2>/dev/null; then
+            echo "bluefin-test:x:1001:1001:Bluefin Test User:/home/bluefin-test:/bin/bash" \
+              >> "${ETC}/passwd"
+          fi
+          if ! grep -q "^bluefin-test:" "${ETC}/shadow" 2>/dev/null; then
+            # Locked password (!) — SSH key auth only
+            echo "bluefin-test:!:19000:0:99999:7:::" >> "${ETC}/shadow"
+          fi
+          if ! grep -q "^bluefin-test:" "${ETC}/group" 2>/dev/null; then
+            echo "bluefin-test:x:1001:" >> "${ETC}/group"
+          fi
+          # Add bluefin-test to wheel group for sudo
+          sed -i 's/^\(wheel:x:10:.*\)$/\1,bluefin-test/' "${ETC}/group" 2>/dev/null || true
+
+          # ── SSH authorized_keys ───────────────────────────────────────────
+          HOME_DIR="/mnt/btroot/home/bluefin-test"
+          mkdir -p "${HOME_DIR}/.ssh"
+          printf '%s\n' "${SSH_AUTHORIZED_KEYS}" > "${HOME_DIR}/.ssh/authorized_keys"
+          chmod 700 "${HOME_DIR}/.ssh"
+          chmod 600 "${HOME_DIR}/.ssh/authorized_keys"
+          chown -R 1001:1001 "${HOME_DIR}"
+
+          # ── sshd: enable + PermitUserEnvironment ─────────────────────────
+          WANTS="${ETC}/systemd/system/multi-user.target.wants"
+          mkdir -p "${WANTS}"
+          ln -sf /usr/lib/systemd/system/sshd.service "${WANTS}/sshd.service" \
+            2>/dev/null || true
+
+          mkdir -p "${ETC}/ssh/sshd_config.d"
+          printf 'PermitUserEnvironment yes\n' \
+            > "${ETC}/ssh/sshd_config.d/10-test.conf"
+
+          # ── GDM autologin ─────────────────────────────────────────────────
+          mkdir -p "${ETC}/gdm"
+          cat > "${ETC}/gdm/custom.conf" <<'GDMEOF'
+          [daemon]
+          AutomaticLoginEnable=True
+          AutomaticLogin=bluefin-test
+          GDMEOF
+
+          # ── sudoers ───────────────────────────────────────────────────────
+          mkdir -p "${ETC}/sudoers.d"
+          printf 'bluefin-test ALL=(ALL) NOPASSWD:ALL\n' \
+            > "${ETC}/sudoers.d/bluefin-test"
+          chmod 440 "${ETC}/sudoers.d/bluefin-test"
+
+          # ── selinux=0 in bootloader entries ───────────────────────────────
+          while IFS= read -r -d '' entry; do
+            sed -i 's/\(^options .*\)$/\1 selinux=0/' "${entry}"
+            echo "Patched selinux=0 in: ${entry}"
+          done < <(find /mnt/btboot/loader/entries/ -name "*.conf" -print0 2>/dev/null)
+
+          echo "configure-disk complete"
+          # trap cleanup EXIT handles unmount + losetup -d
+
+    # ─── convert-and-push ─────────────────────────────────────────────────────
+    # qemu-img raw→qcow2, buildah OCI image, push to local Zot, cleanup staging.
+
+    - name: convert-and-push
+      inputs:
+        parameters:
+          - name: image
+          - name: image-tag
+          - name: containerdisk-tag
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: staging
+          hostPath:
+            path: /var/mnt/ghost-data/bluefin-cd-build
+            type: DirectoryOrCreate
+      script:
+        image: quay.io/buildah/stable:latest
+        command: [bash]
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        volumeMounts:
+          - name: staging
+            mountPath: /mnt/staging
+        source: |
+          set -euo pipefail
+          dnf install -y --quiet qemu-img >/dev/null 2>&1
+
+          TAG="{{inputs.parameters.containerdisk-tag}}"
+          STAGING="/mnt/staging/${TAG}"
+          RAW="${STAGING}/disk.raw"
+          QCOW="${STAGING}/containerdisk.qcow2"
+          DEST="192.168.1.102:30500/bluefin-containerdisk:${TAG}"
+
+          echo "Converting ${RAW} to qcow2..."
+          qemu-img convert -f raw -O qcow2 -p "${RAW}" "${QCOW}"
+          echo "qcow2 size: $(du -sh "${QCOW}" | cut -f1)"
+
+          echo "Building containerDisk OCI image..."
+          CTR=$(buildah from scratch)
+          buildah copy --chown 107:107 "${CTR}" "${QCOW}" /disk/disk.qcow2
+          buildah commit "${CTR}" "${DEST}"
+
+          echo "Pushing to ${DEST}..."
+          buildah push --tls-verify=false "${DEST}"
+          buildah rm "${CTR}" 2>/dev/null || true
+
+          # Update the image-polling-digests ConfigMap so check() can detect staleness.
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          IMAGE="{{inputs.parameters.image}}:{{inputs.parameters.image-tag}}"
+          REMOTE_DIGEST=$(skopeo inspect --no-creds "docker://${IMAGE}" 2>/dev/null \
+            | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))" \
+            || echo "")
+          if [[ -n "${REMOTE_DIGEST}" ]]; then
+            curl -sf --cacert "${CACERT}" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/strategic-merge-patch+json" \
+              -X PATCH \
+              "https://kubernetes.default.svc/api/v1/namespaces/argo/configmaps/image-polling-digests" \
+              -d "{\"data\":{\"containerdisk-${TAG}\": \"${REMOTE_DIGEST}\"}}" \
+              > /dev/null && echo "Updated digest: containerdisk-${TAG}=${REMOTE_DIGEST}" \
+              || echo "WARN: digest update failed (non-fatal)"
+          fi
+
+          echo "Cleaning staging..."
+          rm -f "${RAW}" "${QCOW}"
+
+          echo "Done: ${DEST}"

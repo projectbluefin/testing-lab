@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: delete-golden-disks-
+  namespace: argo
+  annotations:
+    bluefin.io/description: |
+      One-shot: delete all golden disk files on ghost to reclaim ~181G of space
+      on a 91%-full NVMe. Not tracked by ArgoCD — submit manually when needed.
+      Run: argo submit --watch argo/one-shot-delete-golden-disks.yaml
+spec:
+  entrypoint: delete-golden-disks
+  serviceAccountName: argo
+
+  tolerations:
+    - key: node-role.kubernetes.io/gaming
+      operator: Exists
+      effect: NoSchedule
+
+  volumes:
+    - name: bluefin-golden
+      hostPath:
+        path: /var/tmp/bluefin-golden
+        type: DirectoryOrCreate
+    - name: dakota-golden
+      hostPath:
+        path: /var/tmp/dakota-golden
+        type: DirectoryOrCreate
+    - name: bluefin-cd-build
+      hostPath:
+        path: /var/mnt/ghost-data/bluefin-cd-build
+        type: DirectoryOrCreate
+
+  templates:
+    - name: delete-golden-disks
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      script:
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
+        command: [bash]
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        volumeMounts:
+          - name: bluefin-golden
+            mountPath: /var/tmp/bluefin-golden
+          - name: dakota-golden
+            mountPath: /var/tmp/dakota-golden
+          - name: bluefin-cd-build
+            mountPath: /var/mnt/ghost-data/bluefin-cd-build
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        source: |
+          set -euo pipefail
+
+          report() {
+            local path="$1"
+            if [ -d "$path" ] && [ -n "$(ls -A "$path" 2>/dev/null)" ]; then
+              du -sh "$path" 2>/dev/null || echo "(du failed for $path)"
+            else
+              echo "0\t$path (empty or missing)"
+            fi
+          }
+
+          echo "=== Golden disk cleanup — before ==="
+          report /var/tmp/bluefin-golden
+          report /var/tmp/dakota-golden
+          report /var/mnt/ghost-data/bluefin-cd-build
+
+          echo ""
+          echo "=== Deleting /var/tmp/bluefin-golden ==="
+          rm -rf /var/tmp/bluefin-golden/*
+          echo "Done."
+
+          echo ""
+          echo "=== Deleting /var/tmp/dakota-golden ==="
+          rm -rf /var/tmp/dakota-golden/*
+          echo "Done."
+
+          echo ""
+          echo "=== Deleting /var/mnt/ghost-data/bluefin-cd-build ==="
+          rm -rf /var/mnt/ghost-data/bluefin-cd-build/*
+          echo "Done."
+
+          echo ""
+          echo "=== Golden disk cleanup — after ==="
+          report /var/tmp/bluefin-golden
+          report /var/tmp/dakota-golden
+          report /var/mnt/ghost-data/bluefin-cd-build
+
+          echo ""
+          echo "=== Cleanup complete ==="

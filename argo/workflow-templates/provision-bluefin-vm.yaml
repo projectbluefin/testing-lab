@@ -5,9 +5,9 @@ metadata:
   namespace: argo
   annotations:
     description: |
-      Provisions a Bluefin test VM using btrfs reflink from a golden disk.raw.
-      ~24ms clone time (CoW). No CDI, no zot, no PVC.
-      Requires HostDisk feature gate (already enabled in KubeVirt config).
+      Provisions a Bluefin test VM using a containerDisk image from the local Zot registry.
+      No reflink, no hostDisk, no golden disk required.
+      Schedulable on any kubevirt-capable node.
 spec:
   serviceAccountName: argo
   arguments: {}
@@ -21,32 +21,12 @@ spec:
           - name: vm-name
           - name: namespace
             value: "bluefin-test"
-          # Root directory where golden disks live. Override per pipeline:
-          #   bluefin: /var/tmp/bluefin-golden (default)
-          #   dakota:  /var/tmp/dakota-golden
-          - name: golden-root
-            value: "/var/tmp/bluefin-golden"
-          # Root directory where per-VM reflinked disks are written.
-          - name: test-root
-            value: "/var/tmp/bluefin-test"
       outputs:
         parameters:
           - name: vm-ip
             valueFrom:
               parameter: '{{steps.wait-for-vm.outputs.result}}'
       steps:
-        - - name: reflink-disk
-            template: reflink-disk
-            arguments:
-              parameters:
-                - name: image-tag
-                  value: '{{inputs.parameters.image-tag}}'
-                - name: vm-name
-                  value: '{{inputs.parameters.vm-name}}'
-                - name: golden-root
-                  value: '{{inputs.parameters.golden-root}}'
-                - name: test-root
-                  value: '{{inputs.parameters.test-root}}'
         - - name: create-vm
             template: create-vm
             arguments:
@@ -57,8 +37,6 @@ spec:
                   value: '{{inputs.parameters.vm-name}}'
                 - name: namespace
                   value: '{{inputs.parameters.namespace}}'
-                - name: test-root
-                  value: '{{inputs.parameters.test-root}}'
         - - name: wait-for-vm
             template: wait-for-vm-ready
             arguments:
@@ -70,68 +48,6 @@ spec:
                 - name: namespace
                   value: '{{inputs.parameters.namespace}}'
 
-    - name: reflink-disk
-      metadata:
-        labels:
-          bluefin.io/step: reflink-disk
-          bluefin.io/variant: "{{inputs.parameters.image-tag}}"
-      inputs:
-        parameters:
-          - name: image-tag
-          - name: vm-name
-          - name: golden-root
-            value: "/var/tmp/bluefin-golden"
-          - name: test-root
-            value: "/var/tmp/bluefin-test"
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      outputs: {}
-      volumes:
-        - name: golden
-          hostPath:
-            path: "{{inputs.parameters.golden-root}}"
-        - name: test-disks
-          hostPath:
-            path: "{{inputs.parameters.test-root}}"
-            type: DirectoryOrCreate
-      script:
-        image: quay.io/podman/stable:latest
-        command:
-          - bash
-        securityContext:
-          runAsUser: 0
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        volumeMounts:
-          - name: golden
-            mountPath: "{{inputs.parameters.golden-root}}"
-          - name: test-disks
-            mountPath: "{{inputs.parameters.test-root}}"
-        source: |
-          set -euo pipefail
-          TAG="{{inputs.parameters.image-tag}}"
-          VM="{{inputs.parameters.vm-name}}"
-          GOLDEN="{{inputs.parameters.golden-root}}/${TAG}/disk.raw"
-          DEST="{{inputs.parameters.test-root}}/${VM}.raw"
-
-          if [[ ! -f "${GOLDEN}" ]]; then
-            echo "ERROR: golden disk not found: ${GOLDEN}" >&2
-            exit 1
-          fi
-
-          START=$(date +%s%N)
-          cp --reflink=auto "${GOLDEN}" "${DEST}"
-          chown 107:107 "${DEST}"
-          chmod 664 "${DEST}"
-          chcon -t svirt_sandbox_file_t "${DEST}" 2>/dev/null || true
-          ELAPSED=$(( ($(date +%s%N) - START) / 1000000 ))
-          echo "reflink clone: ${ELAPSED}ms → ${DEST} ($(stat -c%s "${DEST}") bytes)"
-
     - name: create-vm
       metadata:
         labels:
@@ -142,9 +58,11 @@ spec:
           - name: image-tag
           - name: vm-name
           - name: namespace
-          - name: test-root
-            value: "/var/tmp/bluefin-test"
       outputs: {}
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
       resource:
         action: apply
         manifest: |
@@ -164,7 +82,7 @@ spec:
                   kubevirt.io/vm: "{{inputs.parameters.vm-name}}"
               spec:
                 nodeSelector:
-                  kubernetes.io/hostname: ghost
+                  kubevirt.io/schedulable: "true"
                 domain:
                   cpu:
                     cores: 4
@@ -184,9 +102,8 @@ spec:
                     pod: {}
                 volumes:
                   - name: rootdisk
-                    hostDisk:
-                      path: "{{inputs.parameters.test-root}}/{{inputs.parameters.vm-name}}.raw"
-                      type: Disk
+                    containerDisk:
+                      image: "192.168.1.102:30500/bluefin-containerdisk:{{inputs.parameters.image-tag}}"
 
     - name: wait-for-vm-ready
       metadata:
@@ -200,6 +117,10 @@ spec:
           - name: namespace
       nodeSelector:
         kubernetes.io/hostname: ghost
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
       outputs: {}
       podSpecPatch: |
         hostNetwork: true

@@ -1,5 +1,4 @@
-# CronWorkflow: dry-run GC for stale Bluefin golden disks on ghost.
-# Keeps the newest disk.raw per tag and any disk.raw modified in the last 14 days.
+# CronWorkflow: GC for stale containerDisk staging files on ghost's data disk.
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
 metadata:
@@ -28,9 +27,9 @@ spec:
     ttlStrategy:
       secondsAfterCompletion: 86400
     volumes:
-      - name: golden-disks
+      - name: cd-staging
         hostPath:
-          path: /var/tmp/bluefin-golden
+          path: /var/mnt/ghost-data/bluefin-cd-build
           type: DirectoryOrCreate
     templates:
       - name: gc
@@ -48,8 +47,8 @@ spec:
           securityContext:
             privileged: true
           volumeMounts:
-            - name: golden-disks
-              mountPath: /host/bluefin-golden
+            - name: cd-staging
+              mountPath: /host/bluefin-cd-build
           resources:
             requests:
               cpu: 50m
@@ -60,76 +59,42 @@ spec:
           source: |
             set -eu
 
-            ROOT="/host/bluefin-golden"
-            RETENTION_DAYS=14
+            ROOT="/host/bluefin-cd-build"
+            RETENTION_HOURS=24
             NOW="$(date -u +%s)"
-            CUTOFF="$((NOW - RETENTION_DAYS * 24 * 60 * 60))"
+            CUTOFF="$((NOW - RETENTION_HOURS * 3600))"
 
             if [ "${DRY_RUN}" != "true" ] && [ "${DRY_RUN}" != "false" ]; then
               echo "ERROR: dry-run must be true or false, got '${DRY_RUN}'" >&2
               exit 1
             fi
 
-            echo "golden-disk-gc start: dry-run=${DRY_RUN} root=${ROOT} retention=${RETENTION_DAYS}d"
+            echo "containerdisk-staging-gc: dry-run=${DRY_RUN} root=${ROOT} retention=${RETENTION_HOURS}h"
             echo "free space before:"
             df -h "${ROOT}" || true
 
-            size_of() {
-              du -sh "$1" 2>/dev/null | awk '{print $1}' || echo "unknown"
-            }
-
-            delete_path() {
-              path="$1"
-              reason="$2"
-              size="$(size_of "${path}")"
-              if [ "${DRY_RUN}" = "true" ]; then
-                echo "WOULD_DELETE size=${size} reason=${reason} path=${path}"
-              else
-                rm -f -- "${path}"
-                echo "DELETED size=${size} reason=${reason} path=${path}"
-              fi
-            }
-
-            keep_path() {
-              path="$1"
-              reason="$2"
-              size="$(size_of "${path}")"
-              echo "KEEP size=${size} reason=${reason} path=${path}"
-            }
-
             if [ ! -d "${ROOT}" ]; then
-              echo "Golden disk root does not exist; nothing to do."
+              echo "Staging root does not exist; nothing to do."
               exit 0
             fi
 
-            find "${ROOT}" -mindepth 1 -maxdepth 1 -type d | sort | while IFS= read -r tag_dir; do
-              tag="$(basename "${tag_dir}")"
-              echo "checking tag=${tag} dir=${tag_dir}"
-
-              newest_disk="$({
-                find "${tag_dir}" -type f -name 'disk.raw' 2>/dev/null | while IFS= read -r disk; do
-                  mtime="$(stat -c %Y "${disk}")"
-                  printf '%s %s\n' "${mtime}" "${disk}"
-                done
-              } | sort -nr | head -n 1 | cut -d ' ' -f 2-)"
-
-              find "${tag_dir}" -type f -name 'disk.raw' 2>/dev/null | sort | while IFS= read -r disk; do
-                mtime="$(stat -c %Y "${disk}")"
-                age_days="$(((NOW - mtime) / 86400))"
-                if [ "${disk}" = "${newest_disk}" ]; then
-                  keep_path "${disk}" "newest-disk.raw-for-${tag}"
-                elif [ "${mtime}" -ge "${CUTOFF}" ]; then
-                  keep_path "${disk}" "recent-${age_days}d-old"
+            # Clean up leftover staging files (disk.raw, containerdisk.qcow2) older than retention
+            find "${ROOT}" -type f \( -name 'disk.raw' -o -name 'containerdisk.qcow2' \) 2>/dev/null | while IFS= read -r stale; do
+              mtime="$(stat -c %Y "${stale}")"
+              age_h="$(((NOW - mtime) / 3600))"
+              if [ "${mtime}" -lt "${CUTOFF}" ]; then
+                size="$(du -sh "${stale}" 2>/dev/null | awk '{print $1}' || echo "unknown")"
+                if [ "${DRY_RUN}" = "true" ]; then
+                  echo "WOULD_DELETE size=${size} age=${age_h}h path=${stale}"
                 else
-                  delete_path "${disk}" "stale-${age_days}d-old"
+                  rm -f -- "${stale}"
+                  echo "DELETED size=${size} age=${age_h}h path=${stale}"
                 fi
-              done
-            done
-
-            find "${ROOT}" -type f \( -name '*.tmp' -o -name '*.staging' -o -name '.tmp' -o -name '.staging' \) 2>/dev/null | sort | while IFS= read -r stray; do
-              delete_path "${stray}" "stray-temp-file"
+              else
+                echo "KEEP age=${age_h}h path=${stale}"
+              fi
             done
 
             echo "free space after:"
             df -h "${ROOT}" || true
-            echo "golden-disk-gc complete."
+            echo "containerdisk-staging-gc complete."

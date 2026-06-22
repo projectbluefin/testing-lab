@@ -50,123 +50,104 @@ spec:
     - name: pipeline
       dag:
         tasks:
-          # 1. Ensure the golden disk exists on ghost (BIB build if absent)
-          - name: ensure-disk
+          # 1. Build (or verify current) containerDisk in local Zot registry
+          - name: build-cd
             templateRef:
-              name: bib-build-and-push
-              template: ensure-disk
+              name: build-containerdisk
+              template: build-containerdisk
             arguments:
               parameters:
                 - name: image
                   value: "{{workflow.parameters.image}}"
                 - name: image-tag
                   value: "{{workflow.parameters.image-tag}}"
+                - name: containerdisk-tag
+                  value: "{{workflow.parameters.image-tag}}"
 
-          # 2. btrfs reflink clone + KubeVirt VM boot → vm-ip
-          - name: provision
-            depends: "ensure-disk.Succeeded"
+          # 2. Parallel test lanes — each lane provisions its own VM, runs one suite, tears down
+          - name: test-lane
+            depends: "build-cd.Succeeded"
+            withItems:
+              - smoke
+              - developer
+              - system
+            when: "'{{workflow.parameters.suites}}' =~ '{{item}}'"
+            template: lane
+            arguments:
+              parameters:
+                - name: suite
+                  value: "{{item}}"
+                - name: vm-name
+                  value: "{{workflow.parameters.variant}}-{{item}}-{{workflow.uid}}"
+                - name: image-tag
+                  value: "{{workflow.parameters.image-tag}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+                - name: variant
+                  value: "{{workflow.parameters.variant}}"
+                - name: ssh-key-secret
+                  value: "{{workflow.parameters.ssh-key-secret}}"
+                - name: branch
+                  value: "{{workflow.parameters.branch}}"
+
+    # ── lane: provision VM → run suite → teardown (per-suite) ────────────────
+    - name: lane
+      inputs:
+        parameters:
+          - name: suite
+          - name: vm-name
+          - name: image-tag
+          - name: namespace
+          - name: variant
+          - name: ssh-key-secret
+          - name: branch
+      steps:
+        - - name: provision
             templateRef:
               name: provision-bluefin-vm
               template: provision-vm
             arguments:
               parameters:
                 - name: image-tag
-                  value: "{{workflow.parameters.image-tag}}"
+                  value: "{{inputs.parameters.image-tag}}"
                 - name: vm-name
-                  value: "bluefin-test-{{workflow.uid}}"
+                  value: "{{inputs.parameters.vm-name}}"
                 - name: namespace
-                  value: "{{workflow.parameters.namespace}}"
-
-          # 3a. Phase 1 — smoke (qecore-backed behave/pytest, every PR)
-          - name: run-smoke
-            depends: "provision.Succeeded"
-            when: "'{{workflow.parameters.suites}}' =~ 'smoke'"
+                  value: "{{inputs.parameters.namespace}}"
+        - - name: run-tests
             templateRef:
               name: run-gnome-tests
               template: run-gnome-tests
             arguments:
               parameters:
                 - name: vm-ip
-                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
+                  value: "{{steps.provision.outputs.parameters.vm-ip}}"
                 - name: suite
-                  value: "smoke"
+                  value: "{{inputs.parameters.suite}}"
                 - name: variant
-                  value: "{{workflow.parameters.variant}}"
+                  value: "{{inputs.parameters.variant}}"
                 - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
+                  value: "{{inputs.parameters.ssh-key-secret}}"
                 - name: branch
-                  value: "{{workflow.parameters.branch}}"
-
-          # 3b. Phase 2 — developer tools (sequential after smoke)
-          - name: run-developer
-            depends: "run-smoke.Succeeded"
-            when: "'{{workflow.parameters.suites}}' =~ 'developer'"
+                  value: "{{inputs.parameters.branch}}"
+        - - name: teardown
             templateRef:
-              name: run-gnome-tests
-              template: run-gnome-tests
+              name: teardown-bluefin-vm
+              template: teardown-vm
             arguments:
               parameters:
-                - name: vm-ip
-                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
-                - name: suite
-                  value: "developer"
-                - name: variant
-                  value: "{{workflow.parameters.variant}}"
-                - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
+                - name: vm-name
+                  value: "{{inputs.parameters.vm-name}}"
+                - name: namespace
+                  value: "{{inputs.parameters.namespace}}"
+            continueOn:
+              failed: true
 
-          # 3c. Phase 3 — software management (sequential, only if in suites list)
-          - name: run-software
-            depends: "run-developer.Succeeded"
-            when: "'{{workflow.parameters.suites}}' =~ 'software'"
-            templateRef:
-              name: run-gnome-tests
-              template: run-gnome-tests
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
-                - name: suite
-                  value: "software"
-                - name: variant
-                  value: "{{workflow.parameters.variant}}"
-                - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
-
-              # 3d. Phase 4 — atomic OS contract tests (no Wayland session needed)
-          # Runs after all GUI suites to avoid bootc reboot colliding with live Wayland session.
-          # run-gnome-tests handles suite=system natively (behave only, no qecore-headless).
-          - name: run-system
-            depends: "(run-software.Succeeded || run-software.Skipped)"
-            when: "'{{workflow.parameters.suites}}' =~ 'system'"
-            templateRef:
-              name: run-gnome-tests
-              template: run-gnome-tests
-            arguments:
-              parameters:
-                - name: vm-ip
-                  value: "{{tasks.provision.outputs.parameters.vm-ip}}"
-                - name: suite
-                  value: "system"
-                - name: variant
-                  value: "{{workflow.parameters.variant}}"
-                - name: ssh-key-secret
-                  value: "{{workflow.parameters.ssh-key-secret}}"
-                - name: branch
-                  value: "{{workflow.parameters.branch}}"
-
-    # ── onExit handler: teardown + optional GitHub commit status ──────────────
-    # cleanup-and-report calls teardown unconditionally, then posts GitHub commit
-    # status when sha is non-empty (PR runs). Nightly runs leave sha empty → skip.
+    # ── onExit handler: optional GitHub commit status post ───────────────────
+    # Each lane tears down its own VM; onExit only needs to report status.
     - name: cleanup-and-report
       dag:
         tasks:
-          - name: teardown
-            template: teardown
           - name: post-status
             template: post-github-status
             when: "'{{workflow.parameters.sha}}' != ''"
@@ -198,20 +179,3 @@ spec:
             -d "$PAYLOAD" \
           && echo "Posted $STATE to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}" \
           || echo "WARNING: failed to post commit status (non-fatal)"
-
-    # ── teardown: stop VM → wait VMI gone → delete hostDisk ──────────────────
-    - name: teardown
-      dag:
-        tasks:
-          - name: teardown-vm
-            templateRef:
-              name: teardown-bluefin-vm
-              template: teardown-vm
-            arguments:
-              parameters:
-                - name: vm-name
-                  value: "bluefin-test-{{workflow.uid}}"
-                - name: image-tag
-                  value: "{{workflow.parameters.image-tag}}"
-                - name: namespace
-                  value: "{{workflow.parameters.namespace}}"
