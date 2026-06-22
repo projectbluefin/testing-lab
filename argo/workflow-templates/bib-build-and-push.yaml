@@ -253,6 +253,10 @@ spec:
           - |
             set -euo pipefail
             TAG="{{inputs.parameters.image-tag}}"
+            IMAGE_REF="{{inputs.parameters.image}}"
+            if [[ "${IMAGE_REF}" != *:* ]]; then
+              IMAGE_REF="${IMAGE_REF}:${TAG}"
+            fi
             OUT="/output/${TAG}"
             mkdir -p "${OUT}"
             if [[ -f "${OUT}/image/disk.raw" ]]; then
@@ -282,7 +286,7 @@ spec:
               --type raw --rootfs ext4 \
               --config "${OUT}/bib-config.toml" \
               --output "${OUT}" \
-              {{inputs.parameters.image}} 2>&1 | tee "${OUT}/bib-build.log"
+              "${IMAGE_REF}" 2>&1 | tee "${OUT}/bib-build.log"
             echo "BIB exit: ${PIPESTATUS[0]}"
             exit ${PIPESTATUS[0]}
 
