@@ -268,8 +268,14 @@ spec:
             MOUNT=$(podman mount "${CID}")
             find "${MOUNT}/etc/selinux" -name "*.bin" -print -delete 2>/dev/null || true
             podman unmount "${CID}"
+            # Commit the deletion as a real image layer so bib-img-build sees it.
+            # Deleting from the merged overlay without committing creates whiteouts
+            # only in the container's upper layer, which is discarded on rm — the
+            # original image layers still contain the .bin files (testing-lab#220).
+            LOCAL_TAG="localhost/bib-selinux-prepped:${TAG}"
+            podman commit "${CID}" "${LOCAL_TAG}"
             podman container rm "${CID}"
-            echo "SELinux prep complete"
+            echo "SELinux prep complete → ${LOCAL_TAG}"
 
     - name: bib-img-build
       inputs:
@@ -322,6 +328,13 @@ spec:
             if [[ "${IMAGE_REF}" != *:* ]]; then
               IMAGE_REF="${IMAGE_REF}:${TAG}"
             fi
+            # Use selinux-prepped local image if bib-selinux-prep committed one.
+            # Both steps share /var/lib/containers/storage via hostPath on ghost.
+            LOCAL_PREPPED="localhost/bib-selinux-prepped:${TAG}"
+            if podman image exists "${LOCAL_PREPPED}" 2>/dev/null; then
+              echo "Using selinux-prepped image: ${LOCAL_PREPPED}" >&2
+              IMAGE_REF="${LOCAL_PREPPED}"
+            fi
             OUT="/output/${TAG}"
             mkdir -p "${OUT}"
             if [[ -f "${OUT}/image/disk.raw" ]]; then
@@ -329,9 +342,6 @@ spec:
               exit 0
             fi
             # Preflight: report PCRE2 version for diagnostics (testing-lab#220).
-            # bluefin-lts and dakota require setfiles PCRE2 >= 10.46 (2025-08-27).
-            # centos-stream9 bootc-image-builder ships 10.44 — org.osbuild.selinux will
-            # fail for those images. Fix: update this image to one with PCRE2 >= 10.46.
             PCRE2_PKG=$(rpm -q --queryformat '%{VERSION}' pcre2 2>/dev/null || echo "unknown")
             echo "PCRE2 in BIB container: ${PCRE2_PKG}" >&2
             if [[ "${PCRE2_PKG}" != "unknown" ]]; then
