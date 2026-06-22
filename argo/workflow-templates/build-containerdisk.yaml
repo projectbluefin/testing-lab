@@ -181,14 +181,15 @@ spec:
           # If the outer container held the loop device open, BLKRRPART would return EINVAL
           # and bootc would fail with "Device has no children".  Creating the loop device
           # inside the inner container avoids that competing lock.
+          # Mount staging to /var/tmp/disk-staging — /mnt may not exist in the Bluefin OCI image.
           podman run --rm --privileged --pid=host \
             -v /dev:/dev \
             -v /run/udev:/run/udev \
-            -v "${STAGING}:${STAGING}" \
+            -v "${STAGING}:/var/tmp/disk-staging" \
             "${IMAGE}" \
             bash -c "
               set -euo pipefail
-              LOOP=\$(losetup -f --show -P '${DISK}')
+              LOOP=\$(losetup -f --show -P /var/tmp/disk-staging/disk.raw)
               echo 'Inner loop: '\"\${LOOP}\"
               trap 'losetup -d \"\$LOOP\" 2>/dev/null || true' EXIT
               bootc install to-disk \
@@ -199,10 +200,11 @@ spec:
                 \"\${LOOP}\"
             " || {
             EXIT=$?
-            # bootc#2246: if disk has content (>10G written), EBUSY on unmount — treat as success.
-            DISK_SIZE=$(stat -c%s "${DISK}" 2>/dev/null || echo 0)
-            if [[ "${DISK_SIZE}" -gt $((10 * 1024 * 1024 * 1024)) ]]; then
-              echo "WARNING: bootc exited ${EXIT} but disk has ${DISK_SIZE} bytes (bootc#2246) — continuing"
+            # bootc#2246: check ALLOCATED blocks (not logical size — sparse file is always 15G).
+            # A sparse file has 0 blocks; a written disk has millions.  >0 means data was written.
+            ALLOCATED=$(stat -c%b "${DISK}" 2>/dev/null || echo 0)
+            if [[ "${ALLOCATED}" -gt 0 ]]; then
+              echo "WARNING: bootc exited ${EXIT} but disk has ${ALLOCATED} allocated blocks (bootc#2246) — continuing"
               umount -l /mnt 2>/dev/null || true
             else
               losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
