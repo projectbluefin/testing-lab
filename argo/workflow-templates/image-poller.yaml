@@ -55,6 +55,10 @@ spec:
                   value: "{{workflow.parameters.variant}}"
 
     - name: poll-digest
+      tolerations:
+        - key: node-role.kubernetes.io/gaming
+          operator: Exists
+          effect: NoSchedule
       inputs:
         parameters:
           - name: image

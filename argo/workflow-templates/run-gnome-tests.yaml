@@ -52,6 +52,10 @@ spec:
         dnsPolicy: ClusterFirstWithHostNet
         securityContext:
           runAsUser: 0
+        tolerations:
+          - key: node-role.kubernetes.io/gaming
+            operator: Exists
+            effect: NoSchedule
       # outputs.artifacts removed: Argo wait sidecar fails with exit 64 when no
       # artifact repository is configured, even for optional artifacts.
       # Results are captured via outputs.result (stdout) + kubectl logs.
