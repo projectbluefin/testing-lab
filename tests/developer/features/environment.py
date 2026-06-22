@@ -50,6 +50,9 @@ def before_all(context) -> None:
 
 
 def before_scenario(context, scenario) -> None:
+    if hasattr(context, 'failed_setup'):
+        scenario.skip(f"Suite setup failed: {context.failed_setup}")
+        return
     try:
         context.sandbox.before_scenario(context, scenario)
     except Exception:
