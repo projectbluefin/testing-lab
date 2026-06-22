@@ -54,7 +54,12 @@ spec:
           STORAGE="/var/lib/containers/storage"
 
           echo "=== Clearing stale lock files under ${STORAGE} ==="
-          count=$(find "${STORAGE}" -name "*.lock" | wc -l)
+          # Exclude overlay diff dirs — those contain app content (e.g. meson.lock)
+          # that lives on read-only overlay layers and must not be deleted.
+          mapfile -t locks < <(find "${STORAGE}" -name "*.lock" \
+            -not -path "*/overlay/*/diff/*" \
+            -not -path "*/overlay-images/*/diff/*")
+          count="${#locks[@]}"
           echo "Found ${count} lock files"
 
           if [[ "${count}" -eq 0 ]]; then
@@ -62,5 +67,8 @@ spec:
             exit 0
           fi
 
-          find "${STORAGE}" -name "*.lock" -print -delete
+          for f in "${locks[@]}"; do
+            echo "Removing: ${f}"
+            rm -f "${f}"
+          done
           echo "=== Cleared ${count} lock files ==="
