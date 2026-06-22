@@ -169,11 +169,17 @@ spec:
 
           truncate -s 15G "${DISK}"
 
+          # Configure podman storage to use the staging hostPath (large NVMe) instead of
+          # ephemeral pod storage, which would be evicted when pull fills it with ~5GB of layers.
+          mkdir -p /mnt/staging/podman-storage
+          mkdir -p /etc/containers
+          printf '[storage]\ndriver = "overlay"\nrunRoot = "/mnt/staging/podman-storage/run"\ngraphRoot = "/mnt/staging/podman-storage/graph"\n' \
+            > /etc/containers/storage.conf
+
           # Pull image (uses zot-ghcr mirror if cached)
           podman pull --tls-verify=true "${IMAGE}"
 
-          # Configure podman to use cgroupfs (not systemd) to avoid cgroup/PID conflict in k8s.
-          mkdir -p /etc/containers
+          # Configure cgroupfs to avoid systemd cgroup manager conflict in k8s.
           printf '[engine]\ncgroup_manager = "cgroupfs"\n' > /etc/containers/containers.conf
 
           # Run bootc install to-disk inside the Bluefin container via podman.
