@@ -178,7 +178,6 @@ spec:
           podman run --rm --privileged \
             -v /dev:/dev \
             -v /run/udev:/run/udev \
-            -v "/mnt/staging:/mnt/staging" \
             "${IMAGE}" \
             bootc install to-disk --generic-image "${LOOP}" || {
             EXIT=$?
