@@ -230,7 +230,7 @@ spec:
           hostPath:
             path: /var/lib/containers/storage
       container:
-        image: ghcr.io/osbuild/bootc-image-builder:latest
+        image: quay.io/centos-bootc/bootc-image-builder:latest
         securityContext:
           privileged: true
           runAsUser: 0
