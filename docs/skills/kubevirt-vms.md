@@ -329,7 +329,71 @@ cat /proc/sys/fs/inotify/max_user_watches   # should be >= 1048576
 
 The DaemonSet applies this on every node restart. Do not remove it.
 
-### 11. Golden disk build — use `bootc install to-disk`, not BIB
+### 12. Cross-policy LTS containerDisk builds — fsetxattr EINVAL
+
+When building the LTS containerDisk on a bluefin (non-LTS) ghost host, `bootc install to-disk`
+fails with:
+```
+fsetxattr(security.selinux): Invalid argument
+```
+
+**Root cause:** The LTS image contains SELinux file labels (types like `container_t`, etc.) not
+present in the host's in-memory SELinux policy. The kernel's `selinux_inode_setxattr` returns
+`EINVAL` for unknown types. This is only absorbed if `has_cap_mac_admin()` returns true, which
+requires both CAP_MAC_ADMIN (satisfied by `--privileged`) AND an SELinux AVC check for
+`capability2 { mac_admin }` in the process's SELinux type.
+
+**Why `seLinuxOptions.type=spc_t` does not fix it:** k3s/containerd assigns
+`unconfined_service_t` to ALL containers regardless of `seLinuxOptions`. Confirmed via
+`/proc/self/attr/current` diagnostic.
+
+**Why `--security-opt label=type:spc_t` does not fix it:** Same — k3s/containerd overrides
+the SELinux type to `unconfined_service_t` for privileged containers.
+
+**Actual fix — LD_PRELOAD wrapper:**
+Compile a tiny `fsetxattr` interceptor in the outer container (before running podman). Mount it
+into the inner container via a dedicated bind mount. The wrapper converts `EINVAL` → `0` for
+`security.*` xattrs, silently dropping unknown labels. The installed VM boots with `selinux=0`
+so missing xattrs are irrelevant.
+
+```bash
+# In the outer script (quay.io/podman/stable which has dnf):
+dnf install -y gcc glibc-devel 2>&1 | tail -2
+mkdir -p /tmp/bluefin-cd-preload
+printf '%s\n' \
+  '#define _GNU_SOURCE' '#include <dlfcn.h>' '#include <string.h>' \
+  '#include <errno.h>' '#include <stddef.h>' \
+  'typedef int (*fn_t)(int,const char*,const void*,size_t,int);' \
+  'int fsetxattr(int fd,const char*n,const void*v,size_t s,int f){' \
+  '  static fn_t real;' \
+  '  if(!real)real=(fn_t)dlsym(RTLD_NEXT,"fsetxattr");' \
+  '  int r=real(fd,n,v,s,f);' \
+  '  if(r==-1&&errno==EINVAL&&n&&strncmp(n,"security.",9)==0){errno=0;return 0;}' \
+  '  return r;}' > /tmp/fsetxattr_wrap.c
+gcc -shared -fPIC -o /tmp/bluefin-cd-preload/fsetxattr_wrapper.so /tmp/fsetxattr_wrap.c -ldl
+chcon -t lib_t /tmp/bluefin-cd-preload/fsetxattr_wrapper.so 2>/dev/null || true
+
+# In the podman run command:
+podman run --rm --privileged ... \
+  -e LD_PRELOAD=/preload/fsetxattr_wrapper.so \
+  -v /tmp/bluefin-cd-preload:/preload \
+  ... ${IMAGE} bash -c "bootc install to-disk ..."
+```
+
+**Important notes:**
+- Compile to `/tmp/bluefin-cd-preload/` (outer container tmpfs), NOT to the staging hostPath.
+  Files on the hostPath (`/mnt/staging/`) get a SELinux file label (`svirt_sandbox_file_t`)
+  that blocks ld.so in the inner container.
+- Use `chcon -t lib_t` to ensure the .so has a loadable label.
+- The `ld.so: cannot be preloaded` error at container startup is a red herring — it fires
+  before mounts are set up for the bash entrypoint, but the wrapper IS loaded correctly when
+  `bootc` exec's later.
+- `ENOTSUP` (not `EINVAL`) means the wrapper loaded but the LTS ostree version doesn't skip
+  ENOTSUP in all paths. Solution: return `0` (noop success) instead of `ENOTSUP`.
+
+See `argo/workflow-templates/build-containerdisk.yaml` for the canonical implementation.
+
+
 
 **Do not use `bootc-image-builder` (BIB) for bluefin/bluefin-lts golden disk builds.**
 
@@ -401,6 +465,8 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 - SSH wait using `nc -z` — `nc` is not available in distroless or minimal images; use `bash -c 'echo >/dev/tcp/${IP}/22'`
 - VM boot timeout with no disk or network explanation — check `cat /proc/sys/fs/inotify/max_user_watches` (should be >= 1048576)
 - Using BIB (`bib-build-and-push`) for bluefin/bluefin-lts builds — BIB's osbuild Fedora 38 runner has a PCRE2 mismatch with current bluefin images. Use `bootc install to-disk` instead.
+- `fsetxattr(security.selinux): Invalid argument` during LTS containerDisk build — `unconfined_service_t` lacks `capability2 mac_admin`; neither `seLinuxOptions` nor `--security-opt` can override the k3s-assigned type. Use the LD_PRELOAD fsetxattr wrapper (section 12).
+- `fsetxattr(security.selinux): Operation not supported` during LTS build — wrapper loaded but returning ENOTSUP; change wrapper to return 0 (noop) instead so ostree version mismatch doesn't matter.
 - SSH `Permission denied (publickey)` after configure-disk — **do not debug disk injection further**; switch to KubeVirt accessCredentials with qemuGuestAgent (section 2b).
 - Using disk injection for SSH keys when accessCredentials is available — disk injection is fragile; accessCredentials is the canonical KubeVirt pattern.
 - `pip install --user` failing with EACCES inside VM — home directory owned by root; always chown after `install -d .ssh` (section 2c).

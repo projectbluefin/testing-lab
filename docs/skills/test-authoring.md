@@ -233,6 +233,8 @@ See `docs/homelab-contracts.md` for the full contract specification.
 | "The top-bar items are in the AT-SPI tree, I can click them directly." | GNOME Shell 50 doesn't expose clock/system-status reliably. Use Shell.Eval. |
 | "The system/ tests are slow — I'll focus on smoke tests." | The bootc contract is the lab's north star. System tests are the highest-value suite. |
 | "I'll add `@wip` and clean it up later." | `@wip` scenarios are skipped in nightly runs. Fix before merging or they rot. |
+| "`grep -c` returning 0 means zero matches, that's fine." | `grep -c` exits 1 when count=0. Combined with `\|\| echo 0` in a pipeline, this emits `0\n0\n` (double output), breaking exact-match steps. Use `\|\| true` instead. |
+| "Key combos take effect immediately — no sleep needed." | AT-SPI operations need time to reflect UI state after a key combo. Add `sleep(1)` before checking widget state (e.g., tab count after `<Shift><Ctrl><T>`). |
 
 ## Red Flags
 
@@ -242,6 +244,8 @@ See `docs/homelab-contracts.md` for the full contract specification.
 - Test that only passes in smoke/developer suites but never validates bootc behavior
 - `hasattr(context, 'failed_setup')` in `before_scenario` — qecore sets this to `None` by default, so `hasattr` always returns True; use `getattr(...) is not None`
 - Optional dependency (e.g. Podman Desktop) initialized inside the main try/except — causes ALL tests to appear as setup failures when the optional app is absent
+- `grep -c ... || echo 0` in a bash step — `grep -c` exits 1 on zero matches; `|| echo 0` fires and doubles the output; use `|| true` instead
+- No `sleep()` between a keyboard shortcut (e.g. `<Shift><Ctrl><T>`) and the AT-SPI check that follows — race condition; add `sleep(1)` before checking widget state
 
 ## Verification
 
