@@ -1,10 +1,9 @@
 ---
 name: kubevirt-vms
 description: >
-  KubeVirt ephemeral VM lifecycle in the testing-lab: golden disk, btrfs
-  reflink clone, VM provisioning, SSH wait, teardown. Use when writing
-  provision-vm templates, debugging VM boot failures, or working with
-  KubeVirt manifests.
+  KubeVirt ephemeral VM lifecycle in the testing-lab: containerDisk build,
+  VM provisioning, SSH wait, teardown. Use when writing provision-vm templates,
+  debugging VM boot failures, or working with KubeVirt manifests.
 metadata:
   context7-sources:
     - /argoproj/argo-workflows
@@ -14,9 +13,9 @@ metadata:
 
 ## When to Use
 
-- Editing `provision-vm.yaml`, `provision-variant-vm.yaml`, `provision-flatcar-vm.yaml`
+- Editing `provision-bluefin-vm.yaml`, `provision-flatcar-vm.yaml`, `knuckle-qa-pipeline.yaml`
 - Debugging VM boot timeouts or SSH readiness failures
-- Adding a new image variant (new golden disk path, new namespace)
+- Adding a new image variant
 - Enabling a new KubeVirt feature gate
 - Understanding why a VM is stuck `Terminating`
 
@@ -28,23 +27,45 @@ metadata:
 
 ## Core Process
 
-### 1. The golden disk + reflink model
+### 1. Disk placement — all VM data goes on ghost-data SSD
+
+Ghost has two storage devices:
+- `/dev/nvme0n1p3` → mounted at `/var` — OS partition (~1.9T, **do not fill**)
+- `/dev/sdb` → mounted at `/var/mnt/ghost-data` — data SSD (~1.9T, use this for VM disks)
+
+**Rule: all VM disk files and build staging MUST live under `/var/mnt/ghost-data/`.**
+Putting VM disk images on `/var/tmp` (nvme) will fill the OS partition and trigger
+kubelet disk-pressure, evicting all pods and crashing the cluster.
+
+| Pipeline | Disk storage location |
+|---|---|
+| Bluefin containerDisk build staging | `/var/mnt/ghost-data/bluefin-cd-build/` |
+| Flatcar hostDisk clones | `/var/mnt/ghost-data/flatcar-test/` |
+| Knuckle hostDisk clones | `/var/mnt/ghost-data/knuckle-test/` |
+| GnomeOS hostDisk clones | `/var/mnt/ghost-data/gnomeos-test/` |
+| LLM model cache | `/var/mnt/ghost-data/llm-models/` |
+
+**Never use `/var/tmp` for VM disk files.** It is on the nvme OS partition.
+
+### 2. Bluefin VM model — containerDisk (no hostDisk files)
+
+Bluefin test VMs use KubeVirt `containerDisk` — an OCI image containing the qcow2
+disk image, stored in the local Zot registry. No reflink, no hostDisk, no golden disk.
 
 ```
-/var/tmp/bluefin-golden/<tag>/disk.raw        ← built once by bib-build-and-push
-        │
-        │  btrfs reflink (~24ms, CoW, ~0 extra disk)
-        ▼
-/var/tmp/bluefin-test/<vm-name>.raw           ← per-run ephemeral clone
-        │
-        │  KubeVirt HostDisk hostPath mount
-        ▼
-KubeVirt VM (VirtualMachineInstance)          ← boots in ~60-90s, torn down on exit
+build-containerdisk (build-containerdisk.yaml)
+  ├─ check       — skopeo: exists in 192.168.1.102:30500/bluefin-containerdisk:<tag>?
+  ├─ install-to-disk  — podman run bootc install to-disk → /mnt/ghost-data/bluefin-cd-build/<tag>/disk.raw
+  ├─ configure-disk   — inject test user, SSH, GDM autologin, sudoers, selinux=0
+  └─ convert-and-push — qemu-img raw→qcow2, buildah OCI wrap, push to zot:30500
+         │
+provision-bluefin-vm (provision-bluefin-vm.yaml)
+  └─ VM boots from containerDisk: 192.168.1.102:30500/bluefin-containerdisk:<tag>
 ```
 
-**Critical:** both paths must be on the same btrfs volume for reflink to work:
+Check if a containerDisk exists:
 ```bash
-stat --file-system --format=%T /var/tmp   # must output: btrfs
+skopeo inspect --tls-verify=false docker://192.168.1.102:30500/bluefin-containerdisk:testing
 ```
 
 ### 2. Required KubeVirt feature gates
@@ -245,11 +266,12 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 - Using `gts` or `lts-hwe` as image tags (they don't exist)
 - VMs in namespaces other than the four test namespaces
 - Hardcoded IPs in VM templates (use pod IP from `kubectl get pod -l kubevirt.io/vm=...`)
+- **Any `hostPath` pointing to `/var/tmp` for VM disks** — use `/var/mnt/ghost-data/` instead
 - A `wait-for-vm` step that writes debug text to stdout (breaks output parameter capture)
 - `registry.k8s.io/kubectl` used as image for a step that needs bash — it is distroless, use `cgr.dev/chainguard/kubectl:latest-dev`
 - SSH wait using `nc -z` — `nc` is not available in distroless or minimal images; use `bash -c 'echo >/dev/tcp/${IP}/22'`
 - VM boot timeout with no disk or network explanation — check `cat /proc/sys/fs/inotify/max_user_watches` (should be >= 1048576)
-- Using BIB (`bib-build-and-push`) for bluefin/bluefin-lts golden disk builds — BIB's osbuild Fedora 38 runner has a PCRE2 mismatch with current bluefin images. Use `bootc install to-disk` instead.
+- Using BIB (`bib-build-and-push`) for bluefin/bluefin-lts builds — BIB's osbuild Fedora 38 runner has a PCRE2 mismatch with current bluefin images. Use `bootc install to-disk` instead.
 
 ## Verification
 
@@ -259,5 +281,5 @@ Before merging any VM provisioning change:
 - [ ] `onExit` teardown deletes VM object AND disk file
 - [ ] Feature gates checked if adding a new VM capability
 - [ ] `just list-vms` shows empty after workflow completion
-- [ ] Golden disk path matches the `AGENTS.md` image variants table
+- [ ] **All `hostPath` volume paths under `/var/mnt/ghost-data/`, never `/var/tmp`**
 - [ ] No hardcoded IPs — pod IP derived at runtime via `kubectl get pod`
