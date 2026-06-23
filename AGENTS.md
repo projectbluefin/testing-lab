@@ -250,7 +250,11 @@ distro-specific replacements when an upstream image exists.
 
 All Bluefin test VMs are now ephemeral. Nightlies and ad hoc validation runs provision fresh VMs through `bluefin-qa-pipeline` and tear them down on workflow exit; GitOps no longer manages persistent titan VM manifests in this repo.
 
-The SSH key secret remains `bluefin-test-ssh-key` in the `argo` namespace for in-cluster test access.
+SSH key injection uses KubeVirt `accessCredentials` with `qemuGuestAgent` — the public key is injected into the running VM by virt-controller via QEMU guest agent at boot. Two secrets are required:
+- `bluefin-test-ssh-key` in `argo` namespace: private+public key for SSH client (workflow pods)
+- `bluefin-test-ssh-pubkey` in the VM namespace (e.g. `bluefin-test`): public key for accessCredentials injection, managed by ArgoCD via `manifests/bluefin-test-ssh-pubkey.yaml`
+
+**Do not use disk injection for SSH keys.** bootc/ostree resets `etc/` files that exist in the image's `usr/etc/` at first boot; `var/` btrfs writes may not survive `qemu-img` conversion.
 
 ## Test Stack
 

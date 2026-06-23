@@ -45,8 +45,8 @@ Run `just logs` first. Then match a row:
 
 | Symptom in logs | Run next |
 |---|---|
-| `Permission denied (publickey)` at SSH wait | `just patch-disk <tag>` → rerun |
-| Workflow times out at SSH wait | `just list-vms` → inspect the target VMI IP → if the VMI is Ready but SSH never comes up, `just patch-disk <tag>` |
+| `Permission denied (publickey)` at SSH wait | Check `kubectl get vm -n bluefin-test <name> -o yaml \| grep -A10 accessCredentials` — secret must exist. Delete orphaned VM + rerun. |
+| Workflow times out at SSH wait | `just list-vms` → confirm VMI is Ready. If SSH port open but auth fails, verify `bluefin-test-ssh-pubkey` secret exists in the VM's namespace: `kubectl get secret -n bluefin-test bluefin-test-ssh-pubkey` |
 | `TypeError: ... requireResult` | Fix the step per [`docs/dogtail-testing.md`](dogtail-testing.md) §6.2 (`findChildren(...)` / `retry=False`) |
 | `Application "gnome-shell" is running` step fails | Replace it with `* GNOME Shell is accessible via AT-SPI` |
 | All top-bar scenarios fail | Confirm `wait_for_shell.py` is present in the copied suite and that the runner re-asserts `unsafe_mode` |
@@ -191,29 +191,42 @@ This rotates the SSH key used **in-cluster** by workflow pods to reach test VMs.
 ssh_key=$(mktemp)
 ssh-keygen -t ed25519 -f "${ssh_key}" -N "" -C "bluefin-test-suite@ghost"
 
-# 2. Replace the secret in-place:
+# 2. Replace the client secret (used by workflow pods to SSH into VMs):
 kubectl create secret generic bluefin-test-ssh-key \
   --from-file=id_ed25519="${ssh_key}" \
   --from-file=id_ed25519.pub="${ssh_key}.pub" \
   -n argo --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. Replace the server-side public key (used by KubeVirt accessCredentials
+#    to inject authorized_keys into VMs via QEMU guest agent):
+PUB_KEY=$(cat "${ssh_key}.pub")
+kubectl create secret generic bluefin-test-ssh-pubkey \
+  --from-literal="key=${PUB_KEY}" \
+  -n bluefin-test --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic bluefin-test-ssh-pubkey \
+  --from-literal="key=${PUB_KEY}" \
+  -n bluefin-lts-test --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+
 shred -u "${ssh_key}" "${ssh_key}.pub"
 
-# 3. Patch every existing golden disk:
-just patch-disk testing
-just patch-disk lts-testing
+# 4. Update manifests/bluefin-test-ssh-pubkey.yaml with the new base64 key
+#    so ArgoCD manages the secret going forward.
 
-# 4. Confirm via real runs:
+# 5. Confirm via real runs:
 just run-tests-tag testing
 just run-tests-tag lts-testing
 
-# 5. Verify the new fingerprint:
+# 6. Verify the new fingerprint:
 kubectl get secret bluefin-test-ssh-key -n argo \
   -o jsonpath='{.data.id_ed25519\.pub}' | base64 -d | ssh-keygen -lf -
 ```
 
-If `patch-disk` fails because the old key can no longer SSH into the golden disk, rebuild that golden disk with `just ensure-disk <tag>`.
+SSH key rotation now has two parts:
+- `bluefin-test-ssh-key` (argo ns): private+public key for the SSH client (workflow pods)
+- `bluefin-test-ssh-pubkey` (VM ns): public key for KubeVirt accessCredentials injection
 
-If `patch-disk` succeeds but fresh workflows still fail SSH, file an issue with the failing workflow name, pod name, and log excerpt.
+`patch-disk` is no longer needed — SSH keys are injected at VM boot time via KubeVirt
+qemuGuestAgent accessCredentials, not baked into the disk image.
 
 ---
 

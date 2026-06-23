@@ -112,14 +112,21 @@ Start with the exact workflow that failed.
 
 ### 5.1 `Permission denied (publickey)` during SSH wait
 
-1. `just logs | grep -n "Permission denied (publickey)"`
-   - **Expected:** at least one matching line.
-   - **Next:** `just patch-disk <tag>` for the tag that failed.
-2. `just patch-disk <tag>`
-   - **Expected:** the `patch-golden-disk` workflow exits `Succeeded`.
-   - **Next:** rerun the failing fresh-VM command.
-3. If the retry still fails:
-   - **Next:** file an issue with workflow name, pod name, and the log excerpt.
+SSH key injection now uses KubeVirt `accessCredentials` — not disk injection.
+
+1. Confirm the `bluefin-test-ssh-pubkey` secret exists in the VM's namespace:
+   ```bash
+   kubectl get secret -n bluefin-test bluefin-test-ssh-pubkey
+   ```
+   - **Expected:** secret exists.
+   - **If missing:** `kubectl apply -f manifests/bluefin-test-ssh-pubkey.yaml` and rerun.
+2. Confirm `accessCredentials` is present in the VM spec:
+   ```bash
+   kubectl get vm -n bluefin-test <name> -o yaml | grep -A10 accessCredentials
+   ```
+   - **Expected:** `qemuGuestAgent` propagation with `users: [root]`.
+3. Confirm qemu-guest-agent is running in the VM (required for injection).
+4. Delete the orphaned VM and rerun the workflow.
 
 ### 5.2 Workflow timed out while waiting for SSH
 
@@ -128,7 +135,8 @@ Start with the exact workflow that failed.
 2. Use `kubernetes-mcp-resources_get` for the `VirtualMachineInstance`.
    - **Expected:** the VMI is Ready and reports an IP address.
 3. If the VMI is Ready but SSH never comes up:
-   - **Next:** `just patch-disk <tag>` and rerun.
+   - Check `bluefin-test-ssh-pubkey` secret and `accessCredentials` in VM spec (see §5.1).
+   - Delete the VM and rerun.
 
 ### 5.3 `TypeError` mentioning `requireResult`
 
@@ -245,9 +253,9 @@ The key rotation flow is still valid because it manages the **in-cluster** test-
 Use the exact command block in [docs/agent-cheatsheet.md](agent-cheatsheet.md) §6.
 
 After rotation:
-1. Run `just patch-disk latest` and `just patch-disk lts`.
-2. Run `just run-tests-tag latest` and `just run-tests-tag lts`.
-3. If fresh workflows still fail SSH, file an issue with workflow name, pod name, and the log excerpt.
+1. Update `manifests/bluefin-test-ssh-pubkey.yaml` with the new base64-encoded public key and push to main.
+2. Run `just run-tests-tag testing` and `just run-tests-tag lts-testing`.
+3. If fresh workflows still fail SSH, verify the `bluefin-test-ssh-pubkey` secret was updated and ArgoCD synced it.
 
 ---
 
