@@ -349,20 +349,12 @@ spec:
               # Fix fstab: non-root partitions (/boot, /boot/efi) block boot in
               # containerDisk VMs if the device UUID isn't detected quickly.
               # Add nofail + short timeout so boot proceeds even if they're slow.
-              # The root partition (/) is already mounted by the time systemd starts.
-              if [[ -f "${ETC}/fstab" ]]; then
+              if [[ -f \"\${ETC}/fstab\" ]]; then
                 echo '[INNER] original fstab:'
-                cat "${ETC}/fstab"
-                awk '
-                  /^[[:space:]]*#/ { print; next }
-                  /^[[:space:]]*$/ { print; next }
-                  $2 != "/" && $2 != "swap" && $2 != "none" && !/nofail/ {
-                    sub(/defaults/, "defaults,nofail,x-systemd.device-timeout=5s")
-                  }
-                  { print }
-                ' "${ETC}/fstab" > /tmp/fstab.new && mv /tmp/fstab.new "${ETC}/fstab"
+                cat \"\${ETC}/fstab\"
+                sed -i '/\/boot/s/defaults/defaults,nofail,x-systemd.device-timeout=5s/' \"\${ETC}/fstab\" 2>/dev/null || true
                 echo '[INNER] patched fstab:'
-                cat "${ETC}/fstab"
+                cat \"\${ETC}/fstab\"
               else
                 echo '[INNER] no fstab found (normal for some bootc images)'
               fi
