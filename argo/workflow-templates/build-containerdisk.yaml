@@ -191,8 +191,13 @@ spec:
           podman pull --tls-verify=true "${IMAGE}"
 
           echo "Starting bootc install (via-loopback)..."
-          # SSH_AUTHORIZED_KEYS is passed via -e into the inner container for
-          # post-install key injection into bluefin-test's home directory.
+          echo "[OUTER] SSH_AUTHORIZED_KEYS prefix: ${SSH_AUTHORIZED_KEYS:0:30}..."
+
+          # Write key to a staging file for --root-ssh-authorized-keys.
+          # bootc install handles root SSH key injection natively; this is the
+          # most reliable mechanism (no post-install ostree-etc-merge concerns).
+          echo "${SSH_AUTHORIZED_KEYS}" > "${STAGING}/root-ssh-keys"
+
           # Ref: bootc install docs — use --via-loopback for VM disk creation.
           PODMAN_EXIT=0
           podman run --rm --privileged --pid=host --ipc=host \
@@ -206,17 +211,19 @@ spec:
             bash -c "
               set -euo pipefail
 
+              echo \"[INNER] SSH_AUTHORIZED_KEYS prefix: \${SSH_AUTHORIZED_KEYS:0:30}...\"
+
               # --via-loopback: upstream recommended pattern for VM disk creation.
-              # bootc manages the loop device internally and releases it on exit.
-              # SSH key injection for bluefin-test is handled post-install via the
-              # btrfs var subvolume mount; --root-ssh-authorized-keys is not used
-              # because the test framework authenticates as bluefin-test, not root.
+              # --root-ssh-authorized-keys: bootc-native root SSH key injection —
+              # this is the reliable path; it writes to /root/.ssh/authorized_keys
+              # during install, avoiding post-install ostree etc-merge uncertainty.
               bootc install to-disk \
                 --generic-image \
                 --filesystem=btrfs \
                 --target-no-signature-verification \
                 --disable-selinux \
                 --karg=selinux=0 \
+                --root-ssh-authorized-keys /output/root-ssh-keys \
                 --via-loopback /output/disk.raw
 
               echo '[INNER] bootc done, mounting for post-install'
@@ -272,15 +279,13 @@ spec:
                 \"\${ETC}/systemd/system/sockets.target.wants/sshd.socket\" || true
               mkdir -p \"\${ETC}/ssh/sshd_config.d\"
               # Note: 'UsePAM no' is NOT supported in this Fedora openssh build.
-              # AuthorizedKeysFile: absolute path wins (Include is at top of sshd_config).
-              printf 'PubkeyAuthentication yes\nStrictModes no\nAuthorizedKeysFile /etc/ssh/test-authorized-keys\n' \
+              # PermitRootLogin prohibit-password: default on Fedora, allows pubkey
+              # for root (set by bootc via --root-ssh-authorized-keys).
+              printf 'PubkeyAuthentication yes\nStrictModes no\nPermitRootLogin prohibit-password\n' \
                 > \"\${ETC}/ssh/sshd_config.d/10-test.conf\"
 
-              # Write authorized key to /etc (read-only deployment, always present at runtime).
-              # This avoids relying on /var/home being populated before first SSH attempt.
-              printf '%s\n' \"\${SSH_AUTHORIZED_KEYS}\" > \"\${ETC}/ssh/test-authorized-keys\"
-              chmod 644 \"\${ETC}/ssh/test-authorized-keys\"
-              echo '[INNER] SSH authorized key written to /etc/ssh/test-authorized-keys'
+              # Diagnostic: confirm the drop-in was written correctly.
+              echo '[INNER] sshd drop-in:' && cat \"\${ETC}/ssh/sshd_config.d/10-test.conf\"
 
               # sudoers
               mkdir -p \"\${ETC}/sudoers.d\"
@@ -290,9 +295,8 @@ spec:
 
               echo '[INNER] etc/ config done'
 
-              # Also inject to /var/home for any tools that check ~/.ssh/authorized_keys.
-              # Per bootc filesystem docs: /var is bound from /ostree/deploy/\$stateroot/var
-              # NOT a top-level btrfs subvolume. Access it directly via the mounted btrfs root.
+              # Inject bluefin-test SSH key to /var/home (persistent var, always
+              # accessible at boot — bootc-native root-ssh-keys handles root).
               STATEROOT=\$(ls /tmp/installed/ostree/deploy/ 2>/dev/null | head -1)
               HOME_DIR=\"/tmp/installed/ostree/deploy/\${STATEROOT}/var/home/bluefin-test\"
               mkdir -p \"\${HOME_DIR}/.ssh\"
@@ -300,7 +304,8 @@ spec:
               chmod 700 \"\${HOME_DIR}/.ssh\"
               chmod 600 \"\${HOME_DIR}/.ssh/authorized_keys\"
               chown -R 1001:1001 \"\${HOME_DIR}\"
-              echo '[INNER] SSH keys also injected to /var/home/bluefin-test'
+              echo '[INNER] SSH keys injected to /var/home/bluefin-test'
+              echo '[INNER] authorized_keys content:' && cat \"\${HOME_DIR}/.ssh/authorized_keys\"
 
               # trap cleanup EXIT: umount btvar, umount installed, losetup -d
             " || PODMAN_EXIT=$?
