@@ -403,33 +403,26 @@ PCRE2 10.44, but bluefin images ship SELinux `.bin` policy files compiled for PC
 This mismatch breaks every time the Fedora base advances. BIB has no way to override
 the internal runner version.
 
-**The correct approach:** the bootc image IS the installer.
+**The correct approach:** use the `build-containerdisk` WorkflowTemplate. It runs `bootc install to-disk`
+inside the container image itself (the image is its own installer), then wraps the output as an OCI
+containerDisk pushed to the local Zot registry. No golden disk file, no BIB, no osbuild.
 
 ```yaml
-container:
-  image: "ghcr.io/projectbluefin/bluefin-lts:testing"  # the real image
-  securityContext:
-    privileged: true
-    runAsUser: 0
-  nodeSelector:
-    kubernetes.io/hostname: ghost
-  command: [bash, -c]
-  args:
-  - |
-    mkdir -p /var/tmp/bluefin-golden/lts-testing
-    truncate -s 40G /var/tmp/bluefin-golden/lts-testing/disk.raw
-    bootc install to-disk \
-      --generic-image \
-      --skip-fetch-check \
-      /var/tmp/bluefin-golden/lts-testing/disk.raw
-    chown 107:107 /var/tmp/bluefin-golden/lts-testing/disk.raw
-    chcon -t svirt_sandbox_file_t /var/tmp/bluefin-golden/lts-testing/disk.raw 2>/dev/null || true
+# Reference the build-containerdisk WorkflowTemplate directly:
+templateRef:
+  name: build-containerdisk
+  template: build-containerdisk
+arguments:
+  parameters:
+  - name: image-tag
+    value: lts-testing
+  - name: image
+    value: ghcr.io/projectbluefin/bluefin-lts:testing
 ```
 
-- No osbuild, no runner chroot, no PCRE2 version mismatch — ever
-- The image installs itself; all binaries are internally consistent
-- Build time: ~12 min (vs ~5 min BIB, but BIB was broken)
-- Cache hit: unchanged — reflink still ~1 sec
+Staging disk is written to `/var/mnt/ghost-data/bluefin-cd-build/<tag>/disk.raw` during the build
+and removed after the OCI image is pushed. See `argo/workflow-templates/build-containerdisk.yaml`
+for the canonical implementation.
 
 If you see the error:
 ```

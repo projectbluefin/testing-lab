@@ -230,7 +230,7 @@ One-shot bootstrap templates (`install-*`, `setup-*`, `titan-disk-cleanup`) shou
 
 Two CronWorkflows at the same schedule covering overlapping namespaces → consolidate into one. Check `kubectl get cronworkflows -n argo` before adding a new cleanup job.
 
-### 11. BIB build failures — stale containers-storage locks
+### 10. BIB build failures — stale containers-storage locks
 
 When a BIB workflow is force-killed mid-run, podman lock files remain at
 `/var/lib/containers/storage/overlay-containers/*/userdata/*.lock`. Subsequent
@@ -249,7 +249,7 @@ just run-ghost-cleanup
 This is safe to run any time no active BIB workflows are running. The `ghost-heavy-compute`
 Argo mutex serializes BIB builds but does not clean stale locks from killed workflows.
 
-### 12. Templates snapshot at submit time — always sync before resubmit
+### 11. Templates snapshot at submit time — always sync before resubmit
 
 Argo snapshots the full WorkflowTemplate body into the Workflow object at submit time.
 A workflow submitted before ArgoCD synced a fix will run the **old** template, even if
@@ -284,7 +284,7 @@ argo lint argo/bluefin-smoke-test.yaml
 
 Or use the convenience wrapper: `just lint`
 
-### 8. ArgoCD ownership — never apply manually
+### 12. ArgoCD ownership — never apply manually
 
 `argo/workflow-templates/` is managed by the `testing-lab` ArgoCD Application with `prune: true` and `selfHeal: true`. Manual `kubectl apply` or `argo create workflow-template` for templates in this directory is forbidden — ArgoCD will overwrite or conflict.
 
@@ -293,7 +293,7 @@ Or use the convenience wrapper: `just lint`
 kubectl apply -f argo/bootstrap/ -n argo
 ```
 
-### 9. TTL and podGC — always set
+### 13. TTL and podGC — always set
 
 Prevent accumulation of completed workflow pods:
 

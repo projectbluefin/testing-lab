@@ -24,11 +24,13 @@ All pipelines use ephemeral VMs — every run provisions a fresh VM and tears it
 |---|---|---|---|
 | ghost | k3s control-plane + KubeVirt compute | 192.168.1.102 | Runs VM workloads and Argo control-plane services |
 | exo-1 | k3s worker | 192.168.1.239 | Workflow pods only |
+| bazzite | k3s worker (on demand) | 192.168.1.223 | Gaming machine; k3s disabled at boot — start manually when needed |
 | Argo UI | external entrypoint | http://192.168.1.102:32746 | Host-local service also exposed on port 2746 |
 | Loki | log aggregation | http://192.168.1.102:30100 | Captures workflow pod logs |
 | ArgoCD | GitOps controller | https://192.168.1.102 | Reconciles this repo into the cluster |
 
-All KubeVirt VMs are pinned to ghost. Workflow pods may land on ghost or exo-1 depending on template constraints.
+HostDisk VMs (Flatcar, Knuckle, GnomeOS) must pin to ghost — their disk files live on ghost's local storage.
+ContainerDisk VMs (Bluefin test VMs) float freely and can schedule on ghost or bazzite.
 
 ## GitOps ownership
 
@@ -53,8 +55,8 @@ The repo is intentionally GitOps-first: cluster state should converge from git, 
 |---|---|---|---|
 | ContainerDisk (`testing`) | `192.168.1.102:30500/bluefin-containerdisk:testing` | Bluefin QA pipeline | Built by `build-containerdisk` |
 | ContainerDisk (`lts-testing`) | `192.168.1.102:30500/bluefin-containerdisk:lts-testing` | Bluefin QA pipeline | Built by `build-containerdisk` |
-| Flatcar hostDisk | `/var/tmp/flatcar-test/<vm-name>/disk.raw` | Flatcar pipeline | Reflinked from golden, removed by teardown |
-| Knuckle hostDisk | `/var/tmp/knuckle-test/<vm-name>/disk.raw` | Knuckle pipeline | Reflinked from golden, removed by teardown |
+| Flatcar hostDisk | `/var/mnt/ghost-data/flatcar-test/<vm-name>/disk.raw` | Flatcar pipeline | Reflinked from golden, removed by teardown |
+| Knuckle hostDisk | `/var/mnt/ghost-data/knuckle-test/<vm-name>/disk.raw` | Knuckle pipeline | Reflinked from golden, removed by teardown |
 
 The SSH secret lives in the `bluefin-test-ssh-key` Kubernetes secret in namespace `argo`.
 Golden disks can be rotated via the `build-containerdisk` template.

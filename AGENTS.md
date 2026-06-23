@@ -114,7 +114,8 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 | ArgoCD | GitOps controller | https://192.168.1.102 (argocd NS) | Two Applications: `testing-lab` + `testing-lab-infra` |
 | llm-d | LLM inference (hive node) | http://192.168.1.102:30800 | OpenAI-compatible API; model: Qwen/Qwen3.6-35B-A3B; namespace: `llm-d` |
 
-All KubeVirt VMs are pinned to ghost via `nodeSelector: kubernetes.io/hostname: ghost`.
+**HostDisk VMs** (Flatcar, Knuckle, GnomeOS) are pinned to ghost via `nodeSelector: kubernetes.io/hostname: ghost` — their disk files live on ghost's local storage.
+**ContainerDisk VMs** (Bluefin test VMs) require no nodeSelector and can schedule on any KubeVirt-capable node (ghost or bazzite).
 
 ## GitOps Rules
 

@@ -239,7 +239,7 @@ Mandatory gate for `knuckle`, `dakota`, and this repo's PRs.
    - Workflow status/steps → `argo-mcp-get_workflow` / `argo-mcp-list_workflows`
    - Log output → `argo-mcp-logs_workflow`
    - Pod/VMI state → `kubernetes-mcp-pods_get` / `kubernetes-mcp-resources_list`
-3. Post the report on the PR using [`docs/vanguard-report-template.md`](vanguard-report-template.md).
+3. Post a report on the PR using the template at [`docs/vanguard-report-template.md`](vanguard-report-template.md).
 4. Only then apply `agent-tested` and approve / queue.
 
 Hard exit checklist:
@@ -298,9 +298,7 @@ Expected steady state:
 
 ---
 
-## 13. ARC runners (GitHub Actions on ghost)
-
-ARC (Actions Runner Controller) provides self-hosted GitHub Actions runners.
+## 11. ARC runners (GitHub Actions on ghost)
 When no jobs are queued, `arc-runners` namespace is empty — that is correct.
 Runners are ephemeral and only exist while a job is running.
 
@@ -337,9 +335,7 @@ installed on the `projectbluefin` org. Credentials in `arc-github-secret`
 
 ---
 
-## 11. Discover live cluster facts — do not trust stale docs
-
-| Fact | Command |
+## 12. Discover live cluster facts — do not trust stale docs
 |---|---|
 | SSH key fingerprint | `kubernetes-mcp-resources_get` the `bluefin-test-ssh-key` Secret, decode `.data.id_ed25519.pub`, then run `ssh-keygen -lf -` locally |
 | Live WorkflowTemplate body | `argo-mcp-get_workflow_template <name>` |
@@ -349,7 +345,7 @@ installed on the `projectbluefin` org. Credentials in `arc-github-secret`
 
 ---
 
-## 12. llm-d hive node — local model inference
+## 13. llm-d hive node — local model inference
 
 Ghost runs an OpenAI-compatible inference server at **`http://192.168.1.102:30800`**.
 Model: `Qwen/Qwen3.6-35B-A3B` Q4_K_M GGUF via `ghcr.io/ggml-org/llama.cpp:server-rocm` (~60 tok/s, gfx1151).

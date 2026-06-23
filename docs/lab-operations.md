@@ -37,7 +37,7 @@ The normal operator path is now **fresh-VM only**. Persistent titan recovery flo
 
 | Goal | Preferred path |
 |---|---|
-| Validate a smoke test or step change | `just run-tests-tag latest` |
+| Validate a smoke test or step change | `just run-tests-tag testing` |
 | Validate atomic OS contract checks | Use Argo MCP to submit `bluefin-qa-pipeline` with `suites=system` |
 | Validate developer or software suites | Use Argo MCP to submit `bluefin-qa-pipeline` with `suites=developer` or `suites=software` |
 | Validate a golden-disk or image change | `just ensure-disk <tag>` then `just run-tests-tag <tag>` |
@@ -261,7 +261,7 @@ After rotation:
 
 ## 9. PR queue mode
 
-1. Run the minimum required lab loop (`just run-tests-tag latest`; use `just run-tests-matrix` for high-risk work).
+1. Run the minimum required lab loop (`just run-tests-tag testing`; use `just run-tests-matrix` for high-risk work).
 2. Collect workflow names, behave summaries, and log excerpts via MCP.
 3. Post [`vanguard-report-template.md`](vanguard-report-template.md) as a PR comment with real evidence.
 4. Only then label / approve / queue.
