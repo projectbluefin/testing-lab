@@ -371,6 +371,36 @@ spec:
                 > \"\${ETC}/systemd/system.conf.d/10-device-timeout.conf\"
               echo '[INNER] set DefaultDeviceTimeoutSec=5 via drop-in'
 
+              # ── EFI BOOT fallback ──────────────────────────────────────────────
+              # OVMF (used by KubeVirt) has ephemeral NVRAM — no persistent boot entries.
+              # It falls back to /EFI/BOOT/BOOTX64.EFI on the EFI partition.
+              # Fedora bootc creates this fallback; RHEL10/el10 bootc only creates
+              # /EFI/redhat/ — OVMF never finds the bootloader and the VM hangs.
+              # Fix: mount p1 (EFI) and copy shim there if not already present.
+              mkdir -p /tmp/efi-part
+              if mount \"\${LOOP}p1\" /tmp/efi-part 2>/dev/null; then
+                echo '[INNER] EFI dirs:' && ls /tmp/efi-part/EFI/ 2>/dev/null || true
+                if [[ ! -f /tmp/efi-part/EFI/BOOT/BOOTX64.EFI ]]; then
+                  echo '[INNER] No /EFI/BOOT/BOOTX64.EFI — creating OVMF fallback'
+                  mkdir -p /tmp/efi-part/EFI/BOOT
+                  SHIM_SRC=\$(find /tmp/efi-part/EFI -name 'shimx64.efi' -o -name 'shim.efi' 2>/dev/null | head -1)
+                  GRUB_SRC=\$(find /tmp/efi-part/EFI -name 'grubx64.efi' 2>/dev/null | head -1)
+                  EFI_SRC=\"\${SHIM_SRC:-\${GRUB_SRC:-}}\"
+                  if [[ -n \"\${EFI_SRC}\" ]]; then
+                    cp \"\${EFI_SRC}\" /tmp/efi-part/EFI/BOOT/BOOTX64.EFI
+                    echo \"[INNER] Copied \${EFI_SRC} -> /EFI/BOOT/BOOTX64.EFI\"
+                  else
+                    echo '[INNER] WARNING: no shim or grubx64.efi found — OVMF may not find bootloader'
+                  fi
+                else
+                  echo '[INNER] /EFI/BOOT/BOOTX64.EFI already exists'
+                fi
+                sync
+                umount /tmp/efi-part
+              else
+                echo '[INNER] WARNING: could not mount EFI partition (p1) — skipping BOOTX64.EFI check'
+              fi
+
               # ── Key injection ──────────────────────────────────────────────────
               # btrfs subvolume list returns EMPTY for this bootc layout — there are no
               # named subvolumes. ostree/deploy/<stateroot>/var/ IS the real /var content.
@@ -465,6 +495,15 @@ spec:
             # The inner container's hard umount already committed all writes.
             btrfs filesystem sync /mnt/verify 2>/dev/null || true
             umount /mnt/verify
+            echo "[VERIFY] EFI BOOT fallback:"
+            mkdir -p /mnt/verify-efi
+            if mount "${VL}p1" /mnt/verify-efi 2>/dev/null; then
+              ls /mnt/verify-efi/EFI/ 2>/dev/null || echo "(no EFI dir)"
+              ls -la /mnt/verify-efi/EFI/BOOT/BOOTX64.EFI 2>/dev/null || echo "MISSING: /EFI/BOOT/BOOTX64.EFI not found"
+              umount /mnt/verify-efi
+            else
+              echo "(could not mount EFI partition)"
+            fi
           else
             echo "[VERIFY] ERROR: could not mount btrfs partition from raw disk"
           fi
