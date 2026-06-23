@@ -278,7 +278,7 @@ spec:
               echo '[INNER] etc/ config done'
 
               # SSH authorized_keys for bluefin-test.
-              # Per bootc filesystem docs: /var is bound from /ostree/deploy/$stateroot/var
+              # Per bootc filesystem docs: /var is bound from /ostree/deploy/\$stateroot/var
               # NOT a top-level btrfs subvolume. Access it directly via the mounted btrfs root.
               STATEROOT=\$(ls /tmp/installed/ostree/deploy/ 2>/dev/null | head -1)
               HOME_DIR=\"/tmp/installed/ostree/deploy/\${STATEROOT}/var/home/bluefin-test\"
