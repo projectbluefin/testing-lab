@@ -59,10 +59,6 @@ spec:
           - name: vm-name
           - name: namespace
       outputs: {}
-      tolerations:
-        - key: node-role.kubernetes.io/gaming
-          operator: Exists
-          effect: NoSchedule
       resource:
         action: apply
         manifest: |
@@ -115,12 +111,6 @@ spec:
           - name: image-tag
           - name: vm-name
           - name: namespace
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      tolerations:
-        - key: node-role.kubernetes.io/gaming
-          operator: Exists
-          effect: NoSchedule
       outputs: {}
       podSpecPatch: |
         hostNetwork: true

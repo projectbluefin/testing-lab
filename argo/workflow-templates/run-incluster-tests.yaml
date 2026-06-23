@@ -97,10 +97,6 @@ spec:
         bluefin.io/step: run-incluster-tests
         bluefin.io/suite: '{{inputs.parameters.suite-path}}'
     name: run-pytest
-    tolerations:
-      - key: node-role.kubernetes.io/gaming
-        operator: Exists
-        effect: NoSchedule
     volumes:
     - emptyDir: {}
       name: workspace
