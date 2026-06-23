@@ -229,7 +229,6 @@ spec:
               echo '[INNER] post-install loop: '\${LOOP}
 
               cleanup() {
-                umount /tmp/btvar 2>/dev/null || true
                 umount /tmp/installed 2>/dev/null || true
                 losetup -d \"\${LOOP}\" 2>/dev/null || true
               }
@@ -279,10 +278,10 @@ spec:
               echo '[INNER] etc/ config done'
 
               # SSH authorized_keys for bluefin-test.
-              # var IS a btrfs subvolume — mount it explicitly to reach live inodes.
-              mkdir -p /tmp/btvar
-              mount -t btrfs -o subvol=var \"\${LOOP}p3\" /tmp/btvar
-              HOME_DIR=\"/tmp/btvar/home/bluefin-test\"
+              # Per bootc filesystem docs: /var is bound from /ostree/deploy/$stateroot/var
+              # NOT a top-level btrfs subvolume. Access it directly via the mounted btrfs root.
+              STATEROOT=\$(ls /tmp/installed/ostree/deploy/ 2>/dev/null | head -1)
+              HOME_DIR=\"/tmp/installed/ostree/deploy/\${STATEROOT}/var/home/bluefin-test\"
               mkdir -p \"\${HOME_DIR}/.ssh\"
               printf '%s\n' \"\${SSH_AUTHORIZED_KEYS}\" > \"\${HOME_DIR}/.ssh/authorized_keys\"
               chmod 700 \"\${HOME_DIR}/.ssh\"
