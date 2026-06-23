@@ -136,14 +136,6 @@ spec:
         securityContext:
           privileged: true
           runAsUser: 0
-          # spc_t (super-privileged container) is required for has_cap_mac_admin() to return true
-          # inside the inner podman container. container_t (containerd default for privileged pods)
-          # does NOT have capability2 mac_admin in Fedora policy → fsetxattr(security.selinux) EINVAL
-          # propagates even with --cap-add=CAP_MAC_ADMIN + --security-opt label=disable.
-          # With spc_t on the outer pod, --security-opt label=disable in the inner podman inherits
-          # spc_t → has_cap_mac_admin passes both kernel cap + SELinux AVC checks → EINVAL absorbed.
-          seLinuxOptions:
-            type: spc_t
         resources:
           requests:
             cpu: "4"
@@ -198,7 +190,6 @@ spec:
           # Pull image — lands in /var/lib/containers/storage (ghost SSD).
           podman pull --tls-verify=true "${IMAGE}"
 
-          echo "Starting bootc install (via-loopback)..."
           echo "[OUTER] SSH_AUTHORIZED_KEYS prefix: ${SSH_AUTHORIZED_KEYS:0:30}..."
 
           # Write key to a staging file for --root-ssh-authorized-keys.
@@ -206,29 +197,33 @@ spec:
           # most reliable mechanism (no post-install ostree-etc-merge concerns).
           echo "${SSH_AUTHORIZED_KEYS}" > "${STAGING}/root-ssh-keys"
 
-          echo "[OUTER-DIAG] SELinux context: $(cat /proc/self/attr/current 2>/dev/null || echo 'unavailable')"
+          # fsetxattr EINVAL fix for cross-policy LTS builds:
+          # unconfined_service_t lacks capability2 mac_admin in Bluefin's SELinux policy
+          # (confirmed: setfattr with unknown label → EINVAL from outer pod context).
+          # seLinuxOptions + --security-opt label=type:spc_t both failed — k3s assigns
+          # unconfined_service_t regardless. LD_PRELOAD wrapper intercepts
+          # fsetxattr(security.*) EINVAL → ENOTSUP; libglnx skips ENOTSUP silently.
+          dnf install -y gcc 2>&1 | tail -2
+          printf '%s\n' \
+            '#define _GNU_SOURCE' \
+            '#include <dlfcn.h>' \
+            '#include <string.h>' \
+            '#include <errno.h>' \
+            '#include <stddef.h>' \
+            'typedef int (*fn_t)(int,const char*,const void*,size_t,int);' \
+            'int fsetxattr(int fd,const char*n,const void*v,size_t s,int f){' \
+            '  static fn_t real;' \
+            '  if(!real)real=(fn_t)dlsym(RTLD_NEXT,"fsetxattr");' \
+            '  int r=real(fd,n,v,s,f);' \
+            '  if(r==-1&&errno==EINVAL&&n&&strncmp(n,"security.",9)==0)errno=ENOTSUP;' \
+            '  return r;}' \
+            > /tmp/fsetxattr_wrap.c
+          gcc -shared -fPIC -o "${STAGING}/fsetxattr_wrapper.so" /tmp/fsetxattr_wrap.c -ldl
+          echo "[OUTER] fsetxattr wrapper compiled: $(ls -lh "${STAGING}/fsetxattr_wrapper.so")"
 
-          # Ref: bootc install docs — use --via-loopback for VM disk creation.
-          # Cross-policy fsetxattr(security.selinux) EINVAL fix:
-          # The kernel's selinux_inode_setxattr hook validates label types against the
-          # host's in-memory policy. When building bluefin-lts on a bluefin host, the lts
-          # image may contain label types absent from the host policy → EINVAL.
-          # selinux_inode_setxattr calls has_cap_mac_admin() which requires BOTH:
-          #   1. cap_capable(cred, &init_user_ns, CAP_MAC_ADMIN, ...) — kernel cap (passes w/ privileged)
-          #   2. cred_has_capability(cred, CAP_MAC_ADMIN, ...) — SELinux AVC check for
-          #      capability2 { mac_admin } in the running container's SELinux TYPE
-          # Diagnostic (commit 12a9986) confirmed the inner container runs as unconfined_service_t,
-          # which lacks capability2 mac_admin in Fedora/Bluefin policy.
-          # seLinuxOptions.type=spc_t on the outer pod did not propagate to the inner container —
-          # either k3s/containerd does not apply seLinuxOptions, or an exec transition overrides it.
-          # Fix: --security-opt label=type:spc_t explicitly sets the inner container's SELinux type
-          # to spc_t, which has capability2 mac_admin → has_cap_mac_admin returns true → EINVAL
-          # absorbed → unknown label types forced to unlabeled_t (fine; VM boots with selinux=0).
-          # Ref: kernel security/selinux/hooks.c has_cap_mac_admin(); bootc-dev/bootc#279
           PODMAN_EXIT=0
           podman run --rm --privileged --pid=host --ipc=host \
-            --cap-add=CAP_MAC_ADMIN \
-            --security-opt label=type:spc_t \
+            -e LD_PRELOAD=/output/fsetxattr_wrapper.so \
             -v /dev:/dev \
             -v /run/udev:/run/udev \
             -v "${STAGING}:/output" \
@@ -239,8 +234,7 @@ spec:
               set -euo pipefail
 
               echo \"[INNER] SSH_AUTHORIZED_KEYS prefix: \${SSH_AUTHORIZED_KEYS:0:30}...\"
-              echo \"[INNER-DIAG] SELinux context: \$(cat /proc/self/attr/current 2>/dev/null || echo 'unavailable')\"
-              echo \"[INNER-DIAG] CapEff: \$(grep CapEff /proc/self/status | awk '{print \$2}')\"
+              echo \"[INNER] LD_PRELOAD: \${LD_PRELOAD:-unset}\"
 
               # --via-loopback: upstream recommended pattern for VM disk creation.
               # --root-ssh-authorized-keys: bootc-native root SSH key injection —
