@@ -1,7 +1,8 @@
 """
-Developer test environment — qecore TestSandbox for Bluefin developer tools.
+Developer test environment — qecore TestSandbox for Ptyxis + micro + Podman Desktop.
 
 AT-SPI app names confirmed in tests/developer/conftest.py:
+  - Ptyxis: root.application("ptyxis")
   - Podman Desktop: root.application("Podman Desktop")  (Flatpak, check at runtime)
 
 Pattern: modehnal/GNOMETerminalAutomation features/environment.py
@@ -17,9 +18,16 @@ from qecore.common_steps import *  # noqa: F401,F403
 
 def before_all(context) -> None:
     try:
-        context.sandbox = TestSandbox("developer", context=context)
+        context.sandbox = TestSandbox("ptyxis", context=context)
         context.sandbox.attach_faf = False
         context.sandbox.production = False
+
+        context.ptyxis = context.sandbox.get_application(
+            name="ptyxis",
+            a11y_app_name="ptyxis",
+            desktop_file_name="org.gnome.Ptyxis.desktop",
+        )
+        context.ptyxis.exit_shortcut = "<Alt>F4"
 
         # micro is launched via terminal, not registered as a standalone app
 
@@ -38,7 +46,7 @@ def before_all(context) -> None:
         return
 
     # Podman Desktop is optional — absence must not block other developer tests
-    # (brew, devmode, distrobox). Tests tagged @podman_desktop are
+    # (brew, ptyxis, devmode, distrobox). Tests tagged @podman_desktop are
     # skipped via before_scenario when this is None.
     try:
         context.podman_desktop = context.sandbox.get_flatpak(
