@@ -45,6 +45,6 @@ spec:
         - name: namespace
           value: "bluefin-test"
         - name: suites
-          value: "smoke,developer"
+          value: "smoke,developer,system"
         - name: ssh-key-secret
           value: "bluefin-test-ssh-key"
