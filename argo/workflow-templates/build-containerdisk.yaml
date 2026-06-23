@@ -357,6 +357,35 @@ spec:
 
           # Clean up any leftover loop devices for this file
           losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
+
+          # Verify post-install writes persisted to raw disk before conversion.
+          # This mounts the btrfs from the OUTER script to confirm inner-container
+          # writes made it through to the backing file.
+          echo "--- Verifying post-install writes in raw disk (outer mount) ---"
+          VL=$(losetup -f --show -P "${DISK}")
+          echo "[VERIFY] loop: ${VL}"
+          partprobe "${VL}" 2>/dev/null || true
+          sleep 1
+          mkdir -p /mnt/verify
+          if mount -t btrfs "${VL}p3" /mnt/verify; then
+            VDP=$(find /mnt/verify/ostree/deploy/*/deploy/ \
+              -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+            echo "[VERIFY] deploy: ${VDP}"
+            echo "[VERIFY] 10-test.conf:"
+            cat "${VDP}/etc/ssh/sshd_config.d/10-test.conf" 2>&1 || echo "MISSING"
+            echo "[VERIFY] authorized_keys/root:"
+            cat "${VDP}/etc/ssh/authorized_keys/root" 2>&1 || echo "MISSING"
+            echo "[VERIFY] var/roothome/.ssh:"
+            ls -la /mnt/verify/ostree/deploy/default/var/roothome/.ssh/ 2>&1 || echo "MISSING"
+            # Force btrfs commit so qemu-img convert sees clean filesystem
+            btrfs filesystem sync /mnt/verify
+            umount /mnt/verify
+          else
+            echo "[VERIFY] ERROR: could not mount btrfs partition from raw disk"
+          fi
+          losetup -d "${VL}" 2>/dev/null || true
+          echo "--- Verification done ---"
+
           chown 107:107 "${DISK}"
 
           echo "Cleaning containers storage after build..."
