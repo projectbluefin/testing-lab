@@ -307,10 +307,14 @@ spec:
               # Bluefin/Fedora may use either; enabling both ensures sshd starts.
               mkdir -p \"\${ETC}/systemd/system/multi-user.target.wants\"
               ln -sf /usr/lib/systemd/system/sshd.service \
-                \"\${ETC}/systemd/system/multi-user.target.wants/sshd.service\" || true
+                \"\${ETC}/systemd/system/multi-user.target.wants/sshd.service\" \
+                && echo '[INNER] sshd.service symlink created' \
+                || echo '[INNER] WARNING: sshd.service symlink failed'
               mkdir -p \"\${ETC}/systemd/system/sockets.target.wants\"
               ln -sf /usr/lib/systemd/system/sshd.socket \
-                \"\${ETC}/systemd/system/sockets.target.wants/sshd.socket\" || true
+                \"\${ETC}/systemd/system/sockets.target.wants/sshd.socket\" \
+                && echo '[INNER] sshd.socket symlink created' \
+                || echo '[INNER] WARNING: sshd.socket symlink failed'
               mkdir -p \"\${ETC}/ssh/sshd_config.d\"
               # Note: 'UsePAM no' is NOT supported in this Fedora openssh build.
               # Use PermitRootLogin yes (most permissive) to allow root pubkey auth.
@@ -421,8 +425,12 @@ spec:
             cat "${VDP}/etc/ssh/sshd_config.d/10-test.conf" 2>&1 || echo "MISSING"
             echo "[VERIFY] authorized_keys/root:"
             cat "${VDP}/etc/ssh/authorized_keys/root" 2>&1 || echo "MISSING"
+            echo "[VERIFY] sshd wants symlinks:"
+            ls -la "${VDP}/etc/systemd/system/multi-user.target.wants/sshd.service" 2>&1 || echo "MISSING: sshd.service symlink not found"
+            ls -la "${VDP}/etc/systemd/system/sockets.target.wants/sshd.socket" 2>&1 || echo "MISSING: sshd.socket symlink not found"
             echo "[VERIFY] var/roothome/.ssh:"
-            ls -la /mnt/verify/ostree/deploy/default/var/roothome/.ssh/ 2>&1 || echo "MISSING"
+            STATEROOT_V=$(ls /mnt/verify/ostree/deploy/ 2>/dev/null | head -1)
+            ls -la /mnt/verify/ostree/deploy/${STATEROOT_V}/var/roothome/.ssh/ 2>&1 || echo "MISSING"
             # Best-effort sync; btrfs-progs may not be in the outer pod image.
             # The inner container's hard umount already committed all writes.
             btrfs filesystem sync /mnt/verify 2>/dev/null || true
