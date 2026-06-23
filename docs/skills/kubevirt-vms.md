@@ -7,6 +7,7 @@ description: >
 metadata:
   context7-sources:
     - /kubevirt/kubevirt
+    - /kubevirt/user-guide
     - /kubevirt/containerized-data-importer
 ---
 
@@ -76,7 +77,47 @@ skopeo inspect --tls-verify=false docker://192.168.1.102:30500/bluefin-container
 k3s restart — the manifest index goes to 0 bytes even though blobs may still exist. Always
 check before running the pipeline; rebuild if the index is empty.
 
-### 2a. Bluefin btrfs disk layout (bootc install to-disk output)
+### 2a. Native bootc OCI boot — what is and isn't possible
+
+**KubeVirt cannot boot a bootc OCI image directly without disk preparation.** This is a hard
+constraint of the current KubeVirt architecture. Summary of what was verified:
+
+**What the bootc OCI image contains (verified on `bluefin:testing`):**
+- Kernel: `/usr/lib/modules/<version>/vmlinuz`  (e.g. `7.0.12-201.fc44.x86_64`)
+- Initramfs: `/usr/lib/modules/<version>/initramfs.img`
+- These paths are accessible via `KubeVirt kernelBoot.container`
+
+**Why `kernelBoot.container` alone is not enough:**
+- `kernelBoot.container` extracts kernel + initramfs from an OCI image and passes them to QEMU
+  as `-kernel`/`-initrd` — it does NOT provide a root filesystem
+- The bootc/ostree initramfs requires `root=UUID=<uuid>` and `ostree=/ostree/boot.1/default/<hash>/0`
+  — both set by `bootc install to-disk` at disk creation time
+- Without an ostree-deployed root disk the VM fails to mount `/` and panics
+
+**Why `containerDisk` cannot use the raw bootc OCI image:**
+- KubeVirt `containerDisk` expects a disk image file at `/disk/` inside the OCI image (raw or qcow2)
+- A bootc OCI image contains OS filesystem layers, not a disk image — KubeVirt rejects it
+- CDI `DataVolume` registry source has the same constraint
+
+**Verified boot cmdline structure (reference for debugging):**
+```
+BOOT_IMAGE=(hd0,gpt3)/boot/ostree/default-<hash>/vmlinuz-7.0.12-201.fc44.x86_64
+root=UUID=<disk-uuid> rw selinux=0 ostree=/ostree/boot.1/default/<hash>/0
+```
+
+**The minimum required disk prep is `bootc install to-disk`.** This can be done:
+1. As a pre-built containerdisk (current: BIB pipeline → Zot → containerDisk) — schedulable on any node
+2. Inline in the workflow: `bootc install to-disk /path/to/disk.raw` → `hostDisk` — ghost-local only
+
+**Diagnosing kernel/initramfs paths in a running VM (guest-agent):**
+```bash
+kubectl exec -n <ns> <virt-launcher-pod> -c compute -- \
+  virsh qemu-agent-command 1 \
+  '{"execute":"guest-exec","arguments":{"path":"cat","arg":["/proc/cmdline"],"capture-output":true}}'
+# Decode result: base64 -d <<< <out-data>
+```
+
+### 2b_btrfs. Bluefin btrfs disk layout (bootc install to-disk output)
 
 `bootc install to-disk` creates:
 - `p1` = BIOS boot (1M)

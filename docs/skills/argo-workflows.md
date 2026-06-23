@@ -306,6 +306,67 @@ spec:
     secondsAfterFailure: 604800    # 7d for failed runs (matches controller configmap)
 ```
 
+### 14. Decoupling slow build steps from test pipelines (image-sync pattern)
+
+Any pipeline step that conditionally runs a slow build (BIB, compilation, disk conversion)
+belongs in a **separate CronWorkflow**, not inline in the test pipeline. The test pipeline
+asserts the artifact exists and fails fast — it never triggers a rebuild.
+
+**Two-component design:**
+
+```
+[digest-watch CronWorkflow, every 5 min]
+  step 1 (curl): GET current GHCR image digest (cheap — single HTTP HEAD, ~100ms)
+  step 2 (kubectl): GET stored digest from ConfigMap containerdisk-source-digests
+  match?    → exit 0 (skip)
+  mismatch? → PATCH ConfigMap with new digest (claim it)
+              kubectl apply Workflow from workflowtemplate/build-containerdisk (async)
+
+[test pipeline (bluefin-qa-pipeline)]
+  assert-cd: skopeo inspect Zot → tag exists? → proceed
+                                → missing?  → exit 1 "containerdisk not ready"
+```
+
+**Rules:**
+- Digest watch uses `curl` + GHCR anonymous token (no skopeo, no image pull):
+  ```bash
+  TOKEN=$(curl -sL "https://ghcr.io/token?scope=repository:projectbluefin/bluefin:pull" \
+    | sed 's/.*"token":"\([^"]*\)".*/\1/')
+  DIGEST=$(curl -sI -H "Authorization: Bearer ${TOKEN}" \
+    -H "Accept: application/vnd.oci.image.index.v1+json" \
+    "https://ghcr.io/v2/projectbluefin/bluefin/manifests/testing" \
+    | grep -i docker-content-digest | awk '{print $2}' | tr -d '\r\n')
+  ```
+- The ConfigMap (`containerdisk-source-digests`) stores **GHCR source digests**, not Zot
+  containerdisk digests — the two images are different (source bootc OCI vs BIB-built qcow2 OCI)
+- ConfigMap is patched by the workflow, NOT managed by ArgoCD. Do not put it in `manifests/`.
+  Create it in the first workflow run via `kubectl create configmap ... || kubectl patch ...`
+- Submitting a build via `kubectl apply` (not `argo submit` CLI, no extra image dependency):
+  ```bash
+  cat > /tmp/build.yaml << EOF
+  apiVersion: argoproj.io/v1alpha1
+  kind: Workflow
+  metadata:
+    generateName: build-cd-sync-
+    namespace: argo
+  spec:
+    workflowTemplateRef:
+      name: build-containerdisk
+    arguments:
+      parameters:
+      - name: image
+        value: "${IMAGE}"
+  EOF
+  kubectl apply -f /tmp/build.yaml
+  ```
+- `assert-cd` in the test pipeline uses the existing `build-containerdisk/check` template
+  but must **exit 1 on missing**, not just output `"missing"` (the original `check` template
+  is non-failing — write a new `assert` template that calls skopeo and fails on empty result)
+
+**Why ConfigMap over Zot annotation:**
+- Zot annotations require `oras` tooling to set post-push; ConfigMap needs only `kubectl`
+- The ConfigMap stores the *source* digest, not the containerdisk digest — conceptually different
+
 ## Common Rationalizations
 
 | Rationalization | Reality |
