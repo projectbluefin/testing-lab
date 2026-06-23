@@ -6,7 +6,7 @@ metadata:
   annotations:
     description: |
       Build a KubeVirt containerDisk from a bootc image.
-      Flow: check (zot existence) → install-to-disk → configure-disk → convert-and-push
+      Flow: check (zot existence) → install-to-disk → convert-and-push
       Replaces bib-build-and-push + golden-disk hostDisk approach.
       All build steps are pinned to ghost (loop devices + /var/mnt/ghost-data staging).
 spec:
@@ -53,16 +53,8 @@ spec:
                 - name: containerdisk-tag
                   value: "{{inputs.parameters.containerdisk-tag}}"
 
-          - name: configure-disk
-            depends: install-to-disk.Succeeded
-            template: configure-disk
-            arguments:
-              parameters:
-                - name: containerdisk-tag
-                  value: "{{inputs.parameters.containerdisk-tag}}"
-
           - name: convert-and-push
-            depends: configure-disk.Succeeded
+            depends: install-to-disk.Succeeded || install-to-disk.Skipped
             template: convert-and-push
             arguments:
               parameters:
@@ -146,6 +138,12 @@ spec:
           limits:
             cpu: "8"
             memory: 16Gi
+        env:
+          - name: SSH_AUTHORIZED_KEYS
+            valueFrom:
+              secretKeyRef:
+                name: bluefin-test-ssh-key
+                key: id_ed25519.pub
         volumeMounts:
           - name: dev
             mountPath: /dev
@@ -170,6 +168,9 @@ spec:
 
           truncate -s 15G "${DISK}"
 
+          # Write SSH public key to staging so bootc can read it inside the container.
+          printf '%s\n' "${SSH_AUTHORIZED_KEYS}" > "${STAGING}/authorized_keys"
+
           # Configure podman storage to use the staging hostPath (large NVMe) instead of
           # ephemeral pod storage, which would be evicted when pull fills it with ~5GB of layers.
           mkdir -p /mnt/staging/podman-storage
@@ -183,12 +184,10 @@ spec:
           # Configure cgroupfs to avoid systemd cgroup manager conflict in k8s.
           printf '[engine]\ncgroup_manager = "cgroupfs"\n' > /etc/containers/containers.conf
 
-          echo "[DIAG] pre-podman disk: $(ls -la ${DISK} 2>&1)"
-          echo "[DIAG] mounts under /mnt: $(mount | grep '/mnt' 2>/dev/null || echo none)"
-
           # Run bootc install to-disk inside the Bluefin container via podman.
-          # Key: the inner container creates its OWN loop device with --partscan (-P).
-          # Mount staging to /var/tmp/disk-staging — /mnt may not exist in the Bluefin OCI image.
+          # --disable-selinux: bootc-native flag, no disk patching needed.
+          # --root-ssh-authorized-keys: bootc-native injection via systemd tmpfiles.d.
+          # --karg=selinux=0: belt-and-suspenders alongside --disable-selinux.
           PODMAN_EXIT=0
           podman run --rm --privileged --pid=host \
             -v /dev:/dev \
@@ -197,26 +196,96 @@ spec:
             "${IMAGE}" \
             bash -c "
               set -euo pipefail
-              echo '[INNER] disk-staging contents: '\$(ls -la /var/tmp/disk-staging/ 2>&1)
               LOOP=\$(losetup -f --show -P /var/tmp/disk-staging/disk.raw)
               echo '[INNER] loop: '\${LOOP}
-              trap 'losetup -d \"\${LOOP}\" 2>/dev/null || true' EXIT
+
+              cleanup() {
+                umount /mnt/btvar 2>/dev/null || true
+                umount /mnt/installed 2>/dev/null || true
+                losetup -d \"\${LOOP}\" 2>/dev/null || true
+              }
+              trap cleanup EXIT
+
               bootc install to-disk \
                 --generic-image \
                 --filesystem=btrfs \
                 --source-imgref 'docker://${IMAGE}' \
                 --target-no-signature-verification \
+                --disable-selinux \
+                --karg=selinux=0 \
+                --root-ssh-authorized-keys /var/tmp/disk-staging/authorized_keys \
                 \"\${LOOP}\"
+
+              # Post-install: configure test user, GDM autologin, and sshd.
+              # Still inside the Bluefin container — btrfs-progs are available.
+              # LOOP is still attached; bootc does not detach a loop we created.
+              #
+              # qecore-headless starts/stops GDM and requires autologin to be
+              # configured for a non-root user before tests can run.
+              # Ref: gitlab.com/dogtail/qecore README.
+
+              mkdir -p /mnt/installed
+              mount -t btrfs \"\${LOOP}p3\" /mnt/installed
+
+              DEPLOY=\$(find /mnt/installed/ostree/deploy/*/deploy/ \
+                -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
+              if [[ -z \"\${DEPLOY}\" ]]; then
+                echo '[INNER] ERROR: ostree deploy path not found' >&2
+                exit 1
+              fi
+              echo '[INNER] deploy: '\${DEPLOY}
+              ETC=\"\${DEPLOY}/etc\"
+
+              # User: bluefin-test (uid/gid 1001)
+              grep -q '^bluefin-test:' \"\${ETC}/passwd\" 2>/dev/null || \
+                echo 'bluefin-test:x:1001:1001:Test User:/var/home/bluefin-test:/bin/bash' \
+                  >> \"\${ETC}/passwd\"
+              grep -q '^bluefin-test:' \"\${ETC}/shadow\" 2>/dev/null || \
+                echo 'bluefin-test:!:19000:0:99999:7:::' >> \"\${ETC}/shadow\"
+              grep -q '^bluefin-test:' \"\${ETC}/group\" 2>/dev/null || \
+                echo 'bluefin-test:x:1001:' >> \"\${ETC}/group\"
+              sed -i 's/^\(wheel:x:10:.*\)$/\1,bluefin-test/' \"\${ETC}/group\" 2>/dev/null || true
+
+              # GDM autologin — required by qecore-headless
+              mkdir -p \"\${ETC}/gdm\"
+              printf '[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=bluefin-test\n' \
+                > \"\${ETC}/gdm/custom.conf\"
+
+              # sshd: enable + permit key auth
+              mkdir -p \"\${ETC}/systemd/system/multi-user.target.wants\"
+              ln -sf /usr/lib/systemd/system/sshd.service \
+                \"\${ETC}/systemd/system/multi-user.target.wants/sshd.service\" || true
+              mkdir -p \"\${ETC}/ssh/sshd_config.d\"
+              printf 'PubkeyAuthentication yes\nStrictModes no\n' \
+                > \"\${ETC}/ssh/sshd_config.d/10-test.conf\"
+
+              # sudoers
+              mkdir -p \"\${ETC}/sudoers.d\"
+              printf 'bluefin-test ALL=(ALL) NOPASSWD:ALL\n' \
+                > \"\${ETC}/sudoers.d/bluefin-test\"
+              chmod 440 \"\${ETC}/sudoers.d/bluefin-test\"
+
+              echo '[INNER] etc/ config done'
+
+              # SSH authorized_keys for bluefin-test.
+              # var IS a btrfs subvolume — mount it explicitly to reach live inodes.
+              mkdir -p /mnt/btvar
+              mount -t btrfs -o subvol=var \"\${LOOP}p3\" /mnt/btvar
+              HOME_DIR=\"/mnt/btvar/home/bluefin-test\"
+              mkdir -p \"\${HOME_DIR}/.ssh\"
+              cp /var/tmp/disk-staging/authorized_keys \"\${HOME_DIR}/.ssh/authorized_keys\"
+              chmod 700 \"\${HOME_DIR}/.ssh\"
+              chmod 600 \"\${HOME_DIR}/.ssh/authorized_keys\"
+              chown -R 1001:1001 \"\${HOME_DIR}\"
+              echo '[INNER] SSH keys injected for bluefin-test'
+
+              # trap cleanup EXIT: umount btvar, umount installed, losetup -d
             " || PODMAN_EXIT=$?
 
           echo "[DIAG] podman exit=${PODMAN_EXIT}"
-          echo "[DIAG] post-podman disk: $(ls -la ${DISK} 2>&1)"
-          echo "[DIAG] mounts under /mnt: $(mount | grep '/mnt' 2>/dev/null || echo none)"
 
           if [[ "${PODMAN_EXIT}" -ne 0 ]]; then
-            # bootc#2246: check ALLOCATED blocks (not logical size — sparse file is always 15G).
             ALLOCATED=$(stat -c%b "${DISK}" 2>/dev/null || echo 0)
-            echo "[DIAG] allocated blocks=${ALLOCATED}"
             if [[ "${ALLOCATED}" -gt 0 ]]; then
               echo "WARNING: bootc exited ${PODMAN_EXIT} but disk has ${ALLOCATED} allocated blocks (bootc#2246) — continuing"
               umount -l /mnt 2>/dev/null || true
@@ -229,183 +298,9 @@ spec:
 
           # Clean up any leftover loop devices for this file
           losetup -j "${DISK}" | awk -F: '{print $1}' | xargs -r losetup -d
+          rm -f "${STAGING}/authorized_keys"
           chown 107:107 "${DISK}"
-          echo "install-to-disk complete: ${DISK} ($(stat -c%s "${DISK}") bytes)"
-
-    # ─── configure-disk ───────────────────────────────────────────────────────
-    # Loop-mounts the raw disk and injects test user, SSH, GDM autologin, sudoers,
-    # and selinux=0 into the ostree deploy. gnome-ponytail-daemon is NOT injected
-    # here — run-gnome-tests installs it at runtime via ostree admin unlock.
-
-    - name: configure-disk
-      inputs:
-        parameters:
-          - name: containerdisk-tag
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      volumes:
-        - name: dev
-          hostPath:
-            path: /dev
-        - name: staging
-          hostPath:
-            path: /var/mnt/ghost-data/bluefin-cd-build
-            type: DirectoryOrCreate
-      script:
-        image: registry.access.redhat.com/ubi9/ubi:9.5
-        command: [bash]
-        securityContext:
-          privileged: true
-          runAsUser: 0
-        resources:
-          requests:
-            cpu: "2"
-            memory: 4Gi
-          limits:
-            cpu: "4"
-            memory: 8Gi
-        env:
-          - name: SSH_AUTHORIZED_KEYS
-            valueFrom:
-              secretKeyRef:
-                name: bluefin-test-ssh-key
-                key: id_ed25519.pub
-        volumeMounts:
-          - name: dev
-            mountPath: /dev
-          - name: staging
-            mountPath: /mnt/staging
-        source: |
-          set -euo pipefail
-          # util-linux (losetup) is pre-installed in ubi9; btrfs mount needs no extra packages.
-
-          TAG="{{inputs.parameters.containerdisk-tag}}"
-          DISK="/mnt/staging/${TAG}/disk.raw"
-
-          if [[ ! -f "${DISK}" ]]; then
-            echo "ERROR: disk not found: ${DISK}" >&2
-            exit 1
-          fi
-
-          LOOP=$(losetup -f --show "${DISK}")
-          echo "Loop: ${LOOP} for ${DISK}"
-          # Force kernel to enumerate partitions (losetup -P alone may not work in k8s /dev bind-mount)
-          partx -a "${LOOP}" 2>/dev/null || partx -u "${LOOP}" 2>/dev/null || true
-          sleep 0.5
-          echo "Partition devices: $(ls ${LOOP}p* 2>/dev/null || echo 'none')"
-
-          cleanup() {
-            umount /mnt/btvar 2>/dev/null || true
-            umount /mnt/btroot 2>/dev/null || true
-            losetup -d "${LOOP}" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
-          # bootc install to-disk creates: p1=BIOS(1M) p2=EFI(512M) p3=btrfs-root
-          # Bluefin btrfs layout: default root IS the system root (subvols: boot, ostree).
-          # There is no subvol named "root" — mount without subvol option.
-          mkdir -p /mnt/btroot
-          blkid "${LOOP}p3" || true
-          mount -t btrfs "${LOOP}p3" /mnt/btroot
-          echo "btrfs root contents: $(ls /mnt/btroot)"
-          echo "[DIAG] btrfs subvolumes:"
-          btrfs subvolume list /mnt/btroot 2>/dev/null || echo "[DIAG] btrfs cmd unavailable"
-          echo "[DIAG] var/ contents: $(ls /mnt/btroot/var/ 2>/dev/null | head -5 || echo EMPTY)"
-
-
-          # Locate the active ostree deploy directory (stateroot varies by image)
-          DEPLOY=$(find /mnt/btroot/ostree/deploy/*/deploy/ \
-            -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
-          if [[ -z "${DEPLOY}" ]]; then
-            echo "ERROR: ostree deploy path not found under /mnt/btroot/ostree/deploy/" >&2
-            exit 1
-          fi
-          echo "Deploy: ${DEPLOY}"
-
-          ETC="${DEPLOY}/etc"
-
-          # ── User: bluefin-test (uid/gid 1001) ────────────────────────────
-          if ! grep -q "^bluefin-test:" "${ETC}/passwd" 2>/dev/null; then
-            echo "bluefin-test:x:1001:1001:Bluefin Test User:/var/home/bluefin-test:/bin/bash" \
-              >> "${ETC}/passwd"
-          fi
-          if ! grep -q "^bluefin-test:" "${ETC}/shadow" 2>/dev/null; then
-            # Locked password (!) — SSH key auth only
-            echo "bluefin-test:!:19000:0:99999:7:::" >> "${ETC}/shadow"
-          fi
-          if ! grep -q "^bluefin-test:" "${ETC}/group" 2>/dev/null; then
-            echo "bluefin-test:x:1001:" >> "${ETC}/group"
-          fi
-          # Add bluefin-test to wheel group for sudo
-          sed -i 's/^\(wheel:x:10:.*\)$/\1,bluefin-test/' "${ETC}/group" 2>/dev/null || true
-
-          # ── SSH authorized_keys ───────────────────────────────────────────
-          # Bluefin btrfs: 'var' is a btrfs subvolume. Mounting the toplevel
-          # exposes ostree/deploy/*/var as dead inodes — writes never reach
-          # the live inode tree. Mount the subvolume explicitly.
-          mkdir -p /mnt/btvar
-          mount -t btrfs -o subvol=var "${LOOP}p3" /mnt/btvar
-          HOME_DIR="/mnt/btvar/home/bluefin-test"
-          mkdir -p "${HOME_DIR}/.ssh"
-          printf '%s\n' "${SSH_AUTHORIZED_KEYS}" > "${HOME_DIR}/.ssh/authorized_keys"
-          chmod 700 "${HOME_DIR}/.ssh"
-          chmod 600 "${HOME_DIR}/.ssh/authorized_keys"
-          chown -R 1001:1001 "${HOME_DIR}"
-          echo "SSH key injected: $(ls -la ${HOME_DIR}/.ssh/)"
-          umount /mnt/btvar
-
-          # ── sshd: enable + key auth config ───────────────────────────────
-          WANTS="${ETC}/systemd/system/multi-user.target.wants"
-          mkdir -p "${WANTS}"
-          ln -sf /usr/lib/systemd/system/sshd.service "${WANTS}/sshd.service" \
-            2>/dev/null || true
-
-          mkdir -p "${ETC}/ssh/sshd_config.d"
-          # StrictModes no: bypass file-permission checks (avoids SELinux context issues).
-          # PubkeyAuthentication yes: explicit — some distro configs override the default.
-          # AuthorizedKeysFile: explicit path relative to home dir.
-          printf 'PermitUserEnvironment yes\nPubkeyAuthentication yes\nAuthorizedKeysFile .ssh/authorized_keys\nStrictModes no\n' \
-            > "${ETC}/ssh/sshd_config.d/10-test.conf"
-          echo "sshd config written: $(cat ${ETC}/ssh/sshd_config.d/10-test.conf)"
-
-          # ── SELinux: disable via config file (belt-and-suspenders) ────────
-          # The kernel arg selinux=0 is also added below, but the config file
-          # is more reliable when bootloader entry patching misses an entry.
-          mkdir -p "${ETC}/selinux"
-          printf 'SELINUX=disabled\nSELINUXTYPE=targeted\n' \
-            > "${ETC}/selinux/config"
-          echo "SELinux config: $(cat ${ETC}/selinux/config)"
-
-          # ── GDM autologin ─────────────────────────────────────────────────
-          mkdir -p "${ETC}/gdm"
-          cat > "${ETC}/gdm/custom.conf" <<'GDMEOF'
-          [daemon]
-          AutomaticLoginEnable=True
-          AutomaticLogin=bluefin-test
-          GDMEOF
-
-          # ── sudoers ───────────────────────────────────────────────────────
-          mkdir -p "${ETC}/sudoers.d"
-          printf 'bluefin-test ALL=(ALL) NOPASSWD:ALL\n' \
-            > "${ETC}/sudoers.d/bluefin-test"
-          chmod 440 "${ETC}/sudoers.d/bluefin-test"
-
-          # ── selinux=0 in bootloader entries ───────────────────────────────
-          # Entries are inside the btrfs root at /boot/loader/entries/ (no separate /boot partition)
-          ENTRIES_FOUND=0
-          while IFS= read -r -d '' entry; do
-            sed -i 's/\(^options .*\)$/\1 selinux=0/' "${entry}"
-            echo "Patched selinux=0 in: ${entry}"
-            ENTRIES_FOUND=$((ENTRIES_FOUND + 1))
-          done < <(find /mnt/btroot/boot/loader/entries/ -name "*.conf" -print0 2>/dev/null)
-          echo "Boot entries patched: ${ENTRIES_FOUND}"
-          if [[ "${ENTRIES_FOUND}" -eq 0 ]]; then
-            echo "WARNING: no bootloader entries found — selinux=0 kernel arg NOT applied" >&2
-            echo "Boot dir contents: $(find /mnt/btroot/boot/ -maxdepth 3 2>/dev/null | head -20)"
-          fi
-
-          echo "configure-disk complete"
-          # trap cleanup EXIT handles unmount + losetup -d
+          echo "install-to-disk complete: ${DISK}"
 
     # ─── convert-and-push ─────────────────────────────────────────────────────
     # qemu-img raw→qcow2, buildah OCI image, push to local Zot, cleanup staging.
