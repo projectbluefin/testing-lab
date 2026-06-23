@@ -323,7 +323,7 @@ spec:
               chmod 600 \"\${VAR_DIR}/roothome/.ssh/authorized_keys\"
               echo '[INNER] root key -> /var/roothome/.ssh/authorized_keys'
 
-              # 2. ${DEPLOY}/root (if root home = /root, in ostree tree — readable even if read-only)
+              # 2. deploy/root (if root home = /root, in ostree tree — readable even if read-only)
               mkdir -p \"\${DEPLOY}/root/.ssh\"
               printf '%s\n' \"\${SSH_AUTHORIZED_KEYS}\" > \"\${DEPLOY}/root/.ssh/authorized_keys\"
               chmod 700 \"\${DEPLOY}/root/.ssh\"
