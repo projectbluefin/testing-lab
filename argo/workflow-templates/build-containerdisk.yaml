@@ -279,14 +279,22 @@ spec:
                 \"\${ETC}/systemd/system/sockets.target.wants/sshd.socket\" || true
               mkdir -p \"\${ETC}/ssh/sshd_config.d\"
               # Note: 'UsePAM no' is NOT supported in this Fedora openssh build.
-              # AuthorizedKeysFile: default .ssh/authorized_keys covers both root
-              # (/var/roothome/.ssh) and bluefin-test (/var/home/bluefin-test/.ssh).
-              # PermitRootLogin prohibit-password: allows root pubkey auth (Fedora default).
-              printf 'PubkeyAuthentication yes\nStrictModes no\nPermitRootLogin prohibit-password\nAuthorizedKeysFile .ssh/authorized_keys\n' \
+              # Use PermitRootLogin yes (most permissive) to allow root pubkey auth.
+              # AuthorizedKeysFile default resolves to root's home (.ssh/authorized_keys).
+              printf 'PubkeyAuthentication yes\nStrictModes no\nPermitRootLogin yes\nAuthorizedKeysFile .ssh/authorized_keys\n' \
                 > \"\${ETC}/ssh/sshd_config.d/10-test.conf\"
 
-              # Diagnostic: confirm the drop-in was written correctly.
+              # Also patch the main sshd_config in case Include is not at the top
+              # or another drop-in overrides PermitRootLogin. First replace existing
+              # lines; append PermitRootLogin yes if not already present.
+              sed -i 's/^[[:space:]]*PermitRootLogin.*/PermitRootLogin yes/' \
+                \"\${ETC}/ssh/sshd_config\" 2>/dev/null || true
+              grep -q '^PermitRootLogin' \"\${ETC}/ssh/sshd_config\" 2>/dev/null || \
+                echo 'PermitRootLogin yes' >> \"\${ETC}/ssh/sshd_config\"
+
+              # Diagnostic: confirm the drop-in and patched sshd_config.
               echo '[INNER] sshd drop-in:' && cat \"\${ETC}/ssh/sshd_config.d/10-test.conf\"
+              echo '[INNER] sshd_config PermitRootLogin:' && grep -i 'PermitRootLogin' \"\${ETC}/ssh/sshd_config\" || echo '(not found)'
 
               # sudoers
               mkdir -p \"\${ETC}/sudoers.d\"

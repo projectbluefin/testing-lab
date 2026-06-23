@@ -148,6 +148,11 @@ spec:
 
             # ── Wait for VM SSH to become ready (up to 10 minutes) ──────────
             echo "Waiting for SSH on ${VM_IP} (root, up to 10 min)..." >&2
+            # Verbose first attempt to capture the exact auth failure for root.
+            ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=15 -o LogLevel=DEBUG3 \
+              root@${VM_IP} 'echo root-ssh-diag-ready' 2>&1 || true
+            echo "--- root SSH diagnostic complete; starting retry loop ---" >&2
             # Wait for root SSH — bootc-native mechanism means this is reliable.
             timeout 600 bash -c "
               until ssh -i '${SSH_KEY}' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
