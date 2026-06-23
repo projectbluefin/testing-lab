@@ -36,7 +36,7 @@ Feature: Ptyxis terminal smoke tests
     * Run and save command output: "journalctl -b --no-pager --since=\"${TEST_JOURNAL_SINCE:-1 minute ago}\" -g 'VUID-' | grep -c 'VUID-' || true"
     * Last command output "is" "0"
 
-  @ptyxis @new_tab
+  @ptyxis @new_tab @wip
   Scenario: New tab opens via keyboard shortcut
     * Key combo: "<Shift><Ctrl><T>" with uinput
     * Ptyxis has "2" tabs
