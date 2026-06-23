@@ -83,11 +83,11 @@ spec:
       - name: namespace
       - name: suite-path
       - name: lane
-        value: homelab-substrate
+        value: ""
       - name: app-label
-        value: app=homelab-substrate
+        value: ""
       - name: service-name
-        value: homelab-substrate
+        value: ""
       - name: branch
         value: main
     metadata:

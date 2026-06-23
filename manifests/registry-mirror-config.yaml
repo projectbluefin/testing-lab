@@ -2,13 +2,14 @@
 # Writes containerd hosts.toml to each node's certs.d path.
 # containerd v2.0 (k3s v1.32+) hot-reloads these — no k3s restart needed.
 #
-# Mirrors configured:
-#   ghcr.io                    → ghost:30501 (zot-ghcr)
-#   docker.io                  → ghost:30502 (zot-docker)
-#   quay.io                    → ghost:30503 (zot-quay)
-#   registry.fedoraproject.org → ghost:30504 (zot-fedora)
-#   registry.access.redhat.com → ghost:30505 (zot-redhat-access)
-#   registry.k8s.io            → ghost:30506 (zot-k8s)
+# All 6 registries mirror through a single zot-cache instance (NodePort 30501).
+# Zot stores each upstream under a subpath via sync destination prefix mapping:
+#   ghcr.io                    → ghost:30501/ghcr
+#   docker.io                  → ghost:30501/docker
+#   quay.io                    → ghost:30501/quay
+#   registry.fedoraproject.org → ghost:30501/fedora
+#   registry.access.redhat.com → ghost:30501/redhat
+#   registry.k8s.io            → ghost:30501/k8s
 #
 # To update mirrors: edit ConfigMap below, then:
 #   kubectl rollout restart daemonset/registry-mirror-config -n local-registry
@@ -24,32 +25,32 @@ data:
   ghcr.io.hosts.toml: |
     server = "https://ghcr.io"
 
-    [host."http://192.168.1.102:30501"]
+    [host."http://192.168.1.102:30501/ghcr"]
       capabilities = ["pull", "resolve"]
   docker.io.hosts.toml: |
     server = "https://registry-1.docker.io"
 
-    [host."http://192.168.1.102:30502"]
+    [host."http://192.168.1.102:30501/docker"]
       capabilities = ["pull", "resolve"]
   quay.io.hosts.toml: |
     server = "https://quay.io"
 
-    [host."http://192.168.1.102:30503"]
+    [host."http://192.168.1.102:30501/quay"]
       capabilities = ["pull", "resolve"]
   registry.fedoraproject.org.hosts.toml: |
     server = "https://registry.fedoraproject.org"
 
-    [host."http://192.168.1.102:30504"]
+    [host."http://192.168.1.102:30501/fedora"]
       capabilities = ["pull", "resolve"]
   registry.access.redhat.com.hosts.toml: |
     server = "https://registry.access.redhat.com"
 
-    [host."http://192.168.1.102:30505"]
+    [host."http://192.168.1.102:30501/redhat"]
       capabilities = ["pull", "resolve"]
   registry.k8s.io.hosts.toml: |
     server = "https://registry.k8s.io"
 
-    [host."http://192.168.1.102:30506"]
+    [host."http://192.168.1.102:30501/k8s"]
       capabilities = ["pull", "resolve"]
 ---
 apiVersion: apps/v1

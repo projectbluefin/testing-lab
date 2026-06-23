@@ -209,12 +209,15 @@ containerd `hosts.toml` (written by `registry-mirror-config` DaemonSet — no k3
 | Instance | Upstream | NodePort | Storage |
 |---|---|---|---|
 | `registry` (writable) | — write target, no upstream | 30500 | `/var/mnt/ghost-data/zot-local` |
-| `zot-ghcr` | `https://ghcr.io` | 30501 | `/var/mnt/ghost-data/zot-ghcr` |
-| `zot-docker` | `https://registry-1.docker.io` | 30502 | `/var/mnt/ghost-data/zot-docker` |
-| `zot-quay` | `https://quay.io` | 30503 | `/var/mnt/ghost-data/zot-quay` |
-| `zot-fedora` | `https://registry.fedoraproject.org` | 30504 | `/var/mnt/ghost-data/zot-fedora` |
-| `zot-redhat-access` | `https://registry.access.redhat.com` | 30505 | `/var/mnt/ghost-data/zot-redhat-access` |
-| `zot-k8s` | `https://registry.k8s.io` | 30506 | `/var/mnt/ghost-data/zot-k8s` |
+| `zot-cache` | all 6 upstreams (ghcr, docker, quay, fedora, redhat, k8s) | 30501 | `/var/mnt/ghost-data/zot-cache` |
+
+Pull path prefixes (used in hosts.toml mirror URLs and Zot destination mapping):
+- `ghcr.io` → `:30501/ghcr`
+- `docker.io` → `:30501/docker`
+- `quay.io` → `:30501/quay`
+- `registry.fedoraproject.org` → `:30501/fedora`
+- `registry.access.redhat.com` → `:30501/redhat`
+- `registry.k8s.io` → `:30501/k8s`
 
 All instances pinned to ghost (hostPath storage) and managed by ArgoCD `testing-lab-infra`
 via `manifests/zot-cache.yaml` (pull-through) and `manifests/zot-writable.yaml` (write target).
@@ -285,7 +288,7 @@ Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](
 | bluefin-lts-test | lts variant test VMs |
 | flatcar-test | Flatcar test VMs |
 | llm-d | LLM inference hive node (Qwen3.6-35B-A3B Q4_K_M GGUF via llama.cpp on ROCm) |
-| local-registry | OCI registry: writable Zot (port 30500), pull-through caches — zot-ghcr (30501), zot-docker (30502), zot-quay (30503), zot-fedora (30504), zot-redhat-access (30505), zot-k8s (30506) |
+| local-registry | OCI registry: writable Zot (port 30500), unified pull-through cache — zot-cache (30501, all upstreams) |
 | arc-systems | ARC controller + listener pods |
 | arc-runners | ARC ephemeral runner pods — **empty when no jobs queued; that is correct** |
 | mcp | Kubernetes MCP server |
