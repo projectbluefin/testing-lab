@@ -363,12 +363,8 @@ spec:
           # StrictModes no: bypass file-permission checks (avoids SELinux context issues).
           # PubkeyAuthentication yes: explicit — some distro configs override the default.
           # AuthorizedKeysFile: explicit path relative to home dir.
-          cat > "${ETC}/ssh/sshd_config.d/10-test.conf" << 'SSHDEOF'
-PermitUserEnvironment yes
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-StrictModes no
-SSHDEOF
+          printf 'PermitUserEnvironment yes\nPubkeyAuthentication yes\nAuthorizedKeysFile .ssh/authorized_keys\nStrictModes no\n' \
+            > "${ETC}/ssh/sshd_config.d/10-test.conf"
           echo "sshd config written: $(cat ${ETC}/ssh/sshd_config.d/10-test.conf)"
 
           # ── SELinux: disable via config file (belt-and-suspenders) ────────
