@@ -5,6 +5,11 @@
 > `gh api`, `read`, `bash` are available. Use them before writing anything.
 > See the [incident log in image-registry.md](https://github.com/projectbluefin/common/blob/main/docs/skills/image-registry.md#incident-log) for what happens when you don't.
 
+> **Before using any tool or library: look up its docs via Context7 first. Always.**
+> Argo Workflows, KubeVirt, ArgoCD, Kubernetes, Helm, qecore, dogtail — every tool has live, authoritative docs.
+> Pattern: `resolve-library-id` → `get-library-docs` → implement → cite the section.
+> Guessing, flag-hunting, and trial-and-error are banned. The docs exist. Read them.
+
 > Load [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) first for commands. This file is the policy + architecture reference.
 
 ## Skill routing — read this first
