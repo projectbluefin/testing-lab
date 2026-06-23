@@ -145,10 +145,11 @@ spec:
 
             # ── Wait for VM SSH to become ready (up to 10 minutes) ──────────
             echo "Waiting for SSH on ${VM_IP} (variant=${VARIANT}, suite=${SUITE})..." >&2
-            # First attempt with verbose output to capture auth errors in logs.
+            # First attempt with FULL verbose output — no head truncation — to capture
+            # the exact auth failure reason (key accepted/rejected, PAM error, etc.).
             ssh -i "${SSH_KEY}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=15 -o LogLevel=DEBUG3 \
-              "${VM_USER}@${VM_IP}" 'echo ssh-diag-ready' 2>&1 | head -80 || true
+              "${VM_USER}@${VM_IP}" 'echo ssh-diag-ready' 2>&1 || true
             echo "--- SSH diagnostic complete; starting retry loop ---" >&2
             timeout 600 bash -c "
               until ${SSH} 'echo ready' 2>/dev/null; do sleep 10; done
