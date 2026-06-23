@@ -178,6 +178,10 @@ spec:
               else
                 echo '[ROOT] bluefin-test user exists'
               fi
+              # Ensure home directory exists with correct ownership
+              mkdir -p /var/home/bluefin-test
+              chown 1001:1001 /var/home/bluefin-test
+              chmod 750 /var/home/bluefin-test
               # Ensure sudoers entry
               echo 'bluefin-test ALL=(ALL) NOPASSWD:ALL' \
                 > /etc/sudoers.d/bluefin-test
