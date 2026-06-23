@@ -22,6 +22,7 @@ Before changing anything, load the relevant skill file from `docs/skills/`:
 | KubeVirt VMs, btrfs reflink, golden disk, teardown | [`docs/skills/kubevirt-vms.md`](docs/skills/kubevirt-vms.md) |
 | ArgoCD sync, GitOps rules, bootstrap vs managed | [`docs/skills/gitops-argocd.md`](docs/skills/gitops-argocd.md) |
 | behave / qecore / dogtail / GNOME AT-SPI tests | [`docs/skills/test-authoring.md`](docs/skills/test-authoring.md) |
+| Loki, Promtail, pod log scraping, retention, disk fill | [`docs/skills/monitoring.md`](docs/skills/monitoring.md) |
 | End of session — write-back loop | [`docs/skills/skill-improvement.md`](docs/skills/skill-improvement.md) |
 
 **At end of every non-trivial session:** run the write-back loop in `docs/skills/skill-improvement.md`. Every session produces two outputs: the work and the learning.

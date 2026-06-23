@@ -329,6 +329,91 @@ cat /proc/sys/fs/inotify/max_user_watches   # should be >= 1048576
 
 The DaemonSet applies this on every node restart. Do not remove it.
 
+### 13. LTS (RHEL10) VM boot — EFI fallback and fstab stalls
+
+**Bluefin-LTS uses RHEL10 (el10) base images. They differ from Fedora in two critical
+ways for KubeVirt VM boot:**
+
+#### a. OVMF cannot find the bootloader (no `/EFI/BOOT/BOOTX64.EFI`)
+
+KubeVirt uses OVMF with ephemeral NVRAM (no stored boot entries). OVMF falls back to the
+well-known path `/EFI/BOOT/BOOTX64.EFI`. 
+
+| Image base | EFI path created by bootc | Fallback created? |
+|---|---|---|
+| Fedora (bluefin:testing) | `/EFI/fedora/` | **Yes** — `bootc install` creates fallback |
+| RHEL10 (bluefin-lts:testing) | `/EFI/redhat/` | **No** — fallback is missing |
+
+**Symptom:** VM shows KubeVirt condition `Ready=True` but SSH never opens. CPU time
+stays at ~40-50s over 12+ minutes (VM is idle at OVMF boot manager screen, not
+executing any OS code). Screenshot pixel analysis shows cyan (0,170,170) / gray
+background = VGA text mode = OVMF UI.
+
+**Diagnosing with CPU time:**
+```bash
+# CPU time increasing = VM executing code (good: systemd starting)
+# CPU time flat/stalled relative to wall clock = VM idle (bad: stuck at OVMF/GRUB)
+kubectl get vmi -n bluefin-lts-test <vm-name> -o jsonpath='{.status.cpuTime}'
+# 43s CPU in 12+ min wall clock → VM completely idle → OVMF issue
+```
+
+**Fix:** Copy the shim EFI binary to the OVMF fallback path during disk build:
+```bash
+# In build-containerdisk configure-disk step:
+EFI_MOUNT=/mnt/efi   # mounted EFI partition
+SHIM=$(find "\${EFI_MOUNT}/EFI/redhat/" -name "shim*.efi" | head -1)
+if [ -n "\${SHIM}" ]; then
+    mkdir -p "\${EFI_MOUNT}/EFI/BOOT"
+    cp "\${SHIM}" "\${EFI_MOUNT}/EFI/BOOT/BOOTX64.EFI"
+fi
+```
+
+This is already implemented in `argo/workflow-templates/build-containerdisk.yaml`. If
+you are authoring a new LTS VM build pipeline, include this step.
+
+#### b. fstab UUID mounts stall boot without a device timeout
+
+RHEL10 bootc `install to-disk` generates `/etc/fstab` entries for `/boot` and `/boot/efi`
+that reference partition UUIDs without `nofail`. In a KubeVirt VM, the EFI partition is
+exposed via `virtio` — systemd sees it as a new block device. If the device is slow to
+appear (race with virtio enumeration), systemd waits indefinitely.
+
+**Fedora** fstab `/boot/efi` options: `defaults` — systemd hits its default device timeout.
+**RHEL10** fstab `/boot/efi` options: `umask=0077,shortname=winnt` — no `nofail`, and the
+sed pattern `/defaults/` doesn't match, leaving the stall in place.
+
+**Symptoms:** VM boot takes 8-15+ minutes; `systemd-analyze blame` shows
+`dev-disk-by\x2duuid-*.device` taking 8+ minutes (the full systemd unit activation timeout).
+
+**Fix — two-part:**
+1. Add `--karg=systemd.device-timeout=5` to the `bootc install to-disk` command.
+2. Add `nofail,x-systemd.device-timeout=5s` to ALL `/boot/*` fstab entries using a
+   field-aware sed (column 4 = mount options, regardless of content):
+
+```bash
+# Field-aware sed: match lines containing /boot in column 2 (whitespace-delimited),
+# append ,nofail,x-systemd.device-timeout=5s to column 4 if not already present.
+# This works for BOTH 'defaults' AND 'umask=0077,shortname=winnt' option strings.
+sed -i '/[[:space:]]\/boot/{ /nofail/! s/^\([^[:space:]]*[[:space:]]\+\)\([^[:space:]]*[[:space:]]\+\)\([^[:space:]]*[[:space:]]\+\)\([^[:space:]]*\)/\1\2\3\4,nofail,x-systemd.device-timeout=5s/ }' /mnt/etc/fstab
+```
+
+3. Add a `DefaultDeviceTimeoutSec=5` systemd drop-in as belt-and-suspenders:
+```bash
+mkdir -p /mnt/etc/systemd/system.conf.d
+printf '[Manager]\nDefaultDeviceTimeoutSec=5\n' > \
+  /mnt/etc/systemd/system.conf.d/99-vm-device-timeout.conf
+```
+
+**Why not just `nofail` without the timeout?** `nofail` only suppresses boot failure, not
+the wait. Systemd still waits for the default device timeout (90s) before giving up.
+`x-systemd.device-timeout=5s` limits the wait to 5 seconds.
+
+The `--karg` adds the timeout as a kernel argument that applies even before systemd reads
+fstab. Belt-and-suspenders: karg + fstab + drop-in.
+
+**Important:** All fstab sed must run INSIDE the build container where fstab lives at
+`/mnt/etc/fstab` (the mounted disk), NOT at `/etc/fstab` (the container's fstab).
+
 ### 12. Cross-policy LTS containerDisk builds — fsetxattr EINVAL
 
 When building the LTS containerDisk on a bluefin (non-LTS) ghost host, `bootc install to-disk`
@@ -466,6 +551,9 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 - LTS VM goes `Stopped` immediately after creation — `bluefin-test-ssh-pubkey` secret missing from `bluefin-lts-test` namespace. The manifest must create the secret in **both** `bluefin-test` and `bluefin-lts-test`. Check with `kubectl get secret -n bluefin-lts-test bluefin-test-ssh-pubkey`.
 - VM goes `Stopped` with `FailedCreate` and `metadata.labels: must be no more than 63 characters` — VM name exceeds Kubernetes label-value limit. `bluefin-lts-testing-developer-<36-char-uuid>` = 67 chars, fails. `smoke` (5 chars) just passes; `developer` (9 chars) overflows. Fix: use `{{workflow.name}}-{{item}}` instead of `{{workflow.parameters.variant}}-{{item}}-{{workflow.uid}}` — workflow names are short and unique. Fixed in `bluefin-qa-pipeline` commit `7fca070`.
 - Orphaned VMs from a prior workflow consuming ghost resources — run `just list-vms` before submitting a new matrix run; delete orphans with `kubernetes-mcp-resources_delete` if present. Four concurrent VMs on ghost can cause VMI Ready timeouts.
+- **LTS (RHEL10) VM SSH never opens but VMI is Ready and CPU time is flat** — OVMF can't find the bootloader; `/EFI/BOOT/BOOTX64.EFI` is missing from the disk. RHEL10 `bootc install` only creates `/EFI/redhat/`; copy the shim to the fallback path in the build step. See section 13a.
+- **LTS VM SSH never opens and CPU time grows but slowly (8-15 min boot)** — fstab `/boot` or `/boot/efi` entry missing `nofail`+`x-systemd.device-timeout=5s`. The field-aware sed in section 13b MUST cover both `defaults` and `umask=...` option strings. A simple `/defaults/ s/defaults/defaults,nofail/` won't match RHEL10's `/boot/efi` entry.
+- **Field-aware fstab sed not patching `/boot/efi`** — the old sed pattern `/defaults/` doesn't match RHEL10 fstab where `/boot/efi` uses `umask=0077,shortname=winnt`. Use the column-4-aware sed from section 13b.
 
 ## Verification
 
@@ -480,6 +568,10 @@ Before merging any VM provisioning change:
 - [ ] Zot-writable index checked before running pipeline: `wc -c /var/mnt/ghost-data/zot-local/bluefin-containerdisk/index.json` > 100 bytes
 - [ ] `bluefin-test-ssh-pubkey` secret exists in **both** `bluefin-test` and `bluefin-lts-test` namespaces
 - [ ] Runtime user bootstrap sets home dir ownership (`chown 1001:1001 /var/home/bluefin-test`) before pip/pip3 installs
+- [ ] **LTS containerDisk**: disk build includes `/EFI/BOOT/BOOTX64.EFI` fallback creation (section 13a)
+- [ ] **LTS containerDisk**: fstab field-aware sed adds `nofail,x-systemd.device-timeout=5s` to ALL `/boot/*` entries (section 13b)
+- [ ] **LTS containerDisk**: `bootc install to-disk` uses `--karg=systemd.device-timeout=5` (section 13b)
+- [ ] If LTS VM Ready but SSH never opens: check CPU time diagnostic before assuming network or systemd issue
 
 ### Bluefin containerDisk SSH injection checklist (DO NOT USE DISK INJECTION)
 
