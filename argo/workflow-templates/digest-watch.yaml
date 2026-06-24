@@ -11,7 +11,8 @@ metadata:
       fetches the live GHCR digest via anonymous curl, compares it against the
       stored value in ConfigMap containerdisk-source-digests, and on mismatch
       patches the ConfigMap and submits a build-containerdisk Workflow with
-      force=true to bypass the Zot existence check.
+      force=false (check will return "missing" since Zot lacks the new digest,
+      so install-to-disk runs reliably even after workflow-controller restarts).
   labels:
     app.kubernetes.io/component: digest-watch
     app.kubernetes.io/part-of: bluefin-test-suite
@@ -197,7 +198,7 @@ spec:
                   {\"name\": \"image\", \"value\": \"${IMAGE}\"},
                   {\"name\": \"image-tag\", \"value\": \"${IMAGE_TAG}\"},
                   {\"name\": \"containerdisk-tag\", \"value\": \"${CD_TAG}\"},
-                  {\"name\": \"force\", \"value\": \"true\"}
+                  {\"name\": \"force\", \"value\": \"false\"}
                 ]}
               }
             }" > /dev/null
