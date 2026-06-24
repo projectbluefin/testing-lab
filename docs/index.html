@@ -312,6 +312,9 @@
 <!-- Alert banner (failures only) -->
 <div id="alert-banner"></div>
 
+<!-- Nightly schedule strip -->
+<div id="nightly-strip" style="margin-bottom:12px"></div>
+
 <!-- Triage section: open bugs + infra failures -->
 <div id="triage-section"></div>
 
@@ -462,6 +465,66 @@ function ghScenarioLink(suite, name) {
 function lokiLogUrl(wfName) {
   const q = encodeURIComponent(`{app_kubernetes_io_part_of="bluefin-test-suite"} |= "${wfName}"`);
   return `http://192.168.1.102:30100/loki/api/v1/query_range?query=${q}&limit=1000`;
+}
+
+// ── Nightly schedule strip ───────────────────────────────────────────────────
+function buildNightlyStrip(images, allData) {
+  // Build slug → latest last_run map
+  const lastRunBySlug = {};
+  for (const d of allData) {
+    const r = d.data?.last_run;
+    if (!r) continue;
+    if (!lastRunBySlug[d.image.slug] || r > lastRunBySlug[d.image.slug])
+      lastRunBySlug[d.image.slug] = r;
+  }
+
+  const chips = images
+    .filter(img => img.nightly_time_utc)
+    .map(img => {
+      const [h, m] = img.nightly_time_utc.split(':').map(Number);
+      const now = new Date();
+      const expectedToday = new Date(Date.UTC(
+        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m));
+      const nextRun = now < expectedToday ? expectedToday : new Date(expectedToday.getTime() + 86400000);
+      const minsUntil = Math.round((nextRun.getTime() - now.getTime()) / 60000);
+      const hoursUntil = Math.round(minsUntil / 60);
+
+      const lastRun = lastRunBySlug[img.slug];
+      const expectedPrev = now < expectedToday
+        ? new Date(expectedToday.getTime() - 86400000)
+        : expectedToday;
+      const isOverdue = !lastRun || new Date(lastRun) < expectedPrev;
+
+      let countdownColor, countdownText;
+      if (isOverdue) {
+        const hOverdue = Math.round((now.getTime() - expectedPrev.getTime()) / 3600000);
+        countdownColor = 'var(--fail)';
+        countdownText = `⚠ overdue ${hOverdue}h`;
+      } else if (minsUntil < 60) {
+        countdownColor = 'var(--pending)';
+        countdownText = `in ${minsUntil}m`;
+      } else {
+        countdownColor = 'var(--muted)';
+        countdownText = `in ${hoursUntil}h`;
+      }
+
+      return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;
+                 background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:11px">
+        <span style="font-weight:600;color:var(--text)">${img.label}</span>
+        <span style="color:var(--muted)">nightly ${img.nightly_time_utc} UTC</span>
+        <span style="color:${countdownColor}">${countdownText}</span>
+      </span>`;
+    }).join('');
+
+  if (!chips) {
+    document.getElementById('nightly-strip').innerHTML = '';
+    return;
+  }
+  document.getElementById('nightly-strip').innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+       <span style="font-size:11px;color:var(--muted)">Nightly schedule:</span>
+       ${chips}
+     </div>`;
 }
 
 // ── Quick stats bar ─────────────────────────────────────────────────────────
@@ -1360,6 +1423,7 @@ function filterStatusTable(failingOnly) {
 
   buildStatsBar(stats);
   buildAlertBanner(allData, stats);
+  buildNightlyStrip(IMAGES, allData);
   buildFailures(allData, stats);
   buildTriage(stats, allData);
   buildStatusTable(IMAGES, allData);
