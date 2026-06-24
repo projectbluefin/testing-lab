@@ -9,7 +9,7 @@ metadata:
       provision blank KubeVirt target VM → boot live installer → run headless install with
       explicit completion signal → reboot from installed disk → rediscover IP → run smoke tests.
 
-      All kubectl/virtctl actions run inside workflow pods scheduled on ghost. The only SSH is
+      All kubectl/virtctl actions run inside workflow pods (any cluster node). The only SSH is
       in-cluster pod → VM test execution.
   labels:
     app.kubernetes.io/component: qa-pipeline
