@@ -1312,7 +1312,7 @@ spec:
     storage: true
     subresources:
       status: {}
-
+---
 apiVersion: v1
 kind: Namespace
 metadata:
