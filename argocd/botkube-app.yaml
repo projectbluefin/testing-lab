@@ -31,7 +31,6 @@ spec:
                   id: "1519233261438631936"  # #factory channel
                   bindings:
                     executors:
-                      - kubectl-read-only
                       - github-dispatch
                     sources:
                       - k8s-err-with-logs
@@ -40,16 +39,6 @@ spec:
         rbac:
           groups: []
         executors:
-          kubectl-read-only:
-            botkube/kubectl:
-              enabled: true
-              config:
-                allowedVerbs: ["get", "describe", "logs", "top"]
-                allowedResources:
-                  - nodes
-                  - pods
-                  - namespaces
-                  - workflows
           github-dispatch:
             botkube/github:
               enabled: true

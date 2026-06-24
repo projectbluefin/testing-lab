@@ -1,5 +1,5 @@
 # Botkube v1.14.0 — Bluefin factory ChatOps
-# ponytail: minimal config — only Discord + GitHub + kubectl plugins enabled
+# ponytail: minimal config — only Discord + GitHub plugin enabled
 
 communications:
   default-group:
@@ -15,7 +15,6 @@ communications:
             disabled: false
           bindings:
             executors:
-              - kubectl-read-only
               - github-dispatch
             sources:
               - k8s-err-with-logs
@@ -31,20 +30,6 @@ rbac:
   groups: []
 
 executors:
-  kubectl-read-only:
-    botkube/kubectl:
-      enabled: true
-      context:
-        defaultNamespace: default
-      config:
-        # read-only verbs; write access requires explicit Maintainer role gate
-        allowedVerbs: ["get", "describe", "logs", "top"]
-        allowedResources:
-          - nodes
-          - pods
-          - namespaces
-          - workflows  # Argo Workflows
-
   github-dispatch:
     botkube/github:
       enabled: true
