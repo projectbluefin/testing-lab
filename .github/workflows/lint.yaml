@@ -47,7 +47,7 @@ jobs:
           FAIL=0
           while IFS= read -r line; do
             echo "$line" | grep -q 'registry-lint-ignore' && continue
-            imgref=$(echo "$line" | sed 's/.*image:[[:space:]]*//' | awk '{print $1}' | tr -d '"'"'"')
+            imgref=$(echo "$line" | sed 's/.*image:[[:space:]]*//' | awk '{print $1}' | tr -d "\"'")
             [[ -z "$imgref" || "${imgref:0:1}" == "#" ]] && continue
             registry=$(echo "$imgref" | cut -d/ -f1)
             # skip bare names (no dot or colon = implicit docker.io, handled by zot-docker)
