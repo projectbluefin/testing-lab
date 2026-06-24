@@ -55,11 +55,6 @@ spec:
       dag:
         tasks:
           # Skipped when force=true (digest-watch already confirmed a rebuild is needed).
-          # NOTE: use force=false for manual ad-hoc builds — the force=true path relies on
-          # check.Skipped in the depends expression which does not fire correctly after a
-          # workflow-controller restart (controller loses DAG reconciliation state for
-          # Skipped nodes). force=false lets check run, output "missing", and proceed
-          # normally via check.Succeeded.
           - name: check
             template: check
             when: "'{{inputs.parameters.force}}' != 'true'"
@@ -68,11 +63,12 @@ spec:
                 - name: containerdisk-tag
                   value: "{{inputs.parameters.containerdisk-tag}}"
 
-          # Skipped when check=exists; runs unconditionally when force=true (check is Skipped,
-          # so tasks.check.outputs.result is empty → '' != 'exists' is true).
+          # Skipped when check=exists.
+          # When force=true, check is Skipped and has no outputs, so reference its
+          # output directly — instead gate on the force param.
           - name: install-to-disk
             depends: "(check.Succeeded || check.Skipped)"
-            when: "'{{tasks.check.outputs.result}}' != 'exists'"
+            when: "'{{inputs.parameters.force}}' == 'true' || '{{tasks.check.outputs.result}}' != 'exists'"
             template: install-to-disk
             arguments:
               parameters:
