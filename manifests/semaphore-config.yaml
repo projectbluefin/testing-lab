@@ -1,0 +1,21 @@
+# Argo Workflows semaphore — caps concurrent VM-running workflows cluster-wide.
+# Each workflow (bluefin-qa-pipeline, dakota-qa-pipeline) holds one slot while
+# a VM is live. Waiting workflows queue inside Argo, never touching the k8s
+# scheduler, so pending resource requests don't pile up and exhaust the node.
+#
+# Slot budget:
+#   ghost:   62Gi - 8Gi system  = 54Gi → 6x 8Gi VMs
+#   bazzite: 30Gi - 16Gi system = 14Gi → 1x 8Gi or 3x 4Gi VMs
+#   cap: 8 — leaves headroom for deps PRs (4Gi) to fill gaps
+#
+# Raise this value to add more concurrency; lower it to protect the cluster.
+# ArgoCD syncs the change within ~3 min; Argo picks it up immediately.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: semaphore-config
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: bluefin-test-suite
+data:
+  max-concurrent-vms: "8"

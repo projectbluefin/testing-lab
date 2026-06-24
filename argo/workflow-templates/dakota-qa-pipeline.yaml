@@ -16,6 +16,11 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
+  synchronization:
+    semaphore:
+      configMapKeyRef:
+        name: semaphore-config
+        key: max-concurrent-vms
   entrypoint: pipeline
   onExit: cleanup-and-report
 
