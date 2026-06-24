@@ -109,6 +109,7 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 |---|---|---|---|
 | ghost | k3s control-plane + KubeVirt compute | 192.168.1.102 | Ryzen AI MAX+ 395, 16c/32t, 64GB RAM |
 | exo-1 | k3s worker (opt-in) | 192.168.1.239 | Dakota laptop — 22c/15.1Gi; `just k8s-on/off` to join/leave; excludes BST builds (16Gi request) |
+| exo-2 | k3s worker (dedicated) | 192.168.1.171 | Flatcar 4593.2.3 — k3s via sysext, k3s-agent enabled at boot; always schedulable |
 | bazzite | k3s worker | 192.168.1.223 | Gaming machine — fully schedulable (no taint); k3s-agent enabled and running at boot |
 | hamilton | k3s worker (opt-in) | 192.168.1.225 | Bluefin workstation — 16c/31.2Gi; `just k8s-on/off` to join/leave |
 | Argo UI | — | http://192.168.1.102:32746 | NodePort; also http://192.168.1.102:2746 on host |
