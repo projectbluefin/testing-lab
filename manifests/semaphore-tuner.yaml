@@ -20,7 +20,8 @@ metadata:
     app.kubernetes.io/component: semaphore-tuner
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
-  schedule: "0 * * * *"
+  schedules:
+    - "0 * * * *"
   timezone: "UTC"
   concurrencyPolicy: Replace
   startingDeadlineSeconds: 120
