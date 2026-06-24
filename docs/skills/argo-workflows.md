@@ -435,6 +435,47 @@ Key rules:
 - `content` must be base64 encoded; use `base64 -w0` (no line wraps)
 - `X-GitHub-Api-Version: 2022-11-28` header required by current GitHub API
 - Log output to a file on persistent storage (hostPath) — pod stdout is GC'd
+- Concurrent pipeline exits conflict on SHA → last writer wins; 409 = silent skip. Acceptable for metrics files.
+
+**Why no inline Python or heredocs (root cause):** YAML `source: |` literal blocks use indentation to determine block extent. Any line at column 0 (including unindented `python3 -c "...\nimport json\n..."` continuation lines, or heredoc bodies like `<<'EOF'\nimport json\n`) terminates the block — YAML treats those lines as new top-level keys. The `yaml: could not find expected ':'` error is the symptom. Fix: use `jq` one-liners, keep everything on the same indented line, or `--rawfile` to read from a pre-staged file.
+
+**onExit dashboard update pattern (bluefin-qa-pipeline + dakota-qa-pipeline):**
+```yaml
+- name: update-factory-stats
+  script:
+    image: quay.io/fedora/fedora:latest
+    command: [bash]
+    env:
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: token
+    source: |
+      set -euo pipefail
+      API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/data/factory-stats.json"
+      # Fetch JSON file + SHA
+      CURRENT=$(curl -sf -H "Authorization: token ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" "${API_URL}" || echo "{}")
+      FILE_SHA=$(echo "$CURRENT" | jq -r '.sha // empty')
+      [[ -z "$FILE_SHA" ]] && echo "No SHA — skipping" && exit 0
+      STATS=$(echo "$CURRENT" | jq -r '.content // ""' | tr -d '\n' | base64 -d \
+        | jq '.')
+      # Build run entry with jq — no Python, no heredocs
+      NEW_RUN=$(jq -nc --arg id "{{workflow.name}}" --arg overall "pass_or_fail" \
+        '{id:$id,overall:$overall,...}')
+      UPDATED=$(echo "$STATS" | jq -c --argjson run "$NEW_RUN" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '.recent_runs = ([$run] + (.recent_runs // []) | .[:15]) | ._meta.generated = $now')
+      BODY=$(jq -nc --arg msg "chore: update dashboard run data" \
+        --arg content "$(echo "$UPDATED" | base64 -w0)" --arg sha "$FILE_SHA" \
+        '{message:$msg,content:$content,sha:$sha}')
+      curl -sf -w "%{http_code}" -o /dev/null -X PUT \
+        -H "Authorization: token ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "Content-Type: application/json" \
+        -d "$BODY" "${API_URL}"
+```
+The real implementation in `bluefin-qa-pipeline.yaml` also fetches per-suite result files into `/tmp/suite-scores/` and merges them via `jq --argjson` one-liners before building `NEW_RUN`.
 
 ### 17. CronWorkflow — `schedules` not `schedule`
 
