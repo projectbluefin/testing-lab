@@ -6,8 +6,8 @@
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
     "consumers": [
+      "docs/index.html",
       "docs/prototype-factory.html",
-      "docs/index.html (future)",
       "docs.projectbluefin.io/testing (planned)"
     ]
   },

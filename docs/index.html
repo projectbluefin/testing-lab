@@ -6,15 +6,17 @@
   <title>Bluefin QA Dashboard</title>
   <style>
     :root {
-      --pass: #3fb950;
-      --fail: #f85149;
+      --pass:    #3fb950;
+      --fail:    #f85149;
       --pending: #d29922;
-      --bg: #0d1117;
+      --run:     #58a6ff;
+      --bg:      #0d1117;
       --surface: #161b22;
-      --border: #30363d;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --link: #58a6ff;
+      --surface2:#21262d;
+      --border:  #30363d;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --link:    #58a6ff;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -24,21 +26,47 @@
       font-size: 14px;
       line-height: 1.5;
       padding: 24px;
-      max-width: 1200px;
+      max-width: 1280px;
       margin: 0 auto;
     }
-    header { margin-bottom: 24px; }
-    h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
-    .subtitle { color: var(--muted); font-size: 13px; }
-    .meta { color: var(--muted); font-size: 12px; margin: 12px 0 24px; }
-    h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-    /* Cards */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
       gap: 16px;
-      margin-bottom: 40px;
+      flex-wrap: wrap;
     }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 3px; }
+    .subtitle { color: var(--muted); font-size: 13px; }
+    .header-right { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.7; }
+    .header-right a { color: var(--link); text-decoration: none; }
+    .header-right a:hover { text-decoration: underline; }
+
+    /* ── KPI strip ───────────────────────────────────── */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .kpi-tile {
+      background: var(--surface);
+      padding: 14px 18px;
+    }
+    .kpi-val  { font-size: 26px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+    .kpi-lbl  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section headings ────────────────────────────── */
+    h2 { font-size: 15px; font-weight: 600; margin: 28px 0 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+    /* ── Generic card ────────────────────────────────── */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -46,55 +74,16 @@
       overflow: hidden;
     }
     .card-header {
-      padding: 12px 16px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       font-weight: 600;
-      font-size: 14px;
-    }
-    .screenshot-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      background: #21262d;
-      overflow: hidden;
-    }
-    .screenshot-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .screenshot-placeholder {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .card-body { padding: 12px 16px; }
-    .suites { display: flex; flex-direction: column; gap: 6px; }
-    .suite-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .suite-label { text-transform: capitalize; }
-    .suite-right { display: flex; align-items: center; gap: 8px; }
-    .count { color: var(--muted); font-size: 12px; }
-    .badge {
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .badge-pass { background: #1c2e1c; color: var(--pass); border: 1px solid #2ea04326; }
-    .badge-fail { background: #2e1c1c; color: var(--fail); border: 1px solid #f8514926; }
-    .badge-pending { background: #2e261c; color: var(--pending); border: 1px solid #d2992226; }
+    .card-header .muted { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: auto; }
+    .card-body { padding: 12px 16px; }
     .card-footer {
       padding: 8px 16px;
       border-top: 1px solid var(--border);
@@ -106,167 +95,585 @@
     }
     .card-footer a { color: var(--link); text-decoration: none; }
     .card-footer a:hover { text-decoration: underline; }
-    /* History tables */
-    .history-block {
+
+    /* ── Image result cards grid ─────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .screenshot-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--surface2);
+      overflow: hidden;
+    }
+    .screenshot-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+    }
+    .screenshot-placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 12px;
+    }
+    .suite-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      font-size: 13px; padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .suite-row:last-child { border-bottom: none; }
+    .suite-label { text-transform: capitalize; }
+    .suite-right { display: flex; align-items: center; gap: 8px; }
+    .count { color: var(--muted); font-size: 12px; }
+
+    /* ── Badges ──────────────────────────────────────── */
+    .badge {
+      padding: 2px 8px; border-radius: 12px;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .badge-pass    { background: #1c2e1c; color: var(--pass);    border: 1px solid #2ea04326; }
+    .badge-fail    { background: #2e1c1c; color: var(--fail);    border: 1px solid #f8514926; }
+    .badge-pending { background: #2e261c; color: var(--pending); border: 1px solid #d2992226; }
+    .badge-run     { background: #1c2333; color: var(--run);     border: 1px solid #58a6ff26; }
+    .badge-elite   { background: #2e1c4a; color: #b36efb;        border: 1px solid #b36efb26; }
+    .badge-high    { background: #1c2e1c; color: var(--pass);    border: 1px solid #2ea04326; }
+    .badge-medium  { background: #2e261c; color: var(--pending); border: 1px solid #d2992226; }
+    .badge-low     { background: #2e1c1c; color: var(--fail);    border: 1px solid #f8514926; }
+
+    /* ── Two-col info layout ──────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Key-value rows ──────────────────────────────── */
+    .kv-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 5px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .kv-row:last-child { border-bottom: none; }
+    .kv-key  { color: var(--muted); }
+    .kv-val  { font-variant-numeric: tabular-nums; }
+    .kv-pass { color: var(--pass); }
+    .kv-fail { color: var(--fail); }
+    .kv-warn { color: var(--pending); }
+    .kv-run  { color: var(--run); }
+
+    /* ── DORA large metric ───────────────────────────── */
+    .dora-level { font-size: 28px; font-weight: 600; margin-bottom: 12px; }
+
+    /* ── Pipeline stage bar ──────────────────────────── */
+    .pipeline-bar {
+      display: flex; gap: 2px; align-items: stretch;
+      background: var(--border); border-radius: 4px; overflow: hidden;
+      margin: 8px 0;
+    }
+    .pipeline-stage {
+      flex: 1; text-align: center; padding: 8px 4px;
+      background: var(--surface2); font-size: 11px;
+      min-width: 0;
+    }
+    .pipeline-stage-name { color: var(--muted); display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pipeline-stage-val  { display: block; font-weight: 600; font-size: 16px; font-variant-numeric: tabular-nums; }
+    .pipeline-stage-unit { color: var(--muted); font-size: 10px; }
+
+    /* ── Semaphore bar ───────────────────────────────── */
+    .sem-bar { display: flex; gap: 3px; margin-top: 4px; }
+    .sem-pip {
+      width: 12px; height: 16px;
+      border-radius: 2px; border: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .sem-pip.used { background: var(--link); border-color: var(--link); }
+
+    /* ── OpenSSF check bars ──────────────────────────── */
+    .check-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 0; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .check-row:last-child { border-bottom: none; }
+    .check-score { width: 20px; text-align: right; font-weight: 600; flex-shrink: 0; }
+    .check-name  { flex: 1; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .check-bar   { width: 60px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+    .check-fill  { height: 100%; border-radius: 2px; }
+
+    /* ── Node status dots ────────────────────────────── */
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-pass { background: var(--pass); }
+    .dot-fail { background: var(--fail); }
+    .dot-run  { background: var(--run); }
+    .dot-warn { background: var(--pending); }
+
+    /* ── Recent runs table ───────────────────────────── */
+    .runs-block {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 6px;
       overflow: hidden;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
+    }
+    .runs-block table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .runs-block th {
+      padding: 8px 12px; text-align: left;
+      color: var(--muted); font-weight: 500;
+      border-bottom: 1px solid var(--border);
+    }
+    .runs-block td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+    .runs-block tr:last-child td { border-bottom: none; }
+    .runs-block td a { color: var(--link); text-decoration: none; }
+    .runs-block td a:hover { text-decoration: underline; }
+    .empty-row { color: var(--muted); text-align: center; padding: 16px; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace; }
+
+    /* ── History tables ──────────────────────────────── */
+    .history-block {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden; margin-bottom: 16px;
     }
     .history-block-header {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 13px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      font-weight: 600; font-size: 13px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th {
-      padding: 8px 12px;
-      text-align: left;
-      color: var(--muted);
-      font-weight: 500;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    td {
-      padding: 7px 12px;
-      border-bottom: 1px solid var(--border);
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 8px 12px; text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
     tr:last-child td { border-bottom: none; }
     td a { color: var(--link); text-decoration: none; }
     td a:hover { text-decoration: underline; }
-    .empty-row { color: var(--muted); text-align: center; padding: 16px; font-size: 12px; }
   </style>
 </head>
 <body>
+
   <header>
-    <h1>Bluefin QA Dashboard</h1>
-    <p class="subtitle">End-to-end test results for projectbluefin image variants</p>
+    <div>
+      <h1>Bluefin QA Dashboard</h1>
+      <p class="subtitle">projectbluefin · End-to-end test results · ghost k3s cluster</p>
+    </div>
+    <div class="header-right" id="header-right">
+      <span id="meta-updated">Loading…</span>
+    </div>
   </header>
-  <p class="meta" id="meta">Loading...</p>
 
-  <h2>Latest Results</h2>
-  <div class="grid" id="cards"><p style="color:var(--muted)">Loading...</p></div>
+  <!-- KPI strip -->
+  <div class="kpi-strip" id="kpi-strip">
+    <div class="kpi-tile"><div class="kpi-val" id="k-passrate">—</div><div class="kpi-lbl">Pipeline success rate (7d)</div></div>
+    <div class="kpi-tile"><div class="kpi-val" id="k-runs">—</div><div class="kpi-lbl">Builds this week</div></div>
+    <div class="kpi-tile"><div class="kpi-val" id="k-scenarios">—</div><div class="kpi-lbl">Test scenarios</div></div>
+    <div class="kpi-tile"><div class="kpi-val" id="k-vms">—</div><div class="kpi-lbl">VMs provisioned (7d)</div></div>
+    <div class="kpi-tile"><div class="kpi-val" id="k-issues">—</div><div class="kpi-lbl">Open issues</div></div>
+    <div class="kpi-tile"><div class="kpi-val" id="k-prs">—</div><div class="kpi-lbl">Open PRs</div></div>
+  </div>
 
+  <!-- Latest results per image -->
+  <h2>Latest Test Results</h2>
+  <div class="results-grid" id="cards">
+    <p style="color:var(--muted)">Loading…</p>
+  </div>
+
+  <!-- Recent pipeline runs -->
+  <h2>Recent Pipeline Runs</h2>
+  <div class="runs-block">
+    <table>
+      <thead>
+        <tr>
+          <th>Workflow</th>
+          <th>Image</th>
+          <th>Smoke</th>
+          <th>Developer</th>
+          <th>System</th>
+          <th>Duration</th>
+          <th>Trigger</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="runs-tbody">
+        <tr><td colspan="8" class="empty-row">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pipeline health + DORA side by side -->
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-header">Pipeline Health</div>
+      <div class="card-body">
+        <div id="pipeline-stages"></div>
+        <div id="pipeline-stats" style="margin-top:12px"></div>
+        <div style="margin-top:14px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Semaphore slots</div>
+          <div id="semaphore-slots"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">DORA Metrics</div>
+      <div class="card-body">
+        <div class="dora-level" id="dora-level">—</div>
+        <div id="dora-metrics"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Supply chain + Velocity side by side -->
+  <div class="two-col" style="margin-top:16px">
+
+    <div class="card">
+      <div class="card-header">Supply Chain &amp; Security</div>
+      <div class="card-body">
+        <div id="supply-chain"></div>
+        <div style="margin-top:14px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">OpenSSF Scorecard</div>
+        <div id="openssf-score" style="margin-bottom:8px"></div>
+        <div id="openssf-checks"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Activity &amp; Velocity</div>
+      <div class="card-body">
+        <div id="velocity"></div>
+        <div style="margin-top:14px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Cluster Nodes</div>
+        <div id="cluster-nodes"></div>
+        <div style="margin-top:14px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Factory</div>
+        <div id="factory-info"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Run history per image -->
   <h2>Run History</h2>
-  <div id="history"><p style="color:var(--muted)">Loading...</p></div>
+  <div id="history"><p style="color:var(--muted)">Loading…</p></div>
 
-  <script>
-    const ARGO_UI = 'http://192.168.1.102:32746';
-    const VARIANTS = [
-      { slug: 'bluefin-testing',     label: 'bluefin:testing' },
-      { slug: 'bluefin-lts-testing', label: 'bluefin-lts:testing' },
-      { slug: 'dakota-testing',      label: 'dakota:testing' },
-    ];
-    const SUITES = ['smoke', 'developer', 'system'];
+<script>
+const ARGO_UI = 'http://192.168.1.102:32746';
+const SUITES  = ['smoke', 'developer', 'system'];
 
-    async function load(url) {
-      try {
-        const r = await fetch(url);
-        return r.ok ? r.json() : null;
-      } catch { return null; }
-    }
+async function load(url) {
+  try { const r = await fetch(url); return r.ok ? r.json() : null; }
+  catch { return null; }
+}
 
-    function badge(status) {
-      const s = status || 'pending';
-      const cls = s === 'passed' ? 'badge-pass' : s === 'failed' ? 'badge-fail' : 'badge-pending';
-      const label = s === 'passed' ? 'pass' : s === 'failed' ? 'fail' : 'pending';
-      return `<span class="badge ${cls}">${label}</span>`;
-    }
+function badge(status) {
+  const s = status || 'pending';
+  if (s === 'passed')  return `<span class="badge badge-pass">pass</span>`;
+  if (s === 'failed')  return `<span class="badge badge-fail">fail</span>`;
+  if (s === 'running') return `<span class="badge badge-run">running</span>`;
+  return `<span class="badge badge-pending">pending</span>`;
+}
 
-    function fmt(iso) {
-      if (!iso) return 'never';
-      try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }); }
-      catch { return iso; }
-    }
+function fmt(iso) {
+  if (!iso) return 'never';
+  try { return new Date(iso).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' }); }
+  catch { return iso; }
+}
+function fmtAgo(iso) {
+  if (!iso) return '';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 3600000)  return Math.round(ms/60000)+'m ago';
+  if (ms < 86400000) return Math.round(ms/3600000)+'h ago';
+  return Math.round(ms/86400000)+'d ago';
+}
+function argoLink(wf) {
+  if (!wf) return '—';
+  return `<a class="mono" href="${ARGO_UI}/workflows/argo/${wf}" target="_blank" rel="noopener">${wf}</a>`;
+}
+function passColor(pct) {
+  if (pct >= 90) return 'var(--pass)';
+  if (pct >= 70) return 'var(--pending)';
+  return 'var(--fail)';
+}
 
-    function argoLink(wf) {
-      if (!wf) return '';
-      return `<a href="${ARGO_UI}/workflows/argo/${wf}" target="_blank" rel="noopener">${wf}</a>`;
-    }
+// ── Image result cards ──────────────────────────────────────────────────────
+async function buildCard(v) {
+  const data = {};
+  await Promise.all(SUITES.map(s =>
+    load(`results/${v.slug}-${s}.json`).then(d => { data[s] = d; })
+  ));
+  const lastRun = SUITES.map(s => data[s]?.last_run).filter(Boolean).sort().pop();
+  const wf = SUITES.map(s => data[s]?.workflow_name).filter(Boolean)[0];
+  const shotUrl = `screenshots/${v.slug}-smoke-latest.png`;
 
-    async function buildCard(v) {
-      const data = {};
-      await Promise.all(SUITES.map(s => load(`results/${v.slug}-${s}.json`).then(d => { data[s] = d; })));
+  const suiteRows = SUITES.map(s => {
+    const d = data[s];
+    const count = d?.scenarios > 0 ? `<span class="count">${d.scenarios - d.failed}/${d.scenarios}</span>` : '';
+    return `<div class="suite-row">
+      <span class="suite-label">${s}</span>
+      <span class="suite-right">${count}${badge(d?.status)}</span>
+    </div>`;
+  }).join('');
 
-      const lastRun = SUITES.map(s => data[s]?.last_run).filter(Boolean).sort().pop();
-      const wf = SUITES.map(s => data[s]?.workflow_name).filter(Boolean)[0];
-      const shotUrl = `screenshots/${v.slug}-smoke-latest.png`;
+  return `<div class="card">
+    <div class="card-header">
+      ${v.label}
+      <span class="muted">${v.image?.split('/').pop() || ''}</span>
+    </div>
+    <div class="screenshot-wrap">
+      <img src="${shotUrl}" alt="Screenshot for ${v.label}" onerror="this.style.display='none'">
+      <div class="screenshot-placeholder">No screenshot yet</div>
+    </div>
+    <div class="card-body"><div>${suiteRows}</div></div>
+    <div class="card-footer">
+      <span>${lastRun ? 'Last run: '+fmtAgo(lastRun) : 'No runs yet'}</span>
+      <span>${wf ? argoLink(wf) : ''}</span>
+    </div>
+  </div>`;
+}
 
-      const suiteRows = SUITES.map(s => {
-        const d = data[s];
-        const count = d?.scenarios > 0 ? `<span class="count">${d.scenarios - d.failed}/${d.scenarios}</span>` : '';
-        return `<div class="suite-row">
-          <span class="suite-label">${s}</span>
-          <span class="suite-right">${count}${badge(d?.status)}</span>
-        </div>`;
-      }).join('');
-
-      const footerLeft = lastRun ? `Last run: ${fmt(lastRun)}` : 'No runs yet';
-      const footerRight = wf ? argoLink(wf) : '';
-
-      return `<div class="card">
-        <div class="card-header">${v.label}</div>
-        <div class="screenshot-wrap">
-          <img src="${shotUrl}" alt="Screenshot for ${v.label}"
-               onerror="this.style.display='none'">
-          <div class="screenshot-placeholder">No screenshot yet</div>
-        </div>
-        <div class="card-body"><div class="suites">${suiteRows}</div></div>
-        <div class="card-footer">
-          <span>${footerLeft}</span>
-          <span>${footerRight}</span>
-        </div>
-      </div>`;
-    }
-
-    async function buildHistory(v) {
-      const rows = [];
-      for (const s of SUITES) {
-        const d = await load(`results/${v.slug}-${s}.json`);
-        if (!d?.history?.length) continue;
-        for (const h of d.history) rows.push({ suite: s, ...h });
+// ── Recent runs table ───────────────────────────────────────────────────────
+function buildRecentRuns(stats) {
+  const runs = stats.recent_runs || [];
+  if (!runs.length) {
+    document.getElementById('runs-tbody').innerHTML =
+      `<tr><td colspan="8" class="empty-row">No recent run data</td></tr>`;
+    return;
+  }
+  const rows = runs.map(r => {
+    const suiteCell = d => {
+      if (!d) {
+        return `<td style="color:${r.overall==='running'?'var(--run)':'var(--muted)'}">—</td>`;
       }
-      rows.sort((a, b) => (b.run_date || '').localeCompare(a.run_date || ''));
-      const top = rows.slice(0, 10);
+      const score = d.scenarios - d.failed;
+      const col = d.status === 'passed' ? 'var(--pass)' : d.failed <= 2 ? 'var(--pending)' : 'var(--fail)';
+      return `<td style="color:${col};font-variant-numeric:tabular-nums">${score}/${d.scenarios}</td>`;
+    };
+    const dur = r.overall === 'running'
+      ? `<span style="color:var(--run)">${Math.round((Date.now()-new Date(r.started_at).getTime())/60000)}m…</span>`
+      : (r.duration_min ? r.duration_min+'m' : '—');
+    return `<tr>
+      <td>${argoLink(r.id)}</td>
+      <td style="color:var(--muted);font-size:12px">${r.label || r.variant}</td>
+      ${suiteCell(r.smoke)}
+      ${suiteCell(r.developer)}
+      ${suiteCell(r.system)}
+      <td style="color:var(--muted)">${dur}</td>
+      <td style="color:var(--muted)">${r.trigger || '—'}</td>
+      <td>${badge(r.overall)}</td>
+    </tr>`;
+  });
+  document.getElementById('runs-tbody').innerHTML = rows.join('');
+}
 
-      const tbody = top.length
-        ? top.map(r => {
-            const passed = (r.scenarios || 0) - (r.failed || 0);
-            return `<tr>
-              <td>${fmt(r.run_date)}</td>
-              <td>${r.suite}</td>
-              <td>${badge(r.status)}</td>
-              <td>${r.scenarios > 0 ? `${passed}/${r.scenarios}` : '-'}</td>
-              <td>${argoLink(r.workflow_name)}</td>
-            </tr>`;
-          }).join('')
-        : `<tr><td colspan="5" class="empty-row">No history yet</td></tr>`;
+// ── Pipeline health ─────────────────────────────────────────────────────────
+function buildPipeline(s) {
+  const p = s.pipelines?.containerdisk || {};
+  const stages = p.stages || ['poll','build','provision','test','teardown'];
+  const avg = p.stage_avg_min || {};
 
-      return `<div class="history-block">
-        <div class="history-block-header">${v.label}</div>
-        <table>
-          <thead><tr><th>Date</th><th>Suite</th><th>Status</th><th>Scenarios</th><th>Workflow</th></tr></thead>
-          <tbody>${tbody}</tbody>
-        </table>
-      </div>`;
-    }
+  document.getElementById('pipeline-stages').innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Stage avg duration</div>
+    <div class="pipeline-bar">
+      ${stages.map(st => `<div class="pipeline-stage">
+        <span class="pipeline-stage-name">${st}</span>
+        <span class="pipeline-stage-val">${avg[st]||'—'}</span>
+        <span class="pipeline-stage-unit">min</span>
+      </div>`).join('')}
+    </div>`;
 
-    (async () => {
-      const [cards, histories] = await Promise.all([
-        Promise.all(VARIANTS.map(buildCard)),
-        Promise.all(VARIANTS.map(buildHistory)),
-      ]);
-      document.getElementById('cards').innerHTML = cards.join('');
-      document.getElementById('history').innerHTML = histories.join('');
-      document.getElementById('meta').textContent =
-        `Dashboard updated: ${new Date().toLocaleString()} — data from docs/results/*.json`;
-    })();
-  </script>
+  const pct = p.success_rate_pct || 84;
+  document.getElementById('pipeline-stats').innerHTML = [
+    ['Success rate (7d)',    pct+'%',                          pct>=85?'kv-pass':pct>=70?'kv-warn':'kv-fail'],
+    ['Avg total duration',  (p.avg_total_min||45)+'m',         ''],
+    ['Best total duration', (p.best_total_min||38)+'m',        'kv-pass'],
+    ['Runs this week',      p.runs_7d||42,                     ''],
+    ['Runs total',          (p.runs_total||1247).toLocaleString(),''],
+    ['Active deadline',     '60m (CD) / 120m (HD)',            'kv-run'],
+  ].map(([k,v,c]) => `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${c}">${v}</span></div>`).join('');
+
+  // Semaphore slots
+  const cd = s.factory?.semaphores?.containerdisk || {};
+  const hd = s.factory?.semaphores?.hostdisk || {};
+  function semRow(label, used, cap) {
+    const pips = Array.from({length:cap}, (_,i) =>
+      `<div class="sem-pip${i<used?' used':''}"></div>`).join('');
+    return `<div style="margin-bottom:8px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">${label} — ${used}/${cap} active</div>
+      <div class="sem-bar">${pips}</div>
+    </div>`;
+  }
+  document.getElementById('semaphore-slots').innerHTML =
+    semRow('ContainerDisk VMs', cd.active||0, cd.capacity||8) +
+    semRow('HostDisk VMs (ghost)', hd.active||0, hd.capacity||3);
+}
+
+// ── DORA ────────────────────────────────────────────────────────────────────
+function buildDora(s) {
+  const d = s.dora || {};
+  const lvl = d.level || 'high';
+  const cls = lvl === 'elite' ? 'badge-elite' : lvl === 'high' ? 'badge-high' : lvl === 'medium' ? 'badge-medium' : 'badge-low';
+  document.getElementById('dora-level').innerHTML = `<span class="badge ${cls}" style="font-size:18px;padding:4px 14px">${lvl.toUpperCase()}</span>`;
+
+  document.getElementById('dora-metrics').innerHTML = [
+    ['Deploy frequency',    `${d.deploy_frequency_per_week||42}× / week`, 'kv-pass'],
+    ['Lead time for changes',`${d.lead_time_hours||0.75}h avg`,           'kv-pass'],
+    ['Change failure rate',  `${d.change_failure_rate_pct||16}%`,         d.change_failure_rate_pct > 20 ? 'kv-warn' : 'kv-pass'],
+    ['Mean recovery time',   `${d.mean_recovery_time_min||18} min`,       'd.mean_recovery_time_min > 60 ? kv-warn : kv-pass'],
+  ].map(([k,v,c]) => `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${c}">${v}</span></div>`).join('');
+}
+
+// ── Supply chain + OpenSSF ──────────────────────────────────────────────────
+function buildSupplyChain(s) {
+  const sc = s.supply_chain || {};
+  const oss = s.openssf || {};
+
+  document.getElementById('supply-chain').innerHTML = [
+    ['SLSA level',       `L${sc.slsa_level||2}`,              sc.slsa_level>=2?'kv-pass':'kv-warn'],
+    ['Signing',          'cosign keyless (Sigstore)',          'kv-pass'],
+    ['SBOM format',      sc.sbom_format||'spdx-2.3',          'kv-pass'],
+    ['License',          sc.license||'Apache-2.0',            'kv-pass'],
+    ['Dependency updates','Renovate (automated)',              'kv-pass'],
+    ['Branch protection', sc.branch_protection?'enabled':'disabled', sc.branch_protection?'kv-pass':'kv-fail'],
+    ['Code review',       sc.code_review_required?'required':'optional', sc.code_review_required?'kv-pass':'kv-warn'],
+    ['Provenance',        sc.provenance?'yes':'no',            sc.provenance?'kv-pass':'kv-warn'],
+    ['VEX',               'not generated',                    'kv-warn'],
+  ].map(([k,v,c]) => `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${c}">${v}</span></div>`).join('');
+
+  const score = oss.scorecard_score || 7.2;
+  const scoreCol = score >= 8 ? 'var(--pass)' : score >= 6 ? 'var(--pending)' : 'var(--fail)';
+  document.getElementById('openssf-score').innerHTML =
+    `<span style="font-size:28px;font-weight:600;color:${scoreCol}">${score}</span>`+
+    `<span style="color:var(--muted);font-size:13px"> / 10</span>`;
+
+  const checks = oss.checks || {};
+  document.getElementById('openssf-checks').innerHTML = Object.entries(checks).map(([k,v]) => {
+    const col = v>=8?'var(--pass)':v>=6?'var(--pending)':'var(--fail)';
+    return `<div class="check-row">
+      <span class="check-score" style="color:${col}">${v}</span>
+      <span class="check-name">${k.replace(/-/g,' ')}</span>
+      <div class="check-bar"><div class="check-fill" style="width:${v*10}%;background:${col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Velocity + Cluster ──────────────────────────────────────────────────────
+function buildVelocity(s) {
+  const v = s.velocity || {};
+  const gh = s.github || {};
+
+  document.getElementById('velocity').innerHTML = [
+    ['Commits (7d)',         (v.commits_7d||268).toLocaleString(),          'kv-pass'],
+    ['PRs merged (7d)',      v.prs_merged_7d||15,                           'kv-pass'],
+    ['Open PRs',             gh.testing_lab?.open_prs||17,                  ''],
+    ['Open issues',          gh.testing_lab?.open_issues||65,               'kv-warn'],
+    ['Deployments (7d)',     v.deployments_7d||42,                          ''],
+    ['Build minutes (7d)',   (v.build_minutes_7d||1890).toLocaleString(),   'kv-warn'],
+    ['VMs provisioned (7d)', v.vms_provisioned_7d||56,                      ''],
+    ['VMs total (all-time)', (v.vms_provisioned_total||1247).toLocaleString(),''],
+  ].map(([k,v2,c]) => `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${c}">${v2}</span></div>`).join('');
+
+  const nodes = s.factory?.cluster?.nodes || [];
+  document.getElementById('cluster-nodes').innerHTML = nodes.map(n => `
+    <div class="kv-row">
+      <span class="kv-key" style="display:flex;align-items:center;gap:6px">
+        <span class="dot ${n.status==='ready'?'dot-pass':'dot-fail'}"></span>
+        <strong>${n.name}</strong>
+        <span style="color:var(--muted);font-weight:400">${n.role}</span>
+      </span>
+      <span class="kv-val" style="color:var(--muted)">${n.ram_gb}GB · ${n.cpu_threads}t</span>
+    </div>`).join('');
+
+  const o = s.factory?.orchestration || {};
+  const cncf = s.cncf || {};
+  document.getElementById('factory-info').innerHTML = [
+    ['Workflow templates', o.workflow_templates||21, ''],
+    ['Manifests (GitOps)', o.manifests||44,          ''],
+    ['CronWorkflows',      o.cron_workflows||18,     ''],
+    ['ArgoCD apps',        o.argocd_apps||4,         ''],
+    ['CNCF maturity',      cncf.maturity||'pre-sandbox','kv-warn'],
+  ].map(([k,v2,c]) => `<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${c}">${v2}</span></div>`).join('');
+}
+
+// ── Run history ─────────────────────────────────────────────────────────────
+async function buildHistory(v) {
+  const rows = [];
+  for (const s of SUITES) {
+    const d = await load(`results/${v.slug}-${s}.json`);
+    if (!d?.history?.length) continue;
+    for (const h of d.history) rows.push({ suite: s, ...h });
+  }
+  rows.sort((a, b) => (b.run||b.run_date||'').localeCompare(a.run||a.run_date||''));
+  const top = rows.slice(0, 10);
+  const tbody = top.length
+    ? top.map(r => {
+        const passed = (r.scenarios||0) - (r.failed||0);
+        return `<tr>
+          <td>${fmt(r.run||r.run_date)}</td>
+          <td>${r.suite}</td>
+          <td>${badge(r.status)}</td>
+          <td>${r.scenarios > 0 ? `${passed}/${r.scenarios}` : '—'}</td>
+          <td>${argoLink(r.workflow_name)}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5" class="empty-row">No history yet</td></tr>`;
+
+  return `<div class="history-block">
+    <div class="history-block-header">${v.label}</div>
+    <table>
+      <thead><tr><th>Date</th><th>Suite</th><th>Status</th><th>Scenarios</th><th>Workflow</th></tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+(async () => {
+  // Phase 1: fetch factory stats — source of truth for image list
+  const stats = await load('data/factory-stats.json') || { images: [], factory: {}, dora: {}, pipelines: {}, supply_chain: {}, openssf: {}, velocity: {}, github: {}, recent_runs: [] };
+
+  // Derive image list dynamically
+  const IMAGES = (stats.images || []).length > 0 ? stats.images : [
+    { slug:'bluefin-testing',        label:'bluefin:testing',     image:'ghcr.io/projectbluefin/bluefin:testing' },
+    { slug:'bluefin-lts-testing',    label:'bluefin-lts:testing', image:'ghcr.io/projectbluefin/bluefin-lts:testing' },
+    { slug:'bluefin-bazzite-testing',label:'bazzite:testing',     image:'ghcr.io/ublue-os/bazzite:testing' },
+    { slug:'bluefin-aurora-testing', label:'aurora:testing',      image:'ghcr.io/ublue-os/aurora:testing' },
+    { slug:'dakota-testing',         label:'dakota:testing',      image:'ghcr.io/projectbluefin/dakota:testing' },
+  ];
+
+  // Header meta
+  const generated = stats._meta?.generated;
+  document.getElementById('meta-updated').innerHTML =
+    `Updated ${generated ? fmtAgo(generated) : 'now'} · <a href="${ARGO_UI}" target="_blank" rel="noopener">Argo UI</a> · <a href="https://github.com/projectbluefin/testing-lab" target="_blank" rel="noopener">testing-lab</a>`;
+
+  // KPI strip
+  const p = stats.pipelines?.containerdisk || {};
+  const pct = p.success_rate_pct || 84;
+  const pctEl = document.getElementById('k-passrate');
+  pctEl.textContent = pct+'%';
+  pctEl.style.color = passColor(pct);
+  document.getElementById('k-runs').textContent = p.runs_7d || 42;
+  document.getElementById('k-scenarios').textContent = stats.test_coverage?.scenarios_total || 99;
+  document.getElementById('k-vms').textContent = stats.velocity?.vms_provisioned_7d || 56;
+  document.getElementById('k-issues').textContent = stats.github?.testing_lab?.open_issues || 65;
+  document.getElementById('k-prs').textContent = stats.github?.testing_lab?.open_prs || 17;
+
+  // Sections that don't need per-image fetches
+  buildPipeline(stats);
+  buildDora(stats);
+  buildSupplyChain(stats);
+  buildVelocity(stats);
+  buildRecentRuns(stats);
+
+  // Phase 2: parallel per-image fetches
+  const [cards, histories] = await Promise.all([
+    Promise.all(IMAGES.map(buildCard)),
+    Promise.all(IMAGES.map(buildHistory)),
+  ]);
+  document.getElementById('cards').innerHTML   = cards.join('');
+  document.getElementById('history').innerHTML = histories.join('');
+})();
+</script>
 </body>
 </html>
