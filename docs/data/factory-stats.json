@@ -1,7 +1,7 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-24T17:57:06Z",
+    "generated": "2026-06-24T18:05:15Z",
     "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
@@ -299,7 +299,7 @@
   ],
   "test_coverage": {
     "feature_files": 15,
-    "scenarios_total": 285,
+    "scenarios_total": 296,
     "suites": {
       "smoke": {
         "scenarios": 29,
@@ -357,7 +357,7 @@
     "coverage_by_suite": {
       "smoke": {
         "images": 1,
-        "scenarios": 126,
+        "scenarios": 137,
         "failed": 28
       },
       "system": {
