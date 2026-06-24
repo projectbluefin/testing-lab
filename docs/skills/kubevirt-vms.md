@@ -293,12 +293,27 @@ The canonical way to wait for a VM to be SSH-accessible:
 kubectl wait vmi -n "${NS}" "${VM}" \
   --for=condition=Ready --timeout=600s
 
-# Step 2: get pod IP (virt-launcher pod IP = VM network interface)
+# Step 2: start sshd.socket via QEMU guest agent (Fedora 41+ OpenSSH packaging workaround)
+# Fedora 41+ ships sshd.service as a compatibility shim that NEVER auto-starts at boot.
+# Only sshd.socket listens on TCP 22, and it requires explicit activation.
+# Without this, SSH polls time out on every Bluefin VM.
+VIRT_POD=$(kubectl get pod -n "${NS}" -l "kubevirt.io/vm=${VM}" \
+  -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n "${NS}" "${VIRT_POD}" -c compute -- \
+  virsh qemu-agent-command 1 \
+  '{"execute":"guest-exec","arguments":{"path":"systemctl","arg":["start","sshd.socket"],"capture-output":false}}' \
+  >&2 || echo "WARNING: guest-exec for sshd.socket failed, SSH poll will be the arbiter" >&2
+
+# Step 3: wait for SSH key injection to complete
+kubectl wait vmi -n "${NS}" "${VM}" \
+  --for=condition=AccessCredentialsSynchronized --timeout=120s
+
+# Step 4: get pod IP
 POD_IP=$(kubectl get pod -n "${NS}" -l "kubevirt.io/vm=${VM}" \
   -o jsonpath='{.items[0].status.podIP}')
 
-# Step 3: wait for SSH port to be open
-timeout 120 bash -c \
+# Step 5: wait for SSH port to be open (300s is plenty once sshd.socket is started)
+timeout 300 bash -c \
   "until bash -c 'echo >/dev/tcp/${POD_IP}/22' 2>/dev/null; do sleep 5; done"
 
 # Emit IP to stdout (captured as output parameter)
@@ -306,6 +321,27 @@ echo "${POD_IP}"
 ```
 
 **Common failure:** `outputs.result` contains debug text. Always send debug to `>&2`.
+
+**RBAC requirement:** `kubectl exec` on `virt-launcher` pods requires `pods/exec` (verb: create)
+on the `pods/exec` sub-resource in the VM namespace. If this is missing, the guest-agent exec
+fails with `Error from server (Forbidden)` and SSH will time out. Add it to the kubevirt-manager
+Role in every VM namespace (`bluefin-test`, `bluefin-lts-test`).
+
+**Why not just `systemctl enable sshd.socket` in the image?** `systemctl enable` writes a symlink
+into the OCI image's `/usr/lib/systemd/system/sockets.target.wants/`. The image does have this
+symlink — but it does NOT appear in `multi-user.target.wants/`, so socket activation does not
+fire until `sockets.target` is reached later in the boot ordering. The race is consistent: the
+VM reports Ready before sockets.target fully activates. The explicit guest-exec start is the
+reliable fix; it runs at a known point (after VMI Ready) with no race.
+
+**Diagnosing sshd status via guest agent (for debugging):**
+```bash
+kubectl exec -n <ns> <virt-launcher-pod> -c compute -- \
+  virsh qemu-agent-command 1 \
+  '{"execute":"guest-exec","arguments":{"path":"systemctl","arg":["is-active","sshd.socket"],"capture-output":true}}'
+# Then decode: base64 -d <<< <out-data value>
+# "inactive" = not started, "active" = listening on TCP 22
+```
 
 ### 6. Teardown — always via onExit, never skip
 
@@ -560,6 +596,7 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 
 | Rationalization | Reality |
 |---|---|
+| "SSH will come up on its own after VMI Ready — just poll longer." | Fedora 41+ `sshd.service` is a dead shim that never starts. No amount of polling helps. Start `sshd.socket` via guest-exec immediately after VMI Ready (section 5). |
 | "I'll keep the VM up between runs to save time." | No persistent test VMs. The `orphan-vm-cleanup` CronWorkflow will delete it. |
 | "The teardown step can be optional." | A missing `onExit` handler leaks VMs and disk clones on failure. Always required. |
 | "containerDisk VMs must pin to ghost." | Only hostDisk VMs need ghost. ContainerDisk VMs can schedule on bazzite too. |
@@ -592,7 +629,8 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 - LTS VM goes `Stopped` immediately after creation — `bluefin-test-ssh-pubkey` secret missing from `bluefin-lts-test` namespace. The manifest must create the secret in **both** `bluefin-test` and `bluefin-lts-test`. Check with `kubectl get secret -n bluefin-lts-test bluefin-test-ssh-pubkey`.
 - VM goes `Stopped` with `FailedCreate` and `metadata.labels: must be no more than 63 characters` — VM name exceeds Kubernetes label-value limit. `bluefin-lts-testing-developer-<36-char-uuid>` = 67 chars, fails. `smoke` (5 chars) just passes; `developer` (9 chars) overflows. Fix: use `{{workflow.name}}-{{item}}` instead of `{{workflow.parameters.variant}}-{{item}}-{{workflow.uid}}` — workflow names are short and unique. Fixed in `bluefin-qa-pipeline` commit `7fca070`.
 - Orphaned VMs from a prior workflow consuming ghost resources — run `just list-vms` before submitting a new matrix run; delete orphans with `kubernetes-mcp-resources_delete` if present. Four concurrent VMs on ghost can cause VMI Ready timeouts.
-- **LTS (RHEL10) VM SSH never opens but VMI is Ready and CPU time is flat** — OVMF can't find the bootloader; `/EFI/BOOT/BOOTX64.EFI` is missing from the disk. RHEL10 `bootc install` only creates `/EFI/redhat/`; copy the shim to the fallback path in the build step. See section 13a.
+- **SSH always times out with 1800s poll even though VMI is Ready** — Fedora 41+ OpenSSH packaging: `sshd.service` is a dead shim, never starts. `sshd.socket` is enabled but requires explicit activation via guest-exec. Check with `systemctl is-active sshd.socket` via guest agent; if inactive, the `wait-for-vm-ready` template is missing the guest-exec start step (section 5). The 1800s timeout is the smoke alarm, not the root cause.
+- **`kubectl exec ... -c compute -- virsh qemu-agent-command` returns Forbidden** — `pods/exec` (verb: create) is missing from the kubevirt-manager Role in the VM namespace. Add it to `manifests/kubevirt-rbac.yaml` for every namespace (`bluefin-test`, `bluefin-lts-test`). RHEL10 `bootc install` only creates `/EFI/redhat/`; copy the shim to the fallback path in the build step. See section 13a.
 - **LTS VM SSH never opens and CPU time grows but slowly (8-15 min boot)** — fstab `/boot` or `/boot/efi` entry missing `nofail`+`x-systemd.device-timeout=5s`. The field-aware sed in section 13b MUST cover both `defaults` and `umask=...` option strings. A simple `/defaults/ s/defaults/defaults,nofail/` won't match RHEL10's `/boot/efi` entry.
 - **Field-aware fstab sed not patching `/boot/efi`** — the old sed pattern `/defaults/` doesn't match RHEL10 fstab where `/boot/efi` uses `umask=0077,shortname=winnt`. Use the column-4-aware sed from section 13b.
 
@@ -600,6 +638,8 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 
 Before merging any VM provisioning change:
 
+- [ ] `wait-for-vm-ready` template starts `sshd.socket` via guest-exec (Fedora 41+ packaging); `AccessCredentialsSynchronized` wait added; SSH poll timeout ≤ 300s
+- [ ] kubevirt-manager Role in EVERY VM namespace (`bluefin-test`, `bluefin-lts-test`) includes `pods/exec` (verb: create) — required for guest-exec
 - [ ] hostDisk templates have `nodeSelector: kubernetes.io/hostname: ghost`; containerDisk templates float freely
 - [ ] `onExit` teardown deletes VM object AND disk file
 - [ ] Feature gates checked if adding a new VM capability
