@@ -112,7 +112,7 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 | exo-1 | k3s worker (opt-in) | 192.168.1.239 | Dakota laptop — 22c/15.1Gi; `just k8s-on/off` to join/leave; excludes BST builds (16Gi request) |
 | exo-0 | k3s worker (dedicated) | 192.168.1.171 | Flatcar 4593.2.3 — k3s via sysext, k3s-agent enabled at boot; always schedulable |
 | exo-2 | k3s worker (dedicated) | 192.168.1.171 | Flatcar 4593.2.3 — k3s via sysext, k3s-agent enabled at boot; always schedulable; update.conf → Nebraska for auto kernel updates |
-| bazzite | k3s worker | 192.168.1.223 | Gaming machine — fully schedulable (no taint); k3s-agent enabled and running at boot |
+| bazzite | k3s worker (offline) | 192.168.1.223 | Gaming machine — removed from active service; rejoin with `just k8s-on` when available |
 | hamilton | k3s worker (opt-in) | 192.168.1.225 | Bluefin workstation — 16c/31.2Gi; `just k8s-on/off` to join/leave |
 | Argo UI | — | http://192.168.1.102:32746 | NodePort; also http://192.168.1.102:2746 on host |
 | Loki | log aggregation | http://192.168.1.102:30100 | Scrapes pods labeled `app.kubernetes.io/part-of=bluefin-test-suite` |
@@ -120,7 +120,7 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 | llm-d | LLM inference (hive node) | http://192.168.1.102:30800 | OpenAI-compatible API; model: Qwen/Qwen3.6-35B-A3B; namespace: `llm-d` |
 
 **No hostDisk VMs remain.** All VM types use containerDisk or PVC:
-- **ContainerDisk VMs** (Bluefin, GnomeOS, Dakota, Flatcar): float freely to any KubeVirt-capable node (ghost or bazzite).
+- **ContainerDisk VMs** (Bluefin, GnomeOS, Dakota, Flatcar): float freely to any KubeVirt-capable node (ghost when bazzite is offline).
 - **PVC-backed VMs** (Knuckle): `local-path` PVC; KubeVirt co-schedules the VM automatically on the PVC's node. No explicit `nodeSelector` needed.
 
 Adding a new KubeVirt node requires no YAML changes — VMs will schedule there automatically.
@@ -388,7 +388,7 @@ priority classes and scheduler decisions can reorder work).
 **All pipelines have `activeDeadlineSeconds`** (1h containerdisk, 2h knuckle)
 so stuck VMs self-evict and release node resources automatically.
 
-**VMs float to any KubeVirt-capable node** (ghost, bazzite). The ghost-pin was
+**VMs float to any KubeVirt-capable node** (ghost; bazzite when rejoined). The ghost-pin was
 removed — the registry-mirror-config DaemonSet writes hosts.toml for
 `192.168.1.102:30500` on all nodes.
 
