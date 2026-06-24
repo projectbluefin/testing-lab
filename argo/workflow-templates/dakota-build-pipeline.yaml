@@ -119,9 +119,10 @@ spec:
               --directory "${EXPORT_DIR}"
 
           echo "=== Pushing to local Zot ==="
-          skopeo copy \
-            --dest-tls-verify=false \
-            "oci:${EXPORT_DIR}" \
-            "docker://192.168.1.102:30500/${TAG}:latest"
+          # skopeo is not in the bst2 image; use podman instead.
+          # Load the OCI layout into podman local storage, then push by image ID.
+          IMAGE_ID=$(podman pull "oci:${EXPORT_DIR}" | tail -1)
+          podman push "${IMAGE_ID}" "192.168.1.102:30500/${TAG}:latest" --tls-verify=false
+          podman rmi "${IMAGE_ID}" 2>/dev/null || true
 
           echo "=== Build complete: 192.168.1.102:30500/${TAG}:latest ==="
