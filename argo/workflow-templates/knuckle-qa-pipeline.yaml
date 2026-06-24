@@ -25,11 +25,7 @@ spec:
         resources:
           requests:
             storage: 30Gi
-  synchronization:
-    semaphores:
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-containerdisk-vms
+  # VM concurrency managed by k8s scheduler via virt-launcher pod memory requests.
   activeDeadlineSeconds: 7200
   entrypoint: pipeline
   onExit: teardown

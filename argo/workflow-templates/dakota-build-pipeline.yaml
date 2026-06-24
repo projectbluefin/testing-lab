@@ -14,11 +14,7 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
-  synchronization:
-    semaphores:
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-bst-builds
+  # BST build concurrency managed by k8s scheduler via pod resource requests.
   activeDeadlineSeconds: 7200
 
   arguments:

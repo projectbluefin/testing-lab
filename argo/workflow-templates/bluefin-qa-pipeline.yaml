@@ -16,15 +16,9 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
-  # ── VM concurrency cap — prevents scheduler flooding ────────────────────────
-  # Each workflow holds one slot while a VM is live. Waiting workflows queue
-  # inside Argo (no VMI objects created) so k8s scheduler stays unburdened.
-  # Slot count is in manifests/semaphore-config.yaml — edit there to tune.
-  synchronization:
-    semaphores:
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-containerdisk-vms
+  # VM concurrency is managed by k8s scheduler via virt-launcher pod memory
+  # requests (8Gi/VM). Pending workflows queue as Pending VMIs — no semaphore
+  # needed. FIFO ordering follows workflow creation timestamp.
   activeDeadlineSeconds: 3600
   # ── entrypoint ──────────────────────────────────────────────────────────────
   entrypoint: pipeline

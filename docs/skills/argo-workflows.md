@@ -350,37 +350,28 @@ asserts the artifact exists and fails fast — it never triggers a rebuild.
 - Zot annotations require `oras` tooling to set post-push; ConfigMap needs only `curl`
 - The ConfigMap stores the *source* digest, not the containerdisk digest — conceptually different
 
-### 15. VM concurrency — semaphore pools (bin-packing)
+### 15. VM concurrency — k8s native scheduling (no semaphores)
 
-Use `spec.synchronization.semaphores` to cap concurrent VM-holding workflows. Without it, submitting 20+ PRs at once creates 20+ VMI objects simultaneously — all their resource requests count against node capacity even while Pending, flooding the scheduler.
+VM concurrency is managed by the **k8s scheduler via virt-launcher pod memory requests**, not Argo semaphores. When a node has insufficient RAM, the virt-launcher pod stays Pending. When a VM finishes, resources free up and the scheduler picks the next Pending pod. FIFO ordering follows workflow creation timestamp.
 
-**The API (v3.6+):**
+**Do not add `spec.synchronization.semaphores` to VM pipeline specs.** The semaphore approach was removed because:
+- Slots were held at workflow scope, not VM-live scope — a 3h pipeline held a slot during build/assert/teardown, not just while the VM was running
+- Build workflows (no VM) held VM slots, starving actual test workflows
+- The slot count was a manually-maintained number that drifted from actual hardware
+
+**What to do instead:** ensure VM specs have explicit memory requests so the scheduler has accurate data:
 ```yaml
-spec:
-  synchronization:
-    semaphores:                          # plural — "semaphore:" singular is DEPRECATED
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-containerdisk-vms
-  activeDeadlineSeconds: 3600           # always set — prevents stuck VMs holding slots forever
+domain:
+  memory:
+    guest: "{{inputs.parameters.vm-memory}}"   # KubeVirt sets virt-launcher request from this
 ```
 
-`semaphore:` (singular) is deprecated and rejected by ArgoCD schema validation. Use `semaphores:` (list). Verified against Context7 `/argoproj/argo-workflows` deprecations doc.
-
-**Two pools in this repo:**
-
-| ConfigMap key | Pipelines | Nodes |
-|---|---|---|
-| `max-containerdisk-vms` | bluefin-qa-pipeline, dakota-qa-pipeline | any Ready node |
-| `max-hostdisk-vms` | knuckle-qa-pipeline, flatcar-smoke-test | ghost only |
-
-hostDisk VMs (knuckle, flatcar) are ghost-pinned because their disk images live in ghost's local hostPath. containerDisk VMs (bluefin, dakota) can schedule on any node with KubeVirt. Two separate pools prevents knuckle builds from starving bluefin PR tests.
-
-**Auto-tuning (semaphore-tuner CronWorkflow, hourly):**
+**All pipelines still need `activeDeadlineSeconds`** so stuck VMs self-evict:
+```yaml
+activeDeadlineSeconds: 3600   # 1h for containerdisk, 7200 for knuckle
 ```
-slots = clamp(floor((sum_ready_node_ram - OVERHEAD_GI) / SLOT_GI), MIN, MAX)
-```
-Adding a node → slots auto-increase within 1 hour. Values written to `manifests/semaphore-config.yaml`. Tune constants in `manifests/semaphore-tuner.yaml`.
+
+**VMs float to any KubeVirt-capable node** — no `nodeSelector: kubernetes.io/hostname: ghost` in VM specs. The registry-mirror-config DaemonSet writes the Zot HTTP registry config to all nodes.
 
 ### 16. GitHub Contents API write-back — curl+jq only
 
@@ -634,7 +625,7 @@ UID 107 = qemu. Required — omitting `--chown` causes VM boot failure (permissi
 - `synchronization.semaphore:` (singular) in any pipeline — deprecated, rejected by ArgoCD schema. Use `synchronization.semaphores:` (list with `- configMapKeyRef:` item)
 - `spec.schedule:` (singular) on a CronWorkflow — field does not exist in CRD schema; use `spec.schedules:` (array)
 - A pipeline with VMs and no `spec.activeDeadlineSeconds` — a stuck VM holds its semaphore slot forever
-- A pipeline with VMs and no semaphore — submitting 20 PRs at once floods the scheduler with VMI resource requests
+- A pipeline with VMs that adds `spec.synchronization.semaphores` — semaphores are removed; k8s scheduler handles concurrency via virt-launcher memory requests
 - A `steps` or `dag` task calling a sub-template without `arguments:`
 - A pipeline with no `onExit` handler (VM will leak on failure)
 - Any `script:` template without `resources:` limits
@@ -673,7 +664,9 @@ Before marking any WorkflowTemplate change done:
 - [ ] Change is committed and pushed — not manually applied to cluster
 - [ ] `description:` annotation present on the new/modified template
 - [ ] File name matches `metadata.name` (e.g. `provision-bluefin-vm.yaml` for `name: provision-bluefin-vm`)
-- [ ] hostDisk pipelines (flatcar only) have `spec.nodeSelector: kubernetes.io/hostname: ghost` at WorkflowTemplate spec level — not just on individual templates. Knuckle uses PVC; GnomeOS uses containerDisk — neither needs spec-level nodeSelector.
+- [ ] VM pipeline spec has NO `synchronization.semaphores` block — k8s scheduler handles VM concurrency
+- [ ] VM pipeline spec has `activeDeadlineSeconds` (1h or 2h) so stuck VMs self-evict
+- [ ] No `nodeSelector: kubernetes.io/hostname: ghost` in VM specs — VMs float to any KubeVirt-capable node
 - [ ] GitHub Contents API write-backs use curl+jq, not inline Python; output teed to a file on persistent hostPath storage
 - [ ] `kubectl get workflowtemplate -n argo` shows no cluster-only templates (not in git) unless they're intentional bootstrap one-shots
 - [ ] No CronWorkflow with a `dry-run` parameter whose default is `"true"` — verify GC jobs actually delete

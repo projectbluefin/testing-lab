@@ -206,9 +206,6 @@ manifests/                     ← ArgoCD (testing-lab-infra App) syncs these
   image-poll-lts-stable.yaml      CronWorkflow: poll bluefin-lts:stable digest
   image-poll-dakota.yaml          CronWorkflow: poll dakota:latest digest
   pr-label-poller.yaml            CronWorkflow: poll PRs for test-me label
-  semaphore-config.yaml           ConfigMap: VM concurrency slot counts (auto-tuned hourly)
-  semaphore-tuner.yaml            CronWorkflow: recompute slot counts from live node capacity
-  semaphore-tuner-rbac.yaml       RBAC: argo SA → get nodes + patch semaphore-config
   lab-test-vm-priorityclass.yaml  PriorityClass for test VM pods
   homelab-access-auth.yaml        homelab access auth config
   homelab-runner-rbac.yaml        RBAC for homelab ARC runners
@@ -376,35 +373,23 @@ Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](
 - Include: current behavior, expected behavior, exact file:line if code issue, acceptance criteria.
 - For infra failures: include workflow name, pod name, and relevant log excerpt.
 
-## VM Concurrency — Semaphore Pools
+## VM Concurrency — k8s Native Scheduling
 
-Two independent semaphore pools gate VM creation. Workflows queue inside Argo
-(no VMI objects created) until a slot is free — the k8s scheduler never sees
-phantom resource requests from jobs not yet running.
+VM concurrency is managed by the k8s scheduler via **virt-launcher pod memory
+requests** (8Gi per VM). No Argo semaphores. No config to maintain.
 
-| Pool key | Pipelines | Nodes | Bootstrap |
-|---|---|---|---|
-| `max-containerdisk-vms` | bluefin-qa-pipeline, dakota-qa-pipeline, knuckle-qa-pipeline, flatcar-smoke-test | any Ready node | 8 |
-| `max-hostdisk-vms` | (unused — all VMs now use containerDisk or PVC) | — | 6 |
+When a node has insufficient RAM, the virt-launcher pod stays Pending. When a
+running VM finishes, resources free up and the scheduler picks the next Pending
+pod. FIFO ordering follows workflow creation timestamp automatically.
 
-Values live in `manifests/semaphore-config.yaml` and are **recomputed hourly**
-by the `semaphore-tuner` CronWorkflow using live node allocatable memory:
-
-```
-slots = clamp(floor((sum_ready_node_ram - 10Gi_overhead_per_node) / 8Gi), MIN, MAX)
-```
-
-**Adding a node:** slots auto-increase on the next tuner run (within 1 hour).
-No manual edits needed. Tune `OVERHEAD_GI`, `SLOT_GI`, or bounds in
-`manifests/semaphore-tuner.yaml`.
+**Adding a node:** the scheduler starts using it immediately. No YAML changes needed.
 
 **All pipelines have `activeDeadlineSeconds`** (1h containerdisk, 2h knuckle)
-so stuck VMs release their semaphore slot automatically.
+so stuck VMs self-evict and release node resources automatically.
 
-**Semaphore API note:** Argo v3.6+ uses `synchronization.semaphores` (list),
-not the deprecated `synchronization.semaphore` (singular). Always use the
-plural form. Confirmed via Context7 docs.
-
+**VMs float to any KubeVirt-capable node** (ghost, bazzite). The ghost-pin was
+removed — the registry-mirror-config DaemonSet writes hosts.toml for
+`192.168.1.102:30500` on all nodes.
 
 
 | Template | CPU req/limit | Memory req/limit |

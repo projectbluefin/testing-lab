@@ -7,11 +7,6 @@ spec:
   entrypoint: flatcar-test-pipeline
   serviceAccountName: argo
   onExit: cleanup
-  synchronization:
-    semaphores:
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-containerdisk-vms
   activeDeadlineSeconds: 3600
   ttlStrategy:
     secondsAfterCompletion: 3600

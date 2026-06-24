@@ -38,12 +38,6 @@ spec:
       - name: namespace
         value: "flatcar-test"
 
-  synchronization:
-    semaphores:
-      - configMapKeyRef:
-          name: semaphore-config
-          key: max-containerdisk-vms
-
   volumeClaimTemplates:
     - metadata:
         name: build-data
