@@ -205,6 +205,10 @@ spec:
               printf '%s\n' '${SSH_PUBKEY}' > /var/home/bluefin-test/.ssh/authorized_keys
               chown 1001:1001 /var/home/bluefin-test/.ssh/authorized_keys
               chmod 600 /var/home/bluefin-test/.ssh/authorized_keys
+              # Restore SELinux file contexts so sshd can read authorized_keys.
+              # Files created by root in a user's homedir inherit the wrong context
+              # without restorecon (e.g. admin_home_t instead of ssh_home_t).
+              restorecon -Rv /var/home/bluefin-test/.ssh/ 2>/dev/null || true
               echo '[ROOT] bluefin-test authorized_keys written:'
               cat /var/home/bluefin-test/.ssh/authorized_keys
               # Enable user lingering so rootless Podman services survive login/logout.
@@ -215,7 +219,10 @@ spec:
             # Wait for bluefin-test SSH to work (short retry loop).
             echo "Verifying bluefin-test SSH..." >&2
             timeout 120 bash -c "
-              until ${SSH} 'echo ready' 2>/dev/null; do sleep 5; done
+              until ${SSH} 'echo ready' 2>&1; do
+                echo '[bluefin-test SSH] not ready, retrying...' >&2
+                sleep 5
+              done
             "
             echo "SSH ready (bluefin-test)." >&2
 
