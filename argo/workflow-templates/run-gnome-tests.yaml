@@ -205,19 +205,18 @@ spec:
               printf '%s\n' '${SSH_PUBKEY}' > /var/home/bluefin-test/.ssh/authorized_keys
               chown 1001:1001 /var/home/bluefin-test/.ssh/authorized_keys
               chmod 600 /var/home/bluefin-test/.ssh/authorized_keys
-              # Restore SELinux file contexts so sshd can read authorized_keys.
-              # Falls back to chcon if restorecon is not available.
-              restorecon -Rv /var/home/bluefin-test/.ssh/ 2>/dev/null || \
-                chcon -t ssh_home_t /var/home/bluefin-test/.ssh/ \
-                               /var/home/bluefin-test/.ssh/authorized_keys 2>/dev/null || true
-              echo '[ROOT] bluefin-test authorized_keys written:'
-              cat /var/home/bluefin-test/.ssh/authorized_keys
-              echo '[ROOT] SELinux context and permissions:'
-              ls -laZ /var/home/bluefin-test/.ssh/ 2>&1 || ls -la /var/home/bluefin-test/.ssh/
-              echo '[ROOT] bluefin-test passwd entry:'
-              getent passwd bluefin-test
-              echo '[ROOT] sshd AuthorizedKeysFile config:'
-              sshd -T 2>/dev/null | grep -i 'authorizedkeys\|strictmodes\|pubkeyauthentication' | head -5
+              # Write key to all possible AuthorizedKeysFile locations across disk versions:
+              # - .ssh/authorized_keys (standard, already done above)
+              # - /etc/ssh/test-authorized-keys (old build-containerdisk format)
+              # - /etc/ssh/authorized_keys/bluefin-test (new build-containerdisk format with %u)
+              # sshd -T reveals which is active; we write all to cover both versions.
+              mkdir -p /etc/ssh/authorized_keys
+              printf '%s\n' '${SSH_PUBKEY}' >> /etc/ssh/test-authorized-keys 2>/dev/null || true
+              printf '%s\n' '${SSH_PUBKEY}' > /etc/ssh/authorized_keys/bluefin-test 2>/dev/null || true
+              chmod 600 /etc/ssh/test-authorized-keys /etc/ssh/authorized_keys/bluefin-test 2>/dev/null || true
+              echo '[ROOT] bluefin-test authorized_keys written (all locations)'
+              echo '[ROOT] sshd AuthorizedKeysFile:'
+              sshd -T 2>/dev/null | grep -i 'authorizedkeysfile' | head -3 || echo 'sshd -T unavailable'
               # Enable user lingering so rootless Podman services survive login/logout.
               # Required by the developer suite 'User lingering is enabled' assertion.
               loginctl enable-linger bluefin-test 2>/dev/null || true
