@@ -1,7 +1,7 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-24T21:06:15Z",
+    "generated": "2026-06-24T21:21:42Z",
     "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
