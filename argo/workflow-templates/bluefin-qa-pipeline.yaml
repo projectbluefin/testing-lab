@@ -295,21 +295,14 @@ spec:
             > "/tmp/suite-scores/${SUITE}.json" || true
           done
 
-          # Build suite_scores object via Python
-          SUITE_SCORES=$(python3 - <<'PYEOF'
-import json, os, sys
-scores = {}
-for suite in ["smoke", "developer", "software", "system"]:
-    p = f"/tmp/suite-scores/{suite}.json"
-    try:
-        with open(p) as f:
-            d = json.load(f)
-            scores[suite] = {"scenarios": d.get("scenarios", 0), "failed": d.get("failed", 0), "status": d.get("status", "unknown")}
-    except Exception:
-        pass
-print(json.dumps(scores))
-PYEOF
-)
+          # Build suite_scores object via jq (one-liner per suite, merge via jq -n)
+          SUITE_SCORES=$(jq -n \
+            --argjson sm "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/smoke.json    2>/dev/null || echo 'null')" \
+            --argjson de "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/developer.json 2>/dev/null || echo 'null')" \
+            --argjson sw "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/software.json  2>/dev/null || echo 'null')" \
+            --argjson sy "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/system.json    2>/dev/null || echo 'null')" \
+            '{smoke:$sm,developer:$de,software:$sw,system:$sy} | with_entries(select(.value != null))' \
+          2>/dev/null || echo '{}')
 
           NEW_RUN=$(jq -nc \
             --arg id   "$WF_NAME" \
