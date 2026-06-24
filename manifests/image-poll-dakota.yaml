@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/part-of: testing-lab
     bluefin.io/trigger: digest-poll
 spec:
+  suspend: true  # dakota composefs image ships no UKI; bootc install to-disk always fails. Do not un-suspend until upstream fixes this.
   schedules:
     - "0 * * * *"
   timezone: "UTC"

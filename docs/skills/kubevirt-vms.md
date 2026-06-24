@@ -186,6 +186,26 @@ The key is visible to sshd within seconds of the QEMU guest agent starting.
 **Why not disk injection:** ostree resets etc/ files that exist in usr/etc/ at first boot;
 var/ writes may not survive qemu-img sparse conversion.
 
+**qemu-guest-agent variant gap:** `bluefin:testing` has `qemu-guest-agent.service` enabled by
+default. `bluefin-lts:testing`, `aurora:testing`, and `bazzite:testing` do NOT. Without the
+guest agent the `AccessCredentialsSynchronized` condition never becomes True and `wait-for-vm`
+times out. `build-containerdisk.yaml` works around this by explicitly symlinking the service
+into `multi-user.target.wants` during the build's post-install phase — this is already done
+and must be preserved when editing that template.
+
+**New variant checklist — required before a new image tag's VMs can run:**
+
+| Item | File |
+|---|---|
+| Namespace created | `manifests/<variant>-test-namespace.yaml` |
+| SSH pubkey secret in namespace | same file (bluefin-test-ssh-pubkey Secret) |
+| RBAC (kubevirt-manager Role + RoleBinding for argo SA) | `manifests/kubevirt-rbac.yaml` |
+| `accessCredentials` lists both `root` and `bluefin-test` | `provision-bluefin-vm.yaml` |
+| CronWorkflow for nightly smoke | `manifests/nightly-<variant>.yaml` |
+| Disk size measured and set per-variant | `argo/workflow-templates/build-containerdisk.yaml` default + `digest-watch.yaml` per-variant override |
+
+Missing RBAC for a new namespace is the #1 cause of `wait-for-vm` exit 1 (`kubectl wait vmi` returns 403 Forbidden).
+
 ### 2c. Runtime user creation (more reliable than disk injection)
 
 Even if `bluefin-test` user was added to `etc/passwd` during disk build, never assume

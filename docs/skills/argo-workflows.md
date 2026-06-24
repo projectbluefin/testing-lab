@@ -498,9 +498,83 @@ Verified against Context7 `/argoproj/argo-workflows` CronWorkflow spec docs.
 
 CronWorkflows also cannot be invoked via `workflowTemplateRef` — if you need a CronWorkflow to be submittable manually, extract its logic into a WorkflowTemplate and have the CronWorkflow reference it with `workflowTemplateRef`.
 
+### 18. `when` condition trap — never reference a Skipped task's outputs
+
+When a DAG task is Skipped (its own `when` condition evaluated false), its `outputs.result`
+is **undefined**. Any downstream task whose `when` references that output will fail to
+evaluate and will also be Skipped — silently, with no error. The entire chain dies.
+
+**Example of the bug:**
+```yaml
+- name: check
+  when: "'{{inputs.parameters.force}}' != 'true'"   # Skipped when force=true
+  template: check
+
+- name: build
+  depends: "(check.Succeeded || check.Skipped)"
+  when: "'{{tasks.check.outputs.result}}' != 'exists'"  # ✗ undefined when check is Skipped
+  template: build
+```
+
+When `force=true`: `check` is Skipped → `tasks.check.outputs.result` is undefined →
+`build`'s `when` fails to evaluate → `build` is also Skipped → nothing runs. No error logged.
+
+**The fix: never skip the task that owns the gate decision. Move the bypass logic inside the script.**
+
+```yaml
+- name: check           # always runs — no 'when' on this task
+  template: check       # script checks force param internally and outputs "missing" if force=true
+
+- name: build
+  depends: "check.Succeeded"
+  when: "'{{tasks.check.outputs.result}}' != 'exists'"   # ✅ output always defined
+  template: build
+```
+
+Inside the `check` script:
+```bash
+if [[ "{{inputs.parameters.force}}" == "true" ]]; then
+  echo "missing"   # short-circuit — always rebuild
+  exit 0
+fi
+# … real existence check …
+```
+
+**Rule:** If a task has a `when` guard AND downstream tasks reference its outputs,
+remove the `when` guard and move the bypass into the script body.
+
+**Symptoms of this bug:**
+- Workflow shows phase `Running` but only 1–2 nodes (the DAG + the Skipped task)
+- No `install-to-disk` or equivalent node ever created
+- Controller logs show `"was unable to obtain the node"` for the downstream task (normal reconciliation noise)
+- `force=true` workflows submitted after a digest change never actually build
+
+### 19. Mutex contention from stuck failed builds
+
+The `ghost-heavy-compute` mutex (on the `install-to-disk` template) allows only one
+concurrent build at a time. Failed workflows that were stopped via `shutdown: Stop` **release
+the mutex**, but workflows that exit with a non-zero script error may hold the mutex until
+the workflow GC TTL clears them.
+
+**Check what holds the mutex:**
+```bash
+kubectl logs -n argo -l app=workflow-controller --since=2m 2>/dev/null \
+  | grep -i "ghost-heavy\|mutex\|Could not acquire"
+```
+
+**Stop a workflow holding the mutex:**
+```bash
+kubectl patch workflow <name> -n argo -p '{"spec":{"shutdown":"Stop"}}' --type=merge
+```
+
+**Dakota builds and the mutex:** `dakota-qa-pipeline` is permanently blocked (composefs image
+without UKI — `bootc install to-disk` fails). The `image-poll-dakota` CronWorkflow is
+suspended in `manifests/image-poll-dakota.yaml` (`spec.suspend: true`). **Never un-suspend
+it** until upstream ships a UKI or the pipeline switches to a golden-disk approach.
+If dakota builds appear again, stop them immediately — each one holds the mutex for its
+`activeDeadlineSeconds` and starves LTS/aurora/bazzite rebuilds.
 
 
-| Rationalization | Reality |
 |---|---|
 | "I'll skip the description annotation for now." | ArgoCD prune and agent navigation both rely on the annotation. Add it. |
 | "The sub-template will see workflow.parameters directly." | It will not. Argo Workflows scopes parameters per-template. Always pass explicitly. |
@@ -535,6 +609,9 @@ CronWorkflows also cannot be invoked via `workflowTemplateRef` — if you need a
 - Any `image:` in `argo/` or `manifests/` referencing `:5000` for the local OCI registry — `:5000` is the container-internal Zot port; use the NodePort `192.168.1.102:30500` so non-hostNetwork pods can reach it
 - Any `image:` referencing a registry not in the allowlist (`ghcr.io`, `quay.io`, `registry.fedoraproject.org`, `registry.access.redhat.com`, `registry.k8s.io`, `192.168.1.102`, `localhost`) — enforce with the lint gate in `.github/workflows/lint.yaml`
 - `depends: "X.Succeeded"` on a task that follows a conditionally-skippable upstream — if upstream is Skipped, the downstream task is Omitted and the whole DAG may appear to succeed even though the chain broke; use `depends: "(X.Succeeded || X.Skipped)"` when the upstream has its own `when` guard
+- A downstream `when` condition that references `{{tasks.X.outputs.result}}` where task X has its own `when` guard — if X is Skipped its output is undefined and the downstream task silently skips too. Fix: let X always run; handle the bypass inside the script (see §18).
+- A `force=true` rebuild workflow where only 1–2 nodes appear (DAG + a Skipped check) and no build step ever runs — this is the §18 `when`/Skipped output bug, not a semaphore or mutex issue
+- Dakota builds (`build-cd-sync-dakota-latest-*`) running at all — dakota pipeline is permanently blocked; these builds always fail and hold the `ghost-heavy-compute` mutex, starving LTS/aurora/bazzite rebuilds. `image-poll-dakota` must remain suspended in git.
 - Commit message not in Conventional Commits format — the pre-commit hook rejects any commit not matching `<type>(<scope>): <description>`. Valid types: `feat fix ci chore docs refactor test build perf revert`
 
 ## Verification

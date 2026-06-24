@@ -161,7 +161,28 @@ controllerServiceAccount:
 When bazzite is online it can accept workflow pods. If a pod lands on bazzite and fails,
 delete it — it will reschedule to ghost automatically.
 
-### 8. Reconciling orphan templates (cluster-only → git)
+### 9. Suspending a broken CronWorkflow permanently
+
+When a CronWorkflow always fails (upstream image broken, build blocked), suspend it **in git**
+— a `kubectl patch` will be reverted by ArgoCD selfHeal within ~3 minutes.
+
+```yaml
+# In manifests/<name>.yaml — add spec.suspend: true
+spec:
+  suspend: true       # ArgoCD enforces this; removes it to re-enable
+  schedules:
+    - "0 * * * *"
+```
+
+Commit and push. ArgoCD sets the CronWorkflow's suspend flag and stops scheduling new runs.
+
+**Suspend vs delete:** temporarily broken → suspend. Permanently abandoned → delete the file; ArgoCD prune removes the CronWorkflow.
+
+**Currently suspended:** `image-poll-dakota` — dakota composefs image ships no UKI;
+`bootc install to-disk` always fails. Do not un-suspend until upstream ships a UKI or
+the pipeline switches to golden-disk.
+
+### 10. Reconciling orphan templates (cluster-only → git)
 
 When a template exists in the cluster but not in git:
 ```bash
