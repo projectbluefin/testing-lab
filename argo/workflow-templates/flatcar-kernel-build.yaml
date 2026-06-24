@@ -1,18 +1,19 @@
-# Builds a full Flatcar OS image with a custom kernel version.
+# Builds a full Flatcar OS image with a custom kernel version and registers
+# it in Nebraska so update_engine can perform an A/B partition update.
 #
 # Pipeline:
-#   build-image  - Flatcar SDK builds packages + OS image + update payload
-#   register     - POST update payload to Nebraska; update_engine sees it immediately
+#   provision-build-vm  - Boot a Flatcar KubeVirt VM (Docker 28 ships in Flatcar)
+#   build-kernel        - SSH in, run Flatcar SDK via run_sdk_container, build image
+#   register-package    - POST update payload to Nebraska with correct Omaha fields
+#   teardown-build-vm   - onExit handler, always runs
 #
-# The update payload (flatcar_production_update.gz) is uploaded to Nebraska's
-# package store. update_engine on Flatcar nodes polls Nebraska (via update.conf
-# written by flatcar-update-configurator DaemonSet) and performs an A/B update.
+# Nebraska registration:
+#   url        = base path (Nebraska constructs full URL as url+filename)
+#   flatcar_action.sha256 = required for valid Omaha responses to update_engine
+#   version    = 9999.MAJOR.MINOR (always > any stock Flatcar, real semver precedence)
 #
 # Flatcar app UUID: e96281a6-d1af-4bde-9a0a-97b76e56dc57
-# Nebraska NodePort: 30802 (http://192.168.1.102:30802)
-#
-# Build node: floats to any schedulable node. Needs privileged + ~100Gi scratch.
-# Build time: ~60-90 minutes first run (no ccache), ~30 minutes with warm cache.
+# Nebraska NodePort: 30802
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -22,40 +23,51 @@ metadata:
     app.kubernetes.io/part-of: testing-lab
 spec:
   entrypoint: pipeline
+  onExit: teardown-build-vm
+  serviceAccountName: argo
   arguments:
     parameters:
       - name: kernel-version
         value: "7.1.1"
       - name: flatcar-scripts-ref
-        value: "main"
+        value: "stable-4593.2.3"
       - name: sdk-version
         value: "4593.0.0"
+      - name: vm-name
+        value: "flatcar-kernel-build"
+      - name: namespace
+        value: "flatcar-test"
+
+  synchronization:
+    semaphores:
+      - configMapKeyRef:
+          name: semaphore-config
+          key: max-containerdisk-vms
 
   volumeClaimTemplates:
     - metadata:
-        name: build-workspace
+        name: build-data
       spec:
         accessModes: [ReadWriteOnce]
         storageClassName: local-path
         resources:
           requests:
             storage: 120Gi
-    - metadata:
-        name: ccache
-      spec:
-        accessModes: [ReadWriteOnce]
-        storageClassName: local-path
-        resources:
-          requests:
-            storage: 20Gi
 
   templates:
+    # -------------------------------------------------------------------------
     - name: pipeline
       steps:
-        - - name: build-image
-            template: build-image
+        - - name: create-vm
+            template: create-vm
+        - - name: wait-for-ssh
+            template: wait-for-ssh
+        - - name: build-kernel
+            template: build-kernel
             arguments:
               parameters:
+                - name: vm-ip
+                  value: "{{steps.wait-for-ssh.outputs.result}}"
                 - name: kernel-version
                   value: "{{workflow.parameters.kernel-version}}"
                 - name: flatcar-scripts-ref
@@ -69,116 +81,267 @@ spec:
                 - name: kernel-version
                   value: "{{workflow.parameters.kernel-version}}"
 
+    - name: create-vm
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: kubevirt.io/v1
+          kind: VirtualMachine
+          metadata:
+            name: "{{workflow.parameters.vm-name}}"
+            namespace: "{{workflow.parameters.namespace}}"
+            labels:
+              app: flatcar-kernel-build
+              argo-workflow: "{{workflow.name}}"
+          spec:
+            runStrategy: Always
+            template:
+              metadata:
+                labels:
+                  kubevirt.io/vm: "{{workflow.parameters.vm-name}}"
+              spec:
+                domain:
+                  cpu:
+                    cores: 16
+                  memory:
+                    guest: 32Gi
+                  devices:
+                    disks:
+                      - name: rootdisk
+                        disk:
+                          bus: virtio
+                        bootOrder: 1
+                      - name: builddisk
+                        disk:
+                          bus: virtio
+                      - name: cloudinit
+                        disk:
+                          bus: virtio
+                    interfaces:
+                      - name: default
+                        masquerade: {}
+                  machine:
+                    type: q35
+                networks:
+                  - name: default
+                    pod: {}
+                volumes:
+                  - name: rootdisk
+                    containerDisk:
+                      image: 192.168.1.102:30500/flatcar-containerdisk:latest
+                  - name: builddisk
+                    persistentVolumeClaim:
+                      claimName: "{{workflow.name}}-build-data"
+                  - name: cloudinit
+                    cloudInitNoCloud:
+                      userData: |
+                        #cloud-config
+                        write_files:
+                          - path: /home/core/.ssh/authorized_keys
+                            permissions: '0600'
+                            owner: core:core
+                        runcmd:
+                          - mkdir -p /home/core/.ssh
+                          - chmod 700 /home/core/.ssh
+
+    - name: wait-for-ssh
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        env:
+          - name: SSH_PUBKEY
+            valueFrom:
+              secretKeyRef:
+                name: bluefin-test-ssh-key
+                key: id_ed25519.pub
+        source: |
+          set -euo pipefail
+          exec 3>&1; exec 1>&2
+          NS="{{workflow.parameters.namespace}}"
+          VM="{{workflow.parameters.vm-name}}"
+
+          echo "Waiting for VMI ready..."
+          kubectl wait vmi -n "${NS}" "${VM}" \
+            --for=condition=Ready --timeout=300s
+
+          echo "Waiting for guest agent..."
+          timeout 180 bash -c \
+            "until kubectl get vmi -n '${NS}' '${VM}' \
+              -o jsonpath='{.status.conditions[?(@.type==\"AgentConnected\")].status}' \
+              | grep -q True; do sleep 5; done"
+
+          # Inject SSH key via QEMU guest agent
+          LAUNCHER=$(kubectl get pod -n "${NS}" \
+            -l "kubevirt.io/vm=${VM}" -o jsonpath='{.items[0].metadata.name}')
+          DOMAIN="${NS}_${VM}"
+          PUBKEY="${SSH_PUBKEY}"
+          kubectl exec -n "${NS}" "${LAUNCHER}" -c compute -- bash -c "
+            virsh qemu-agent-command '${DOMAIN}' \
+              '{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/bin/sh\",\"arg\":[\"-c\",\"mkdir -p /home/core/.ssh && echo ${PUBKEY} > /home/core/.ssh/authorized_keys && chown -R core:core /home/core/.ssh && chmod 700 /home/core/.ssh && chmod 600 /home/core/.ssh/authorized_keys\"],\"capture-output\":true}}'
+          "
+
+          POD_IP=$(kubectl get pod -n "${NS}" \
+            -l "kubevirt.io/vm=${VM}" -o jsonpath='{.items[0].status.podIP}')
+
+          echo "Waiting for SSH on ${POD_IP}..."
+          timeout 120 bash -c \
+            "until bash -c 'echo >/dev/tcp/${POD_IP}/22' 2>/dev/null; do sleep 5; done"
+
+          # Format and mount the build disk inside the VM
+          kubectl exec -n "${NS}" "${LAUNCHER}" -c compute -- bash -c "
+            virsh qemu-agent-command '${DOMAIN}' \
+              '{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/bin/sh\",\"arg\":[\"-c\",\"lsblk -rno NAME,SIZE | grep -v vda | grep -v sr0 | head -1 | read DEV SZ && DEV=/dev/\${DEV} && mkfs.ext4 -F \${DEV} && mkdir -p /var/tmp/build && mount \${DEV} /var/tmp/build && chown core:core /var/tmp/build\"],\"capture-output\":true}}'
+          " || true
+
+          echo "${POD_IP}" >&3
+
     # -------------------------------------------------------------------------
-    # build-image: runs the Flatcar SDK as the pod container.
-    # Clones flatcar/scripts, copies kernel overlay, builds packages + OS image.
-    # Output: flatcar_production_update.gz on the build-workspace PVC.
+    # build-kernel: SSH into the Flatcar build VM.
+    # Flatcar 4593 ships Docker 28 — run_sdk_container works natively.
+    # scripts ref pinned to stable-4593.2.3 to match SDK 4593.0.0.
+    # Manifest is regenerated inside the SDK with `ebuild manifest`.
+    # Output: /var/tmp/build/output/flatcar_production_update.gz on the build-data PVC.
     # -------------------------------------------------------------------------
-    - name: build-image
+    - name: build-kernel
       inputs:
         parameters:
+          - name: vm-ip
           - name: kernel-version
           - name: flatcar-scripts-ref
           - name: sdk-version
-      container:
-        image: "ghcr.io/flatcar/flatcar-sdk-amd64:{{inputs.parameters.sdk-version}}"
-        command: [bash, -euo, pipefail, -c]
-        args:
-          - |
-            KERNEL_VERSION="{{inputs.parameters.kernel-version}}"
-            SCRIPTS_REF="{{inputs.parameters.flatcar-scripts-ref}}"
-
-            echo "=== Flatcar kernel build: ${KERNEL_VERSION} ==="
-
-            # Clone flatcar/scripts (shallow for speed)
-            git clone --depth=1 --branch "${SCRIPTS_REF}" \
-              https://github.com/flatcar/scripts /workspace/scripts
-            cd /workspace/scripts
-
-            # Clone testing-lab to get the kernel overlay
-            git clone --depth=1 \
-              https://github.com/projectbluefin/testing-lab /workspace/testing-lab
-
-            # Install kernel overlay into the scripts tree
-            OVERLAY_SRC=/workspace/testing-lab/flatcar/kernel-overlay
-            OVERLAY_DEST=sdk_container/src/third_party/flatcar-kernel-overlay
-            cp -r "${OVERLAY_SRC}" "${OVERLAY_DEST}"
-
-            # Register overlay in portage repos.conf
-            mkdir -p /etc/portage/repos.conf
-            cat > /etc/portage/repos.conf/flatcar-kernel.conf << EOF
-            [flatcar-kernel]
-            location = /workspace/scripts/${OVERLAY_DEST}
-            masters = portage-stable coreos
-            auto-sync = no
-            EOF
-
-            # Configure ccache
-            export CCACHE_DIR=/ccache
-            export USE_CCACHE=1
-            export CCACHE_MAXSIZE=15G
-            ccache --zero-stats 2>/dev/null || true
-
-            # Update the Manifest checksums for the kernel tarball.
-            # ebspike fetches the tarball and recomputes hashes.
-            emerge --quiet --oneshot dev-util/ebspike 2>/dev/null || true
-            ebspike "${OVERLAY_DEST}/sys-kernel/coreos-sources/coreos-sources-${KERNEL_VERSION}.ebuild" \
-              || echo "ebspike not available; Manifest must be pre-populated"
-
-            # Set up the amd64-usr board (cross-compilation sysroot)
-            ./setup_board --board=amd64-usr --default --skip-chroot-upgrade
-
-            # Build just the kernel source package from our overlay
-            emerge-amd64-usr --quiet --jobs=4 \
-              "=sys-kernel/coreos-sources-${KERNEL_VERSION}"
-
-            # Build the full OS image (produces flatcar_production_update.gz)
-            # --generate_update creates the Omaha-compatible payload signed with dev key
-            ./build_image --board=amd64-usr prod
-
-            # Locate the update payload
-            IMAGES_DIR="src/build/images/amd64-usr/latest"
-            PAYLOAD="${IMAGES_DIR}/flatcar_production_update.gz"
-            if [ ! -f "${PAYLOAD}" ]; then
-              echo "ERROR: update payload not found at ${PAYLOAD}"
-              ls "${IMAGES_DIR}/" || true
-              exit 1
-            fi
-
-            # Copy payload and metadata to workspace output dir for next step
-            mkdir -p /workspace/output
-            cp "${PAYLOAD}" /workspace/output/flatcar_production_update.gz
-            sha1sum "${PAYLOAD}" | awk '{print $1}' > /workspace/output/sha1.txt
-            sha256sum "${PAYLOAD}" | awk '{print $1}' > /workspace/output/sha256.txt
-            wc -c < "${PAYLOAD}" > /workspace/output/size.txt
-
-            echo "=== Build complete ==="
-            echo "Payload: $(wc -c < /workspace/output/flatcar_production_update.gz) bytes"
-            echo "SHA1:    $(cat /workspace/output/sha1.txt)"
-            echo "SHA256:  $(cat /workspace/output/sha256.txt)"
-        securityContext:
-          privileged: true
+      activeDeadlineSeconds: 10800
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash]
         resources:
           requests:
-            cpu: "8"
-            memory: 16Gi
-          limits:
-            cpu: "32"
-            memory: 32Gi
-        volumeMounts:
-          - name: build-workspace
-            mountPath: /workspace
-          - name: ccache
-            mountPath: /ccache
+            cpu: 500m
+            memory: 512Mi
         env:
-          - name: CCACHE_DIR
-            value: /ccache
+          - name: SSH_KEY
+            valueFrom:
+              secretKeyRef:
+                name: bluefin-test-ssh-key
+                key: id_ed25519
+        source: |
+          set -euo pipefail
+          VM_IP="{{inputs.parameters.vm-ip}}"
+          KERNEL_VERSION="{{inputs.parameters.kernel-version}}"
+          SCRIPTS_REF="{{inputs.parameters.flatcar-scripts-ref}}"
+          SDK_VERSION="{{inputs.parameters.sdk-version}}"
+
+          # Write SSH key
+          echo "${SSH_KEY}" > /tmp/id_ed25519
+          chmod 600 /tmp/id_ed25519
+          SSH="ssh -i /tmp/id_ed25519 -o StrictHostKeyChecking=no \
+               -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+               core@${VM_IP}"
+
+          echo "=== Connected to build VM at ${VM_IP} ==="
+
+          $SSH bash -s << REMOTE
+          set -euo pipefail
+          KERNEL_VERSION="${KERNEL_VERSION}"
+          SCRIPTS_REF="${SCRIPTS_REF}"
+          SDK_VERSION="${SDK_VERSION}"
+          BUILD_DIR=/var/tmp/build
+
+          echo "=== Clone flatcar/scripts @ \${SCRIPTS_REF} ==="
+          git clone --depth=1 --branch "\${SCRIPTS_REF}" \
+            https://github.com/flatcar/scripts \${BUILD_DIR}/scripts
+          cd \${BUILD_DIR}/scripts
+
+          echo "=== Clone testing-lab for kernel overlay ==="
+          git clone --depth=1 \
+            https://github.com/projectbluefin/testing-lab \
+            \${BUILD_DIR}/testing-lab
+
+          echo "=== Install kernel overlay ==="
+          OVERLAY_DEST=sdk_container/src/third_party/flatcar-kernel-overlay
+          cp -r \${BUILD_DIR}/testing-lab/flatcar/kernel-overlay \${OVERLAY_DEST}
+
+          echo "=== Regenerate Manifest checksums via SDK ==="
+          # Run ephemeral SDK container just for manifest generation
+          docker run --rm \
+            -v \${BUILD_DIR}/scripts/\${OVERLAY_DEST}:/overlay \
+            ghcr.io/flatcar/flatcar-sdk-amd64:\${SDK_VERSION} \
+            bash -c "
+              ebuild /overlay/sys-kernel/coreos-sources/coreos-sources-\${KERNEL_VERSION}.ebuild manifest
+              ebuild /overlay/sys-kernel/coreos-kernel/coreos-kernel-\${KERNEL_VERSION}.ebuild manifest 2>/dev/null || true
+              ebuild /overlay/sys-kernel/coreos-modules/coreos-modules-\${KERNEL_VERSION}.ebuild manifest 2>/dev/null || true
+            "
+
+          echo "=== Run SDK build via run_sdk_container ==="
+          # run_sdk_container detects Docker and uses it natively
+          ./run_sdk_container --rm \
+            -m \${BUILD_DIR}/testing-lab/flatcar/kernel-overlay:/overlay \
+            -V \${SDK_VERSION} \
+            -- bash -c "
+              set -euo pipefail
+
+              # Register overlay in portage repos.conf
+              mkdir -p /etc/portage/repos.conf
+              cat > /etc/portage/repos.conf/flatcar-kernel.conf << EOF
+          [flatcar-kernel]
+          location = /overlay
+          masters = portage-stable coreos
+          auto-sync = no
+          EOF
+
+              # Set up board
+              /mnt/host/source/src/scripts/setup_board \
+                --board=amd64-usr --default --skip-chroot-upgrade
+
+              # Build kernel packages
+              emerge-amd64-usr --quiet --jobs=8 \
+                =sys-kernel/coreos-sources-\${KERNEL_VERSION} \
+                =sys-kernel/coreos-kernel-\${KERNEL_VERSION} \
+                =sys-kernel/coreos-modules-\${KERNEL_VERSION}
+
+              # Build the full Flatcar OS image (generates update payload)
+              /mnt/host/source/src/scripts/build_image \
+                --board=amd64-usr prod
+
+              mkdir -p /mnt/host/source/src/build/output
+              cp /mnt/host/source/src/build/images/amd64-usr/latest/flatcar_production_update.gz \
+                 /mnt/host/source/src/build/output/flatcar_production_update.gz
+            "
+
+          # Collect output metadata
+          PAYLOAD=\${BUILD_DIR}/scripts/src/build/output/flatcar_production_update.gz
+          mkdir -p \${BUILD_DIR}/output
+          cp "\${PAYLOAD}" \${BUILD_DIR}/output/
+          sha1sum "\${PAYLOAD}" | awk '{print \$1}' > \${BUILD_DIR}/output/sha1.txt
+          sha256sum "\${PAYLOAD}" | awk '{print \$1}' > \${BUILD_DIR}/output/sha256.txt
+          wc -c < "\${PAYLOAD}" | tr -d ' ' > \${BUILD_DIR}/output/size.txt
+          echo "=== Build complete: \$(wc -c < \${BUILD_DIR}/output/flatcar_production_update.gz) bytes ==="
+          REMOTE
+
+          # Copy output from VM to workflow pod via kubectl cp
+          NS="{{workflow.parameters.namespace}}"
+          VM="{{workflow.parameters.vm-name}}"
+          LAUNCHER=$(kubectl get pod -n "${NS}" \
+            -l "kubevirt.io/vm=${VM}" -o jsonpath='{.items[0].metadata.name}')
+          echo "Copying output from VM..."
+          scp -i /tmp/id_ed25519 -o StrictHostKeyChecking=no \
+            core@${VM_IP}:/var/tmp/build/output/flatcar_production_update.gz /tmp/
+          scp -i /tmp/id_ed25519 -o StrictHostKeyChecking=no \
+            core@${VM_IP}:/var/tmp/build/output/sha1.txt /tmp/
+          scp -i /tmp/id_ed25519 -o StrictHostKeyChecking=no \
+            core@${VM_IP}:/var/tmp/build/output/sha256.txt /tmp/
+          scp -i /tmp/id_ed25519 -o StrictHostKeyChecking=no \
+            core@${VM_IP}:/var/tmp/build/output/size.txt /tmp/
+          echo "Output files ready"
 
     # -------------------------------------------------------------------------
-    # register-package: copies the payload into Nebraska's package PVC and
-    # registers it via the Nebraska REST API.
-    # Nebraska serves it at: http://192.168.1.102:30802/flatcar/<filename>
-    # update_engine on nodes downloads it on next check-in.
+    # register-package: copies payload to Nebraska pod and registers via REST API.
+    # Nebraska URL field = base path; Nebraska constructs full URL as url+filename.
+    # flatcar_action.sha256 is required for valid Omaha action metadata.
+    # Version uses 9999.MAJOR.MINOR for real semver precedence over stock Flatcar.
     # -------------------------------------------------------------------------
     - name: register-package
       inputs:
@@ -187,54 +350,75 @@ spec:
       script:
         image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
         source: |
           set -euo pipefail
-
           KERNEL_VERSION="{{inputs.parameters.kernel-version}}"
           NEBRASKA_URL="http://192.168.1.102:30802"
           FLATCAR_APP_ID="e96281a6-d1af-4bde-9a0a-97b76e56dc57"
 
-          PAYLOAD=/workspace/output/flatcar_production_update.gz
-          SHA1=$(cat /workspace/output/sha1.txt)
-          SHA256=$(cat /workspace/output/sha256.txt)
-          SIZE=$(cat /workspace/output/size.txt)
-          FILENAME="flatcar_production_update-${KERNEL_VERSION}.gz"
+          PAYLOAD=/tmp/flatcar_production_update.gz
+          SHA1=$(cat /tmp/sha1.txt)
+          SHA256=$(cat /tmp/sha256.txt)
+          SIZE=$(cat /tmp/size.txt)
 
-          # Copy payload into Nebraska's package directory via the nebraska pod
+          # Version: 9999.MAJOR.MINOR gives real semver precedence > any stock Flatcar
+          KERNEL_MAJOR=$(echo "${KERNEL_VERSION}" | cut -d. -f1)
+          KERNEL_MINOR=$(echo "${KERNEL_VERSION}" | cut -d. -f2)
+          VERSION="9999.${KERNEL_MAJOR}.${KERNEL_MINOR}"
+          FILENAME="flatcar_production_update-kernel${KERNEL_VERSION}.gz"
+
+          echo "Registering kernel ${KERNEL_VERSION} as Flatcar version ${VERSION}"
+
+          # Copy payload into Nebraska's /packages/ directory
           NEBRASKA_POD=$(kubectl get pod -n flatcar-update \
             -l app=nebraska -o jsonpath='{.items[0].metadata.name}')
-          kubectl cp "${PAYLOAD}" \
-            "flatcar-update/${NEBRASKA_POD}:/packages/${FILENAME}"
+          kubectl cp "${PAYLOAD}" "flatcar-update/${NEBRASKA_POD}:/packages/${FILENAME}"
 
-          # Nebraska package URL (served from its /flatcar/ path)
-          PKG_URL="${NEBRASKA_URL}/flatcar/${FILENAME}"
+          # Nebraska serves files at {nebraska-url}/flatcar/{filename}
+          # The `url` field in the API must be the BASE PATH only —
+          # Nebraska appends filename when building Omaha responses.
+          PKG_BASE_URL="${NEBRASKA_URL}/flatcar/"
 
-          # Register the package via Nebraska REST API
-          # Version string format: Flatcar uses semver-like e.g. "4593.2.3+kernel7.1.1"
-          VERSION="4593.2.3+kernel${KERNEL_VERSION}"
-
-          # Convert SHA1 to base64 (Nebraska API expects base64-encoded SHA1)
-          SHA1_B64=$(echo -n "${SHA1}" | xxd -r -p | base64)
+          # SHA1 as base64-encoded raw bytes (what Nebraska/Omaha expects)
+          SHA1_B64=$(printf '%s' "${SHA1}" | xxd -r -p | base64)
 
           curl -sf -X POST \
             "${NEBRASKA_URL}/api/v1/apps/${FLATCAR_APP_ID}/packages" \
             -H "Content-Type: application/json" \
             -d "{
               \"filename\": \"${FILENAME}\",
-              \"url\": \"${PKG_URL}\",
+              \"url\": \"${PKG_BASE_URL}\",
               \"version\": \"${VERSION}\",
               \"hash\": \"${SHA1_B64}\",
               \"hash256\": \"${SHA256}\",
               \"size\": \"${SIZE}\",
               \"type\": 1,
-              \"arch\": 1
+              \"arch\": 1,
+              \"flatcar_action\": {
+                \"sha256\": \"${SHA256}\"
+              }
             }"
 
           echo ""
-          echo "=== Package registered in Nebraska ==="
-          echo "Version:  ${VERSION}"
-          echo "URL:      ${PKG_URL}"
+          echo "=== Package registered ==="
+          echo "Version: ${VERSION}  (kernel ${KERNEL_VERSION})"
+          echo "URL:     ${PKG_BASE_URL}${FILENAME}"
           echo "update_engine on Flatcar nodes will pick this up on next check-in"
-        volumeMounts:
-          - name: build-workspace
-            mountPath: /workspace
+
+    # -------------------------------------------------------------------------
+    # teardown-build-vm: always runs via onExit. Deletes the KubeVirt VM.
+    # -------------------------------------------------------------------------
+    - name: teardown-build-vm
+      resource:
+        action: delete
+        flags: ["--ignore-not-found=true"]
+        manifest: |
+          apiVersion: kubevirt.io/v1
+          kind: VirtualMachine
+          metadata:
+            name: "{{workflow.parameters.vm-name}}"
+            namespace: "{{workflow.parameters.namespace}}"

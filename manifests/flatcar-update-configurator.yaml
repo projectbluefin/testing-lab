@@ -1,14 +1,12 @@
 # Writes /etc/flatcar/update.conf on every Flatcar node so update_engine
 # checks Nebraska instead of the upstream Flatcar update servers.
-# Runs on all nodes; non-Flatcar nodes exit silently.
+# Runs on all nodes; non-Flatcar nodes exit silently (hourly recheck).
 # Rechecks hourly and rewrites if the config drifts.
 #
-# Flatcar update.conf keys:
-#   GROUP   - which channel/group to track (matches a Nebraska group name)
-#   SERVER  - Omaha endpoint (Nebraska /v1/update/)
-#
-# Detection note: /etc/os-release on Flatcar is a symlink to /usr/lib/os-release.
-# We mount both /etc and /usr/lib from the host so the symlink resolves.
+# Flatcar-specific:
+#   /etc/os-release is a symlink -> /usr/lib/os-release (mount both)
+#   /etc is overlayfs; direct hostPath writes fail — enter host mount ns via nsenter
+#   update_engine re-reads update.conf on SIGHUP without needing the IPC namespace
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -33,33 +31,38 @@ spec:
         - operator: Exists
       containers:
         - name: configurator
-          image: cgr.dev/chainguard/busybox:latest
+          image: cgr.dev/chainguard/wolfi-base:latest
           securityContext:
             privileged: true
+            seccompProfile:
+              type: Unconfined
           command:
             - /bin/sh
             - -c
             - |
               while true; do
-                if ! grep -q 'ID=flatcar' /host/usr/lib/os-release 2>/dev/null \
-                   && ! grep -q 'ID=flatcar' /host/etc/os-release 2>/dev/null; then
+                if ! grep -q 'ID=flatcar' /host/usr/lib/os-release 2>/dev/null; then
                   sleep 3600
                   continue
                 fi
-                mkdir -p /host/etc/flatcar
-                desired_server="http://192.168.1.102:30802/v1/update/"
-                current=$(cat /host/etc/flatcar/update.conf 2>/dev/null || echo "")
-                if ! echo "$current" | grep -qF "$desired_server"; then
-                  printf 'GROUP=stable\nSERVER=%s\n' "$desired_server" \
-                    > /host/etc/flatcar/update.conf
-                  nsenter -t 1 -m -u -i -n -- systemctl restart update-engine || true
-                  echo "$(date): reconfigured update.conf on $(cat /host/etc/hostname)"
+                DESIRED_SERVER="http://192.168.1.102:30802/v1/update/"
+                CURRENT=$(nsenter --target 1 --mount -- \
+                  sh -c 'cat /etc/flatcar/update.conf 2>/dev/null || echo ""')
+                if ! echo "$CURRENT" | grep -qF "$DESIRED_SERVER"; then
+                  nsenter --target 1 --mount -- sh -c "
+                    mkdir -p /etc/flatcar
+                    printf 'GROUP=stable\nSERVER=%s\n' '$DESIRED_SERVER' \
+                      > /etc/flatcar/update.conf
+                  "
+                  UPDATE_ENGINE_PID=$(nsenter --target 1 --mount -- \
+                    sh -c 'pgrep update_engine 2>/dev/null || echo ""')
+                  [ -n "$UPDATE_ENGINE_PID" ] && \
+                    kill -HUP "$UPDATE_ENGINE_PID" 2>/dev/null || true
+                  echo "$(date -u): configured update.conf -> $DESIRED_SERVER"
                 fi
                 sleep 3600
               done
           volumeMounts:
-            - name: host-etc
-              mountPath: /host/etc
             - name: host-usr-lib
               mountPath: /host/usr/lib
               readOnly: true
@@ -71,9 +74,6 @@ spec:
               cpu: 50m
               memory: 32Mi
       volumes:
-        - name: host-etc
-          hostPath:
-            path: /etc
         - name: host-usr-lib
           hostPath:
             path: /usr/lib
