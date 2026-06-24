@@ -71,7 +71,10 @@ spec:
            REPO=$(echo "$PR" | jq -r '.base.repo.full_name')
            SHA=$(echo "$PR"  | jq -r '.head.sha')
            PR_NUM=$(echo "$PR" | jq -r '.number')
-           BRANCH=$(echo "$PR" | jq -r '.head.ref')
+           # Always use main branch of testing-lab for external PRs.
+           # The branch from the source repo (bluefin, common, etc.) is unrelated
+           # to testing-lab branches and would cause git-sync to fail.
+           BRANCH="main"
            REPO_SLUG=$(echo "$REPO" | sed 's|.*/||; s/bluefin-lts/lts/; s/bluefin/blu/; s/dakota/dak/; s/knuckle/knu/')
            TITLE=$(echo "$PR" | jq -r '.title')
            # Slugify title: lowercase, non-alnum to dash, truncate to 30 chars
