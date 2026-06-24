@@ -389,14 +389,23 @@ spec:
                 name: github-token
                 key: token
         source: |
+          set -euo pipefail
           STATE=$([ "{{workflow.status}}" = "Succeeded" ] && echo success || echo failure)
           URL="http://192.168.1.102:32746/workflows/argo/{{workflow.name}}"
           PAYLOAD="{\"state\":\"${STATE}\",\"context\":\"ghost-lab\",\"description\":\"Bluefin lab test ${STATE}\",\"target_url\":\"${URL}\"}"
-          curl -sf -X POST \
+          echo "Posting ${STATE} to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}" >&2
+          echo "Token length: ${#GITHUB_TOKEN}" >&2
+          HTTP_CODE=$(curl -s -o /tmp/gh-response.json -w "%{http_code}" -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             "https://api.github.com/repos/{{workflow.parameters.repo}}/statuses/{{workflow.parameters.sha}}" \
-            -d "$PAYLOAD" \
-          && echo "Posted $STATE to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}" \
-          || echo "WARNING: failed to post commit status (non-fatal)"
+            -d "$PAYLOAD")
+          echo "HTTP code: $HTTP_CODE" >&2
+          cat /tmp/gh-response.json >&2
+          if [[ "$HTTP_CODE" =~ ^2 ]]; then
+            echo "Posted $STATE to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}"
+          else
+            echo "ERROR: GitHub API returned HTTP $HTTP_CODE — failing step for visibility" >&2
+            exit 1
+          fi
