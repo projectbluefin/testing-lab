@@ -1,0 +1,127 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dakota-build-pipeline
+  namespace: argo
+  annotations:
+    description: |
+      Parallel dakota BST build pipeline. Builds bluefin and bluefin-nvidia OCI variants
+      in parallel against the in-cluster buildbox-casd CAS on ghost. Triggered by push to
+      dakota:testing via GHA cluster-build.yml. On success, exports to local Zot (:30500).
+      Uses bst-build PriorityClass — preemptable by lab-test-vm pods.
+  labels:
+    app.kubernetes.io/component: dakota-build
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  serviceAccountName: argo
+  synchronization:
+    semaphores:
+      - configMapKeyRef:
+          name: semaphore-config
+          key: max-bst-builds
+  activeDeadlineSeconds: 7200
+
+  arguments:
+    parameters:
+      - name: repo
+        value: "https://github.com/projectbluefin/dakota.git"
+      - name: ref
+        value: "testing"
+
+  entrypoint: build
+
+  templates:
+
+    - name: build
+      dag:
+        tasks:
+          - name: build-bluefin
+            template: bst-build
+            arguments:
+              parameters:
+                - name: element
+                  value: "oci/bluefin.bst"
+                - name: tag
+                  value: "dakota-cluster-testing"
+          - name: build-bluefin-nvidia
+            template: bst-build
+            arguments:
+              parameters:
+                - name: element
+                  value: "oci/bluefin-nvidia.bst"
+                - name: tag
+                  value: "dakota-cluster-testing-nvidia"
+
+    - name: bst-build
+      priorityClassName: bst-build
+      inputs:
+        parameters:
+          - name: element
+          - name: tag
+      volumes:
+        - name: fuse
+          hostPath:
+            path: /dev/fuse
+        - name: bst-cache
+          emptyDir: {}
+      script:
+        image: 192.168.1.102:30500/bst2:64eb0b4930d57a92710822898fb73af6cc1ae35d
+        command: [bash]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            type: spc_t
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+          limits:
+            cpu: "8"
+            memory: 28Gi
+        volumeMounts:
+          - name: fuse
+            mountPath: /dev/fuse
+          - name: bst-cache
+            mountPath: /root/.cache/buildstream
+        source: |
+          set -euo pipefail
+
+          # Write in-cluster BST config — plain gRPC to in-cluster casd, no TLS
+          cat > /tmp/buildstream-cluster.conf << 'BSTCONF'
+          cache:
+            storage-service:
+              url: http://buildbox-casd.local-registry.svc.cluster.local:11002
+              push: true
+          BSTCONF
+
+          BST_CONF=/tmp/buildstream-cluster.conf
+          ELEMENT="{{inputs.parameters.element}}"
+          TAG="{{inputs.parameters.tag}}"
+          REF="{{workflow.parameters.ref}}"
+          REPO="{{workflow.parameters.repo}}"
+
+          echo "=== Cloning dakota @ ${REF} ==="
+          git clone --depth=1 --branch "${REF}" "${REPO}" /src
+          cd /src
+
+          echo "=== Building ${ELEMENT} ==="
+          bst --config "${BST_CONF}" \
+              --no-interactive \
+              -o x86_64_v3 true \
+              build "${ELEMENT}"
+
+          echo "=== Exporting ${ELEMENT} ==="
+          EXPORT_DIR="/tmp/export-$(basename ${ELEMENT} .bst)"
+          mkdir -p "${EXPORT_DIR}"
+          bst --config "${BST_CONF}" \
+              --no-interactive \
+              artifact checkout "${ELEMENT}" \
+              --directory "${EXPORT_DIR}"
+
+          echo "=== Pushing to local Zot ==="
+          skopeo copy \
+            --dest-tls-verify=false \
+            "oci:${EXPORT_DIR}" \
+            "docker://192.168.1.102:30500/${TAG}:latest"
+
+          echo "=== Build complete: 192.168.1.102:30500/${TAG}:latest ==="
