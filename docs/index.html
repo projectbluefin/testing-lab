@@ -323,6 +323,12 @@
 
 <!-- Image status table -->
 <h2>Image Status</h2>
+<div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
+  <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+    <input type="checkbox" id="filter-failing" onchange="filterStatusTable(this.checked)">
+    Show failing / untested images only
+  </label>
+</div>
 <div class="status-table">
   <table>
     <thead>
@@ -383,6 +389,16 @@
 const ARGO_UI   = 'http://192.168.1.102:32746';
 const GH_REPO   = 'https://github.com/projectbluefin/testing-lab';
 const SUITES    = ['smoke', 'developer', 'software', 'system'];
+
+// Workflow template per image slug (for submit links in coverage gaps)
+const WORKFLOW_TEMPLATES = {
+  'bluefin-testing':         'bluefin-qa-pipeline',
+  'bluefin-lts-testing':     'bluefin-qa-pipeline',
+  'bluefin-bazzite-testing': 'bluefin-qa-pipeline',
+  'bluefin-aurora-testing':  'bluefin-qa-pipeline',
+  'dakota-testing':          'dakota-qa-pipeline',
+  'flatcar-testing':         'run-flatcar-tests',
+};
 const SUITE_FEATURES = {
   smoke:     GH_REPO + '/tree/main/tests/smoke/features',
   developer: GH_REPO + '/tree/main/tests/developer/features',
@@ -583,6 +599,29 @@ function failingSince(history) {
   return since;
 }
 
+// Compute nightly overdue hours for an image row
+// Returns positive number of hours overdue, or null if on schedule / no nightly
+function nightlyOverdue(img, row) {
+  const utcHour = img.nightly_time_utc;
+  if (!utcHour) return null;
+  const [h, m] = utcHour.split(':').map(Number);
+  const now = new Date();
+  // Expected run time today (UTC)
+  const expectedToday = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m
+  ));
+  // If expected time today hasn't passed yet, check yesterday's run
+  const expectedRun = now < expectedToday
+    ? new Date(expectedToday.getTime() - 86400000)
+    : expectedToday;
+  // Latest last_run across all suites for this image
+  const lastRuns = Object.values(row).map(d => d?.last_run).filter(Boolean).sort();
+  const lastRun = lastRuns.length ? new Date(lastRuns[lastRuns.length - 1]) : null;
+  if (lastRun && lastRun >= expectedRun) return null; // ran on time
+  const hoursOverdue = Math.round((now.getTime() - expectedRun.getTime()) / 3600000);
+  return hoursOverdue > 0 ? hoursOverdue : null;
+}
+
 // Suite cell for status table
 function suiteCell(d, suite) {
   if (!d) return `<div class="suite-cell cell-pend">—</div>`;
@@ -598,6 +637,12 @@ function suiteCell(d, suite) {
     else if (delta < 0) trend = `<span style="color:var(--pass);font-size:10px" title="${Math.abs(delta)} fewer failures than last run">↓${Math.abs(delta)}</span>`;
   }
 
+  // Staleness: if result is older than 48h, warn maintainers data may be outdated
+  const ageH = d.last_run ? (Date.now() - new Date(d.last_run).getTime()) / 3600000 : Infinity;
+  const staleBadge = (ageH > 48 && d.status !== 'pending')
+    ? `<span style="font-size:10px;color:var(--muted);display:block" title="${Math.round(ageH/24)}d since this result was recorded — may be stale">stale ${Math.round(ageH/24)}d</span>`
+    : '';
+
   if (d.status === 'running') {
     return `<div class="suite-cell cell-run">
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">running</a>
@@ -606,14 +651,14 @@ function suiteCell(d, suite) {
   if (d.status === 'passed') {
     return `<div class="suite-cell cell-pass">
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">✓ ${score}/${d.scenarios}</a>
-      ${trend}
+      ${trend}${staleBadge}
     </div>`;
   }
   if (d.status === 'failed') {
     const style = isCritical ? ' style="color:#ff6b6b;font-weight:700"' : '';
     return `<div class="suite-cell cell-fail"${style}>
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener"${style}>✗ ${score}/${d.scenarios}</a>
-      ${trend}
+      ${trend}${staleBadge}
     </div>`;
   }
   return `<div class="suite-cell cell-pend">pending</div>`;
@@ -648,6 +693,17 @@ function buildAlertBanner(allData, stats) {
   }
   const blockedPRs = Object.keys(prMap).length;
 
+  // Overdue nightlies: use allData to check coverage
+  const bySlugRow = {};
+  for (const d of allData) {
+    if (!bySlugRow[d.image.slug]) bySlugRow[d.image.slug] = {};
+    bySlugRow[d.image.slug][d.suite] = d.data;
+  }
+  const overdueImages = (stats.images||[]).filter(img => {
+    const row = bySlugRow[img.slug] || {};
+    return nightlyOverdue(img, row) !== null;
+  });
+
   // System suite failures are platform contract failures — critical
   const systemFails = failures.filter(d => d.suite === 'system');
 
@@ -658,6 +714,7 @@ function buildAlertBanner(allData, stats) {
   if (blockedPRs) parts.push(`<strong>${blockedPRs}</strong> PR${blockedPRs>1?'s':''} blocked`);
   if (stuck.length) parts.push(`<strong>${stuck.length}</strong> stuck`);
   if (bugs.length) parts.push(`<strong>${bugs.length}</strong> open bug${bugs.length>1?'s':''}`);
+  if (overdueImages.length) parts.push(`<strong>${overdueImages.length}</strong> nightly overdue`);;
 
   // Deduplicate system in suite count if shown separately
   const nonSystemFails = failures.filter(d => d.suite !== 'system');
@@ -729,11 +786,19 @@ function buildPRMatrix(stats) {
     }
 
     const attempts = prRuns.length;
+    const suiteScores = ['smoke','developer','system'].map(s => {
+      const d = latest[s];
+      if (!d) return '';
+      const col = d.status === 'passed' ? 'var(--pass)' : d.status === 'running' ? 'var(--run)' : 'var(--fail)';
+      const score = (d.scenarios||0) - (d.failed||0);
+      return `<span style="color:${col};font-size:11px">${s}:${score}/${d.scenarios||0}</span>`;
+    }).filter(Boolean).join(' ');
     return `<div class="infra-fail-row" style="${rowStyle}">
       <span style="font-weight:600"><a href="${ctx.url}" target="_blank" rel="noopener">${ctx.repo.split('/')[1]}#${ctx.num}</a></span>
       <span class="mono" style="font-size:11px"><a href="${argoHref(latest.id)}" target="_blank" rel="noopener">${latest.id.length>36?latest.id.slice(0,34)+'…':latest.id}</a></span>
       <span style="color:var(--muted)">${latest.label||latest.variant}</span>
       ${statusHtml}
+      ${suiteScores ? `<span style="font-size:11px">${suiteScores}</span>` : ''}
       <span style="color:var(--muted);font-size:11px">${attempts} attempt${attempts>1?'s':''} · ${fmtAgo(latest.started_at)}</span>
     </div>`;
   }).join('');
@@ -827,12 +892,17 @@ function buildTriage(stats, allData) {
   const gapHtml = (neverTested.length || partialCoverage.length) ? `
     <div class="triage-section-head" style="margin-top:${bugHtml?'12px':'0'}">Coverage gaps</div>
     ${neverTested.map(img => {
-      const argoSubmitUrl = `${ARGO_UI}/workflows/argo?label=image=${img.slug}`;
+      const tmpl = WORKFLOW_TEMPLATES[img.slug];
+      const submitUrl = tmpl ? `${ARGO_UI}/workflow-templates/argo/${tmpl}` : null;
+      const runLink = submitUrl
+        ? `<a href="${submitUrl}" target="_blank" rel="noopener" style="color:var(--link);font-size:11px;margin-left:auto">▶ Submit in Argo</a>`
+        : '';
       return `<div class="infra-fail-row" style="border-left-color:var(--pending)">
         <span style="color:var(--pending);font-weight:600">${img.label}</span>
         <span style="color:var(--muted)">never tested</span>
         <span style="color:var(--muted);font-size:11px">${img.image}</span>
-        ${img.nightly_time_utc ? `<span style="color:var(--muted);font-size:11px">nightly: ${img.nightly_time_utc} UTC</span>` : ''}
+        ${img.nightly_time_utc ? `<span style="color:var(--muted);font-size:11px">nightly ${img.nightly_time_utc} UTC</span>` : ''}
+        ${runLink}
       </div>`;
     }).join('')}
     ${partialCoverage.map(img => {
@@ -992,6 +1062,7 @@ function buildFailures(allData, stats) {
         <span class="sep">·</span>
         ${since ? `Failing since: ${fmtAgo(since)}` : ''}
         ${argoUrl ? `<span class="sep">·</span><a href="${argoUrl}" target="_blank" rel="noopener">Argo logs</a>` : ''}
+        ${d.workflow_name ? `<span class="sep">·</span><a href="${lokiLogUrl(d.workflow_name)}" target="_blank" rel="noopener" style="color:var(--muted)" title="Query Loki for all pods in this workflow">Loki logs</a>` : ''}
         <span class="sep">·</span>
         <a href="${featureUrl}" target="_blank" rel="noopener">Feature files</a>
         <span class="sep">·</span>
@@ -1043,6 +1114,13 @@ function buildStatusTable(images, allData) {
 
     // Never run: all tracked suites are pending/null
     const neverRun = imgSuites.every(s => !row[s] || row[s].status === 'pending' || !row[s].last_run);
+    const hasFailure = imgSuites.some(s => row[s]?.status === 'failed');
+
+    // Nightly overdue detection
+    const overdueH = nightlyOverdue(img, row);
+    const overdueHtml = overdueH !== null
+      ? `<span style="font-size:10px;color:var(--fail);margin-left:6px" title="Nightly at ${img.nightly_time_utc} UTC — run expected but no results yet">⚠ overdue ${overdueH}h</span>`
+      : '';
 
     // Image label: link to GHCR if available + metadata tooltip
     const ghcrUrl = img.image && img.image.startsWith('ghcr.io')
@@ -1061,8 +1139,9 @@ function buildStatusTable(images, allData) {
       ? `<span style="font-size:10px;color:var(--pending);margin-left:6px" title="No test runs recorded for this image">no data</span>`
       : '';
 
-    return `<tr${neverRun?' style="opacity:0.65"':''}>
-      <td style="font-weight:600;white-space:nowrap">${imgLabel}${neverBadge}</td>
+    const rowStatus = hasFailure ? 'fail' : neverRun ? 'untested' : 'ok';
+    return `<tr data-status="${rowStatus}"${neverRun?' style="opacity:0.65"':''}>
+      <td style="font-weight:600;white-space:nowrap">${imgLabel}${neverBadge}${overdueHtml}</td>
       ${cols}
       <td style="white-space:nowrap">${greenHtml}</td>
       <td style="color:var(--muted);white-space:nowrap">${fmtAgo(lastRun)}</td>
@@ -1223,6 +1302,14 @@ async function buildHistoryBlock(img, allSuiteData) {
       <tbody>${tbody}</tbody>
     </table>
   </div>`;
+}
+
+// Filter status table to show only failing / untested rows
+function filterStatusTable(failingOnly) {
+  document.querySelectorAll('#status-tbody tr[data-status]').forEach(tr => {
+    const s = tr.dataset.status;
+    tr.style.display = (failingOnly && s === 'ok') ? 'none' : '';
+  });
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
