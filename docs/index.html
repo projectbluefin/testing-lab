@@ -294,6 +294,18 @@
   <div class="header-meta" id="header-meta">Loading…</div>
 </header>
 
+<!-- Quick links bar -->
+<div id="quicklinks-bar" style="margin-bottom:12px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+  <span style="color:var(--muted)">Quick links:</span>
+  <a href="http://192.168.1.102:32746/workflows/argo?phase=Failed" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">⚠ Failed workflows</a>
+  <a href="http://192.168.1.102:32746/workflows/argo?phase=Running" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">▶ Running workflows</a>
+  <a href="https://github.com/projectbluefin/testing-lab/issues?q=is%3Aopen+label%3Abug" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">Bugs</a>
+  <a href="https://github.com/projectbluefin/testing-lab/issues/new/choose" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">+ File issue</a>
+  <a href="https://github.com/projectbluefin/testing-lab/blob/main/RUNBOOK.md" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">RUNBOOK</a>
+  <a href="https://github.com/projectbluefin/testing-lab/blob/main/docs/agent-cheatsheet.md" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">Cheatsheet</a>
+  <a href="http://192.168.1.102:32746/workflows/argo" target="_blank" rel="noopener" style="background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:4px">Argo UI</a>
+</div>
+
 <!-- Quick stats bar -->
 <div id="stats-bar" class="stats-bar"></div>
 
@@ -346,15 +358,16 @@
       <tr>
         <th>Workflow</th>
         <th>Image</th>
-        <th>Smoke</th>
-        <th>Developer</th>
-        <th>System</th>
+        <th title="GNOME Shell boot, display, AT-SPI">Smoke</th>
+        <th title="Ptyxis, Podman, Flatpak">Developer</th>
+        <th title="Bazaar, Flatpak extensions">Software</th>
+        <th title="bootc / composefs / fs-verity — PLATFORM">System ⚑</th>
         <th>Duration</th>
-        <th>Trigger / PR</th>
+        <th>Trigger</th>
         <th>Result</th>
       </tr>
     </thead>
-    <tbody id="runs-tbody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+    <tbody id="runs-tbody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
   </table>
 </div>
 
@@ -525,36 +538,44 @@ function failingSince(history) {
 function suiteCell(d, suite) {
   if (!d) return `<div class="suite-cell cell-pend">—</div>`;
   const score = d.scenarios - d.failed;
+  const isCritical = suite === 'system';
+
+  // Trend: compare current failed count to previous run
+  let trend = '';
+  if (d.history?.length >= 2) {
+    const prev = d.history[1];
+    const delta = (d.failed||0) - (prev.failed||0);
+    if (delta > 0) trend = `<span style="color:var(--fail);font-size:10px" title="${delta} more failures than last run">↑${delta}</span>`;
+    else if (delta < 0) trend = `<span style="color:var(--pass);font-size:10px" title="${Math.abs(delta)} fewer failures than last run">↓${Math.abs(delta)}</span>`;
+  }
+
   if (d.status === 'running') {
     return `<div class="suite-cell cell-run">
-      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">
-        running
-      </a>
+      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">running</a>
     </div>`;
   }
   if (d.status === 'passed') {
     return `<div class="suite-cell cell-pass">
-      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">
-        ✓ ${score}/${d.scenarios}
-      </a>
+      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">✓ ${score}/${d.scenarios}</a>
+      ${trend}
     </div>`;
   }
   if (d.status === 'failed') {
-    return `<div class="suite-cell cell-fail">
-      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">
-        ✗ ${score}/${d.scenarios}
-      </a>
+    const style = isCritical ? ' style="color:#ff6b6b;font-weight:700"' : '';
+    return `<div class="suite-cell cell-fail"${style}>
+      <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener"${style}>✗ ${score}/${d.scenarios}</a>
+      ${trend}
     </div>`;
   }
   return `<div class="suite-cell cell-pend">pending</div>`;
 }
 
 // Run score cell for recent runs table
-function runSuiteCell(d) {
+function runSuiteCell(d, critical) {
   if (!d) return '<td style="color:var(--muted)">—</td>';
   const score = (d.scenarios||0) - (d.failed||0);
-  const col = d.status === 'passed' ? 'var(--pass)' : d.status === 'running' ? 'var(--run)' : 'var(--fail)';
-  return `<td style="color:${col};font-variant-numeric:tabular-nums">
+  const col = d.status === 'passed' ? 'var(--pass)' : d.status === 'running' ? 'var(--run)' : (critical ? '#ff6b6b' : 'var(--fail)');
+  return `<td style="color:${col};font-variant-numeric:tabular-nums${critical && d.status==='failed' ? ';font-weight:700' : ''}">
     <a href="${argoHref(d.workflow_name||'')}" target="_blank" rel="noopener" style="color:inherit">
       ${score}/${d.scenarios||0}
     </a>
@@ -973,26 +994,34 @@ function buildCluster(stats) {
 function buildRecentRuns(stats) {
   const runs = stats.recent_runs || [];
   if (!runs.length) {
-    document.getElementById('runs-tbody').innerHTML = '<tr><td colspan="8" class="empty">No recent run data</td></tr>';
+    document.getElementById('runs-tbody').innerHTML = '<tr><td colspan="9" class="empty">No recent run data</td></tr>';
     return;
   }
   const rows = runs.map(r => {
     const dur = r.overall === 'running'
       ? `<span style="color:var(--run)">${Math.round((Date.now()-new Date(r.started_at).getTime())/60000)}m…</span>`
       : (r.duration_min ? r.duration_min+'m' : '—');
-    const wfLink = argoLink(r.id, r.id.length>30 ? r.id.slice(0,28)+'…' : r.id);
+    const wfLink = argoLink(r.id, r.id.length>32 ? r.id.slice(0,30)+'…' : r.id);
     const badge = r.overall === 'passed'  ? '<span class="badge badge-pass">pass</span>'
-                : r.overall === 'fail'    ? '<span class="badge badge-fail">fail</span>'
+                : r.overall === 'fail'    ? `<span class="badge badge-fail" title="${r.failure_type||''}">fail${r.failure_type==='infra'?' (infra)':''}</span>`
                 : r.overall === 'running' ? '<span class="badge badge-run">running</span>'
                 : '<span class="badge badge-pending">—</span>';
+
+    // Trigger cell: PR link if available
+    const ctx = prContext(r.id || '');
+    const trig = ctx
+      ? `<a href="${ctx.url}" target="_blank" rel="noopener">${ctx.repo.split('/')[1]}#${ctx.num}</a>`
+      : triggerLabel(r);
+
     return `<tr>
       <td class="mono" style="font-size:11px">${wfLink}</td>
-      <td style="color:var(--muted)">${r.label||r.variant}</td>
-      ${runSuiteCell(r.smoke ? {...r.smoke, workflow_name: r.id} : null)}
-      ${runSuiteCell(r.developer ? {...r.developer, workflow_name: r.id} : null)}
-      ${runSuiteCell(r.system ? {...r.system, workflow_name: r.id} : null)}
+      <td style="color:var(--muted);white-space:nowrap">${r.label||r.variant}</td>
+      ${runSuiteCell(r.smoke    ? {...r.smoke,    workflow_name: r.id} : null)}
+      ${runSuiteCell(r.developer? {...r.developer,workflow_name: r.id} : null)}
+      ${runSuiteCell(r.software ? {...r.software, workflow_name: r.id} : null)}
+      ${runSuiteCell(r.system   ? {...r.system,   workflow_name: r.id} : null, true)}
       <td style="color:var(--muted)">${dur}</td>
-      <td>${triggerLabel(r)}</td>
+      <td style="white-space:nowrap">${trig}</td>
       <td>${badge}</td>
     </tr>`;
   }).join('');
