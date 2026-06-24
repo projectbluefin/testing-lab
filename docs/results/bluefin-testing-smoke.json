@@ -1,11 +1,18 @@
 {
   "variant": "bluefin-testing",
   "suite": "smoke",
-  "last_run": null,
-  "workflow_name": null,
-  "status": "pending",
-  "scenarios": 0,
+  "last_run": "2026-06-24T03:56:23.176681Z",
+  "workflow_name": "bluefin-qa-fresh-8lnfn",
+  "status": "passed",
+  "scenarios": 29,
   "failed": 0,
   "screenshot_url": "https://projectbluefin.github.io/testing-lab/screenshots/bluefin-testing-smoke-latest.png",
-  "history": []
+  "history": [
+    {
+      "run": "2026-06-24T03:56:23.176681Z",
+      "status": "passed",
+      "scenarios": 29,
+      "failed": 0
+    }
+  ]
 }
