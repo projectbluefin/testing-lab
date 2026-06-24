@@ -208,16 +208,52 @@ spec:
             continueOn:
               failed: true
 
-    # ── onExit handler: optional GitHub commit status post ───────────────────
-    # Each lane tears down its own VM; onExit only needs to report status.
+    # ── onExit handler: VM cleanup + optional GitHub status + dashboard ──────────
+    # cleanup-vms runs first, unconditionally — it deletes any VMs this workflow
+    # may have created but not torn down (e.g., when provision fails, lane teardown
+    # is skipped, leaving an orphaned VM).  Safe to run even when teardown already
+    # deleted the VM (--ignore-not-found).
     - name: cleanup-and-report
       dag:
         tasks:
+          - name: cleanup-vms
+            template: cleanup-orphan-vms
           - name: post-status
             template: post-github-status
+            depends: cleanup-vms
             when: "'{{workflow.parameters.sha}}' != ''"
           - name: update-dashboard
             template: update-factory-stats
+            depends: cleanup-vms
+
+    # ── cleanup-orphan-vms: delete any VMs left behind when provision fails ──────
+    # The lane teardown step only runs after run-tests; if provision fails, teardown
+    # is skipped and the VM is orphaned.  This template deletes all VMs matching
+    # {{workflow.name}}-<suite> across all possible suites — idempotent because
+    # kubectl delete --ignore-not-found is a no-op for already-deleted VMs.
+    - name: cleanup-orphan-vms
+      podSpecPatch: |
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        nodeSelector:
+          kubernetes.io/hostname: ghost
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        source: |
+          NS="{{workflow.parameters.namespace}}"
+          WF="{{workflow.name}}"
+          for SUITE in smoke developer software system; do
+            kubectl delete vm -n "${NS}" "${WF}-${SUITE}" --ignore-not-found 2>/dev/null \
+              && echo "Cleaned ${WF}-${SUITE}" || true
+          done
 
     # ── update-factory-stats: append recent run to factory-stats.json ─────────
     # Runs on every pipeline exit (success or failure). Patches the recent_runs
