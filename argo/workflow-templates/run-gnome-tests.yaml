@@ -146,9 +146,12 @@ spec:
             LOG=/tmp/results/runner.log
             exec > >(tee -a "$LOG") 2>&1
 
-            # Install SSH client if not present (base fedora image omits it)
-            if ! command -v ssh &>/dev/null; then
-              dnf install -y --quiet openssh-clients rsync 2>&1 | tail -3
+            # Install SSH client and jq if not present (base fedora image omits them)
+            PKGS=()
+            command -v ssh &>/dev/null  || PKGS+=(openssh-clients rsync)
+            command -v jq  &>/dev/null  || PKGS+=(jq)
+            if [[ ${#PKGS[@]} -gt 0 ]]; then
+              dnf install -y --quiet "${PKGS[@]}" 2>&1 | tail -3
             fi
 
             SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
@@ -343,12 +346,15 @@ spec:
 
             # Derive image slug for screenshot tag and results JSON push.
             # Convention: testing -> bluefin-testing, lts-testing -> bluefin-lts-testing,
+            # bazzite-testing -> bazzite-testing, aurora-testing -> aurora-testing,
             # dakota-testing -> dakota-testing.
             VARIANT_TAG="{{inputs.parameters.containerdisk-tag}}"
             case "${VARIANT_TAG}" in
-              lts-*)    IMG_SLUG="bluefin-${VARIANT_TAG}" ;;
-              dakota-*) IMG_SLUG="${VARIANT_TAG}" ;;
-              *)        IMG_SLUG="bluefin-${VARIANT_TAG}" ;;
+              lts-*)     IMG_SLUG="bluefin-${VARIANT_TAG}" ;;
+              dakota-*)  IMG_SLUG="${VARIANT_TAG}" ;;
+              bazzite-*) IMG_SLUG="${VARIANT_TAG}" ;;
+              aurora-*)  IMG_SLUG="${VARIANT_TAG}" ;;
+              *)         IMG_SLUG="bluefin-${VARIANT_TAG}" ;;
             esac
 
             # Push desktop screenshot to GHCR as OCI artifact for release notes.
