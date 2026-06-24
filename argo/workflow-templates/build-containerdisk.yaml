@@ -366,6 +366,15 @@ spec:
               ln -sf /dev/null \"\${ETC}/systemd/system/sshd.service\" \
                 && echo '[INNER] sshd.service masked (socket activation only)' \
                 || echo '[INNER] WARNING: failed to mask sshd.service'
+              # Enable qemu-guest-agent — required for KubeVirt accessCredentials
+              # (SSH key injection) and for virsh qemu-agent-command (sshd.socket).
+              # bluefin:testing has it enabled by default; bluefin-lts:testing does
+              # not, so we enable it explicitly here for all variants.
+              mkdir -p \"\${ETC}/systemd/system/multi-user.target.wants\"
+              ln -sf /usr/lib/systemd/system/qemu-guest-agent.service \
+                \"\${ETC}/systemd/system/multi-user.target.wants/qemu-guest-agent.service\" \
+                && echo '[INNER] qemu-guest-agent.service symlink created' \
+                || echo '[INNER] WARNING: qemu-guest-agent.service symlink failed'
               mkdir -p \"\${ETC}/ssh/sshd_config.d\"
               # Note: 'UsePAM no' is NOT supported in this Fedora openssh build.
               # Use PermitRootLogin yes (most permissive) to allow root pubkey auth.
