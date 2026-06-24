@@ -1,8 +1,8 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-24T04:51:00Z",
-    "source": "testing-lab — live data as of 2026-06-24T04:51 UTC",
+    "generated": "2026-06-24T05:27:16Z",
+    "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
     "consumers": [
@@ -95,7 +95,14 @@
       "cache": {
         "type": "zot",
         "port": 30501,
-        "upstreams": ["ghcr.io", "docker.io", "quay.io", "registry.fedoraproject.org", "registry.access.redhat.com", "registry.k8s.io"],
+        "upstreams": [
+          "ghcr.io",
+          "docker.io",
+          "quay.io",
+          "registry.fedoraproject.org",
+          "registry.access.redhat.com",
+          "registry.k8s.io"
+        ],
         "storage_path": "/var/mnt/ghost-data/zot-cache"
       },
       "writable": {
@@ -122,18 +129,54 @@
     "change_failure_rate_pct": 16,
     "mean_recovery_time_min": 18,
     "monthly_history": [
-      { "month": "2026-01", "level": "medium", "deploy_freq": 18, "cfr_pct": 28 },
-      { "month": "2026-02", "level": "medium", "deploy_freq": 24, "cfr_pct": 22 },
-      { "month": "2026-03", "level": "high",   "deploy_freq": 31, "cfr_pct": 19 },
-      { "month": "2026-04", "level": "high",   "deploy_freq": 36, "cfr_pct": 17 },
-      { "month": "2026-05", "level": "high",   "deploy_freq": 40, "cfr_pct": 16 },
-      { "month": "2026-06", "level": "high",   "deploy_freq": 42, "cfr_pct": 16 }
+      {
+        "month": "2026-01",
+        "level": "medium",
+        "deploy_freq": 18,
+        "cfr_pct": 28
+      },
+      {
+        "month": "2026-02",
+        "level": "medium",
+        "deploy_freq": 24,
+        "cfr_pct": 22
+      },
+      {
+        "month": "2026-03",
+        "level": "high",
+        "deploy_freq": 31,
+        "cfr_pct": 19
+      },
+      {
+        "month": "2026-04",
+        "level": "high",
+        "deploy_freq": 36,
+        "cfr_pct": 17
+      },
+      {
+        "month": "2026-05",
+        "level": "high",
+        "deploy_freq": 40,
+        "cfr_pct": 16
+      },
+      {
+        "month": "2026-06",
+        "level": "high",
+        "deploy_freq": 42,
+        "cfr_pct": 16
+      }
     ]
   },
   "pipelines": {
     "containerdisk": {
-      "description": "Build bootc ContainerDisk image → provision KubeVirt VM → run GNOME tests → teardown",
-      "stages": ["poll", "build", "provision", "test", "teardown"],
+      "description": "Build bootc ContainerDisk image \u2192 provision KubeVirt VM \u2192 run GNOME tests \u2192 teardown",
+      "stages": [
+        "poll",
+        "build",
+        "provision",
+        "test",
+        "teardown"
+      ],
       "avg_total_min": 45,
       "best_total_min": 38,
       "stage_avg_min": {
@@ -159,8 +202,12 @@
       "node_affinity": "any"
     },
     "hostdisk": {
-      "description": "Provision Flatcar/Knuckle HostDisk VM → run tests → teardown",
-      "stages": ["provision", "test", "teardown"],
+      "description": "Provision Flatcar/Knuckle HostDisk VM \u2192 run tests \u2192 teardown",
+      "stages": [
+        "provision",
+        "test",
+        "teardown"
+      ],
       "avg_total_min": 90,
       "best_total_min": 72,
       "success_rate_pct": 78,
@@ -177,7 +224,9 @@
       "slug": "bluefin-testing",
       "label": "bluefin:testing",
       "image": "ghcr.io/projectbluefin/bluefin:testing",
-      "arch": ["x86_64"],
+      "arch": [
+        "x86_64"
+      ],
       "golden_disk": "/var/tmp/bluefin-golden/testing/disk.raw",
       "base": "bootc/ostree + composefs + fs-verity",
       "nightly_time_utc": "02:00",
@@ -187,7 +236,9 @@
       "slug": "bluefin-lts-testing",
       "label": "bluefin-lts:testing",
       "image": "ghcr.io/projectbluefin/bluefin-lts:testing",
-      "arch": ["x86_64"],
+      "arch": [
+        "x86_64"
+      ],
       "golden_disk": "/var/tmp/bluefin-golden/lts-testing/disk.raw",
       "base": "bootc/ostree + composefs + fs-verity",
       "nightly_time_utc": "02:30",
@@ -197,7 +248,9 @@
       "slug": "bluefin-bazzite-testing",
       "label": "bazzite:testing",
       "image": "ghcr.io/ublue-os/bazzite:testing",
-      "arch": ["x86_64"],
+      "arch": [
+        "x86_64"
+      ],
       "golden_disk": "/var/tmp/bluefin-golden/bazzite-testing/disk.raw",
       "base": "bootc/ostree + composefs + fs-verity",
       "nightly_time_utc": "03:00",
@@ -207,7 +260,9 @@
       "slug": "bluefin-aurora-testing",
       "label": "aurora:testing",
       "image": "ghcr.io/ublue-os/aurora:testing",
-      "arch": ["x86_64"],
+      "arch": [
+        "x86_64"
+      ],
       "golden_disk": "/var/tmp/bluefin-golden/aurora-testing/disk.raw",
       "base": "bootc/ostree + composefs + fs-verity",
       "nightly_time_utc": "03:30",
@@ -217,7 +272,9 @@
       "slug": "dakota-testing",
       "label": "dakota:testing",
       "image": "ghcr.io/projectbluefin/dakota:testing",
-      "arch": ["x86_64"],
+      "arch": [
+        "x86_64"
+      ],
       "golden_disk": "/var/tmp/bluefin-golden/dakota-testing/disk.raw",
       "base": "bootc/ostree + composefs + fs-verity",
       "nightly_time_utc": "04:00",
@@ -227,8 +284,12 @@
       "slug": "flatcar-testing",
       "label": "flatcar:testing",
       "image": "flatcar-base.raw (hostDisk)",
-      "arch": ["x86_64"],
-      "suites": ["flatcar"],
+      "arch": [
+        "x86_64"
+      ],
+      "suites": [
+        "flatcar"
+      ],
       "vm_type": "hostDisk",
       "node": "ghost",
       "base": "Flatcar Container Linux",
@@ -238,42 +299,60 @@
   ],
   "test_coverage": {
     "feature_files": 15,
-    "scenarios_total": 99,
+    "scenarios_total": 74,
     "suites": {
       "smoke": {
         "scenarios": 29,
         "focus": "GNOME Shell boot, display, accessibility AT-SPI",
-        "frameworks": ["behave", "qecore", "dogtail"]
+        "frameworks": [
+          "behave",
+          "qecore",
+          "dogtail"
+        ]
       },
       "developer": {
         "scenarios": 31,
         "focus": "Ptyxis terminal, Podman, Flatpak, Homebrew",
-        "frameworks": ["behave", "qecore", "dogtail"]
+        "frameworks": [
+          "behave",
+          "qecore",
+          "dogtail"
+        ]
       },
       "system": {
         "scenarios": 14,
         "focus": "bootc integrity, composefs, fs-verity, uupd staged deployments",
-        "frameworks": ["behave"]
+        "frameworks": [
+          "behave"
+        ]
       },
       "flatcar": {
         "scenarios": 10,
         "focus": "Flatcar systemd, container workloads",
-        "frameworks": ["behave"]
+        "frameworks": [
+          "behave"
+        ]
       },
       "software": {
         "scenarios": 8,
         "focus": "Bazaar, Flatpak, GNOME extensions",
-        "frameworks": ["behave", "qecore"]
+        "frameworks": [
+          "behave",
+          "qecore"
+        ]
       },
       "homelab": {
         "scenarios": 7,
         "focus": "storage, substrate, backup, homelab access",
-        "frameworks": ["behave"]
+        "frameworks": [
+          "behave"
+        ]
       }
     },
     "vm_type": "KubeVirt ephemeral ContainerDisk",
     "test_user": "bluefin-test (uid 1001)",
-    "display_server": "Wayland (GNOME Shell 50)"
+    "display_server": "Wayland (GNOME Shell 50)",
+    "scenarios_failed": 16
   },
   "supply_chain": {
     "slsa_level": 2,
@@ -290,7 +369,12 @@
     "branch_protection": true,
     "code_review_required": true,
     "reproducible_builds": true,
-    "base_stack": ["bootc", "ostree", "composefs", "fs-verity"],
+    "base_stack": [
+      "bootc",
+      "ostree",
+      "composefs",
+      "fs-verity"
+    ],
     "registry_mirror": true,
     "image_signing": true,
     "vex_generated": false
@@ -342,9 +426,24 @@
     "acmm_desc": "Agents act, supervisor monitors",
     "governor_mode": "busy",
     "agents": [
-      { "id": "c-ad58129be630", "name": "castrojo", "tier": "contributor", "state": "idle" },
-      { "id": "bonedigger",     "name": "bonedigger", "tier": "worker",      "state": "running" },
-      { "id": "copilot-cli",   "name": "Copilot CLI", "tier": "worker",      "state": "idle" }
+      {
+        "id": "c-ad58129be630",
+        "name": "castrojo",
+        "tier": "contributor",
+        "state": "idle"
+      },
+      {
+        "id": "bonedigger",
+        "name": "bonedigger",
+        "tier": "worker",
+        "state": "running"
+      },
+      {
+        "id": "copilot-cli",
+        "name": "Copilot CLI",
+        "tier": "worker",
+        "state": "idle"
+      }
     ],
     "agents_active": 1,
     "agents_total": 3,
@@ -374,7 +473,7 @@
     "testing_lab": {
       "stars": 0,
       "forks": 1,
-      "open_issues": 65,
+      "open_issues": 48,
       "open_prs": 17,
       "watchers": 0
     },
@@ -394,31 +493,39 @@
       "title": "Ptyxis new-tab key combo fails when uinput setup is silently broken",
       "url": "https://github.com/projectbluefin/testing-lab/issues/237",
       "created_at": "2026-06-23T22:21:07Z",
-      "affects": ["developer"],
+      "affects": [
+        "developer"
+      ],
       "area": "test"
     },
     {
       "number": 236,
-      "title": "zot-writable loses manifest index on pod restart",
+      "title": "fix: zot-writable loses manifest index on pod restart",
       "url": "https://github.com/projectbluefin/testing-lab/issues/236",
       "created_at": "2026-06-23T02:45:42Z",
-      "affects": ["all-pipelines"],
+      "affects": [
+        "all-pipelines"
+      ],
       "area": "infra"
     },
     {
       "number": 235,
-      "title": "configure-disk SSH injection writes to wrong btrfs inode (var subvolume)",
+      "title": "fix: configure-disk SSH injection writes to wrong btrfs inode (var subvolume)",
       "url": "https://github.com/projectbluefin/testing-lab/issues/235",
       "created_at": "2026-06-23T02:45:27Z",
-      "affects": ["build"],
+      "affects": [
+        "build"
+      ],
       "area": "infra"
     },
     {
       "number": 225,
-      "title": "Add toggle-testing-rebase and migration-upgrade-test WorkflowTemplates to GitOps",
+      "title": "feat: add toggle-testing-rebase and migration-upgrade-test WorkflowTemplates to GitOps",
       "url": "https://github.com/projectbluefin/testing-lab/issues/225",
       "created_at": "2026-06-20T05:27:02Z",
-      "affects": ["gitops"],
+      "affects": [
+        "gitops"
+      ],
       "area": "infra"
     }
   ],
@@ -428,9 +535,21 @@
       "trigger": "nightly",
       "variant": "bluefin-testing",
       "label": "bluefin:testing",
-      "smoke":    { "status": "passed", "scenarios": 29, "failed": 0 },
-      "developer":{ "status": "failed", "scenarios": 31, "failed": 10 },
-      "system":   { "status": "failed", "scenarios": 14, "failed": 6 },
+      "smoke": {
+        "status": "passed",
+        "scenarios": 29,
+        "failed": 0
+      },
+      "developer": {
+        "status": "failed",
+        "scenarios": 31,
+        "failed": 10
+      },
+      "system": {
+        "status": "failed",
+        "scenarios": 14,
+        "failed": 6
+      },
       "overall": "fail",
       "failure_type": "test",
       "duration_min": 36,
@@ -442,7 +561,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (PR #709)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "running",
       "duration_min": null,
       "started_at": "2026-06-24T04:30:08Z",
@@ -453,7 +574,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #769)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "running",
       "duration_min": null,
       "started_at": "2026-06-24T04:30:06Z",
@@ -464,7 +587,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #768)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "running",
       "duration_min": null,
       "started_at": "2026-06-24T04:30:07Z",
@@ -475,7 +600,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (PR #709)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "fail",
       "failure_type": "infra",
       "duration_min": 22,
@@ -487,7 +614,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #760)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "fail",
       "failure_type": "infra",
       "duration_min": 19,
@@ -499,7 +628,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #767)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "fail",
       "failure_type": "infra",
       "duration_min": 11,
@@ -511,7 +642,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #768)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "fail",
       "failure_type": "infra",
       "duration_min": 11,
@@ -523,7 +656,9 @@
       "trigger": "pr-poller",
       "variant": "bluefin-testing",
       "label": "bluefin:testing (common #760)",
-      "smoke": null, "developer": null, "system": null,
+      "smoke": null,
+      "developer": null,
+      "system": null,
       "overall": "fail",
       "failure_type": "infra",
       "duration_min": 31,
@@ -535,9 +670,13 @@
       "trigger": "manual",
       "variant": "bluefin-testing",
       "label": "bluefin:testing",
-      "smoke":    { "status": "passed", "scenarios": 29, "failed": 0 },
+      "smoke": {
+        "status": "passed",
+        "scenarios": 29,
+        "failed": 0
+      },
       "developer": null,
-      "system":   null,
+      "system": null,
       "overall": "pass",
       "duration_min": 4,
       "started_at": "2026-06-23T14:27:18Z",
