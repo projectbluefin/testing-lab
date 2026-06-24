@@ -1,0 +1,91 @@
+# manifests/buildbox-casd.yaml
+# In-cluster CAS for dakota BST builds. Stores artifacts on ghost NVMe (local-path PVC).
+# Build pods in any namespace reach it at buildbox-casd.local-registry.svc.cluster.local:11002.
+# Pinned to ghost via nodeSelector — local-path PVC follows the pod's node.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: buildbox-casd-data
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/component: buildbox-casd
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  storageClassName: local-path
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildbox-casd
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/component: buildbox-casd
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: buildbox-casd
+  template:
+    metadata:
+      labels:
+        app: buildbox-casd
+        app.kubernetes.io/component: buildbox-casd
+        app.kubernetes.io/part-of: testing-lab
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
+      containers:
+        - name: casd
+          image: 192.168.1.102:30500/bst2:64eb0b4930d57a92710822898fb73af6cc1ae35d
+          command:
+            - buildbox-casd
+            - --bind
+            - 0.0.0.0:11002
+            - --quota-high
+            - 190G
+            - /data
+          ports:
+            - name: grpc
+              containerPort: 11002
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: 11002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: buildbox-casd-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: buildbox-casd
+  namespace: local-registry
+  labels:
+    app.kubernetes.io/component: buildbox-casd
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  selector:
+    app: buildbox-casd
+  ports:
+    - name: grpc
+      port: 11002
+      targetPort: 11002
+      protocol: TCP
