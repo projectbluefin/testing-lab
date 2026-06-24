@@ -27,7 +27,7 @@ spec:
       # disk-size: raw disk pre-allocation for bootc install to-disk.
       # 20G is the default; increase for larger images (e.g. bazzite/aurora).
       - name: disk-size
-        value: "20G"
+        value: "25G"
   templates:
 
     # ─── Top-level DAG ────────────────────────────────────────────────────────
@@ -173,6 +173,11 @@ spec:
               secretKeyRef:
                 name: bluefin-test-ssh-key
                 key: id_ed25519.pub
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
         volumeMounts:
           - name: dev
             mountPath: /dev
@@ -211,6 +216,8 @@ spec:
           echo "Cleaning containers storage for fresh pull..."
           rm -rf /var/lib/containers/* 2>/dev/null || true
 
+          # Authenticate with GHCR to avoid rate limits and to support private images.
+          echo "${GITHUB_TOKEN}" | podman login ghcr.io -u _ --password-stdin
           # Pull image — lands in /var/lib/containers/storage (ghost SSD).
           podman pull --tls-verify=true "${IMAGE}"
 
