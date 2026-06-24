@@ -338,10 +338,10 @@ spec:
 
           # Build suite_scores object via jq (one-liner per suite, merge via jq -n)
           SUITE_SCORES=$(jq -n \
-            --argjson sm "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/smoke.json    2>/dev/null || echo 'null')" \
-            --argjson de "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/developer.json 2>/dev/null || echo 'null')" \
-            --argjson sw "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/software.json  2>/dev/null || echo 'null')" \
-            --argjson sy "$(jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/system.json    2>/dev/null || echo 'null')" \
+            --argjson sm "$(test -s /tmp/suite-scores/smoke.json    && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/smoke.json    2>/dev/null || echo 'null')" \
+            --argjson de "$(test -s /tmp/suite-scores/developer.json && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/developer.json 2>/dev/null || echo 'null')" \
+            --argjson sw "$(test -s /tmp/suite-scores/software.json  && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/software.json  2>/dev/null || echo 'null')" \
+            --argjson sy "$(test -s /tmp/suite-scores/system.json    && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/system.json    2>/dev/null || echo 'null')" \
             '{smoke:$sm,developer:$de,software:$sw,system:$sy} | with_entries(select(.value != null))' \
           2>/dev/null || echo '{}')
 

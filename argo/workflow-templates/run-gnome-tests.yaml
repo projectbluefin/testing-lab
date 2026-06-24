@@ -193,58 +193,29 @@ spec:
               else
                 echo '[ROOT] bluefin-test user exists'
               fi
-              # Ensure home directory exists with correct ownership
+              # Ensure home directory and .ssh exist with correct ownership/permissions.
+              # KubeVirt qemuGuestAgent injects the key to ~/.ssh/authorized_keys for
+              # both root and bluefin-test (provision-bluefin-vm.yaml accessCredentials).
+              # We ensure the directory exists so the injection has a place to land.
               mkdir -p /var/home/bluefin-test
               chown 1001:1001 /var/home/bluefin-test
               chmod 750 /var/home/bluefin-test
+              mkdir -p /var/home/bluefin-test/.ssh
+              chown 1001:1001 /var/home/bluefin-test/.ssh
+              chmod 700 /var/home/bluefin-test/.ssh
               # Ensure sudoers entry
               echo 'bluefin-test ALL=(ALL) NOPASSWD:ALL' \
                 > /etc/sudoers.d/bluefin-test
               chmod 440 /etc/sudoers.d/bluefin-test
-              install -d -m 700 -o 1001 -g 1001 /var/home/bluefin-test/.ssh
-              printf '%s\n' '${SSH_PUBKEY}' > /var/home/bluefin-test/.ssh/authorized_keys
-              chown 1001:1001 /var/home/bluefin-test/.ssh/authorized_keys
-              chmod 600 /var/home/bluefin-test/.ssh/authorized_keys
-              # Write key to all possible AuthorizedKeysFile locations across disk versions:
-              # - .ssh/authorized_keys (standard, already done above)
-              # - /etc/ssh/test-authorized-keys (old build-containerdisk format)
-              # - /etc/ssh/authorized_keys/bluefin-test (new build-containerdisk format with %u)
-              # sshd -T reveals which is active; we write all to cover both versions.
-              mkdir -p /etc/ssh/authorized_keys
-              printf '%s\n' '${SSH_PUBKEY}' >> /etc/ssh/test-authorized-keys 2>/dev/null || true
-              printf '%s\n' '${SSH_PUBKEY}' > /etc/ssh/authorized_keys/bluefin-test 2>/dev/null || true
-              chmod 600 /etc/ssh/test-authorized-keys /etc/ssh/authorized_keys/bluefin-test 2>/dev/null || true
-              echo '[ROOT] bluefin-test authorized_keys written (all locations)'
-              echo '[ROOT] /etc/ssh/test-authorized-keys contents:'
-              cat /etc/ssh/test-authorized-keys 2>/dev/null || echo '(file not found)'
-              echo '[ROOT] /etc/ssh/authorized_keys/bluefin-test:'
-              cat /etc/ssh/authorized_keys/bluefin-test 2>/dev/null || echo '(file not found)'
-              echo '[ROOT] sshd -T (global):'
-              sshd -T 2>/dev/null | grep -i 'authorizedkeysfile\|allowusers\|denyusers\|permituserenv\|usepam\|passwordauth' | head -10 || echo 'sshd -T unavailable'
-              echo '[ROOT] sshd -T -C user=bluefin-test (per-user):'
-              sshd -T -C user=bluefin-test,addr=127.0.0.1,host=localhost,laddr=127.0.0.1,lport=22 2>/dev/null | \
-                grep -i 'authorizedkeysfile\|allowusers\|denyusers\|passwordauth\|pubkeyauth\|strictmodes\|usepam\|match' | head -15 || echo 'sshd -T -C unavailable'
-              echo '[ROOT] full sshd_config (all files):'
-              cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
               # Enable user lingering so rootless Podman services survive login/logout.
               # Required by the developer suite 'User lingering is enabled' assertion.
               loginctl enable-linger bluefin-test 2>/dev/null || true
-              echo '[ROOT] user lingering enabled for bluefin-test'
+              echo '[ROOT] bluefin-test bootstrap complete'
             "
-            # Verbose single SSH attempt as bluefin-test to capture exact server refusal reason.
-            echo "Verbose SSH probe (bluefin-test)..." >&2
-            ssh -vvv -i "${SSH_KEY}" \
-              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=10 -o PasswordAuthentication=no \
-              bluefin-test@${VM_IP} 'echo ok' 2>&1 | \
-              grep -iE 'debug1|error|denied|accept|authenticat|offer|send_pubkey|server refuse' | head -30 || true
-            echo "---" >&2
-            # Capture sshd journal from the VM's perspective.
-            ${ROOT_SSH} "journalctl -u sshd --since '2 minutes ago' --no-pager 2>/dev/null | tail -30 || true"
-            # Wait for bluefin-test SSH to work (short retry loop).
+            # Wait for bluefin-test SSH (KubeVirt injects key; give it a moment).
             echo "Verifying bluefin-test SSH..." >&2
             timeout 120 bash -c "
-              until ${SSH} 'echo ready' 2>&1; do
+              until ${SSH} 'echo ready' 2>/dev/null; do
                 echo '[bluefin-test SSH] not ready, retrying...' >&2
                 sleep 5
               done
