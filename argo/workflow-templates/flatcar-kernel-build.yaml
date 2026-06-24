@@ -217,7 +217,7 @@ spec:
           - name: sdk-version
       activeDeadlineSeconds: 10800
       script:
-        image: registry.fedoraproject.org/fedora-hummingbird:latest
+        image: quay.io/fedora/fedora:latest
         command: [bash]
         resources:
           requests:
