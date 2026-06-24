@@ -16,6 +16,8 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
+  nodeSelector:
+    kubernetes.io/hostname: ghost
   synchronization:
     semaphores:
       - configMapKeyRef:
