@@ -42,6 +42,10 @@ spec:
 
           CONTEXT="ghost-lab"
           API="https://api.github.com"
+          # Max new dispatches per run — prevents burst storms when many PRs are in
+          # failure state after a cluster outage. Aligns with semaphore-config max.
+          MAX_DISPATCH=8
+          DISPATCHED=0
 
           # Repos tested on every PR — no label required.
           AUTO_REPOS=(
@@ -55,6 +59,14 @@ spec:
           dispatch_pr() {
            local PR="$1"
            local REPO SHA PR_NUM BRANCH EXISTING TMPL TITLE TITLE_SLUG VM_MEM
+
+           # Rate-limit: stop dispatching once we hit MAX_DISPATCH this run
+           if [[ "$DISPATCHED" -ge "$MAX_DISPATCH" ]]; then
+             REPO=$(echo "$PR" | jq -r '.base.repo.full_name')
+             PR_NUM=$(echo "$PR" | jq -r '.number')
+             echo "PR #${PR_NUM} ${REPO}: dispatch cap (${MAX_DISPATCH}) reached, deferring to next run" >&2
+             return
+           fi
 
            REPO=$(echo "$PR" | jq -r '.base.repo.full_name')
            SHA=$(echo "$PR"  | jq -r '.head.sha')
@@ -156,6 +168,7 @@ spec:
                  value: "${PR_NUM}"${EXTRA_PARAMS}
           EOF
            echo "PR #${PR_NUM} ${REPO}: dispatched ${TMPL}" >&2
+           (( DISPATCHED++ )) || true
           }
 
           # --- Pass 1: every open PR in auto-test repos ---

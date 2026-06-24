@@ -271,6 +271,7 @@ spec:
                 key: token
         source: |
           set -euo pipefail
+          dnf install -y --quiet jq 2>/dev/null | tail -1 >&2
 
           API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/data/factory-stats.json"
           WF_NAME="{{workflow.name}}"
@@ -365,12 +366,14 @@ spec:
             --arg sha  "$FILE_SHA" \
             '{message:$msg,content:$content,sha:$sha}')
 
-          HTTP=$(curl -sf -w "%{http_code}" -o /dev/null \
+          HTTP_CODE_FILE=$(mktemp)
+          curl -s -w "%{http_code}" -o /dev/null \
             -X PUT \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
-            -d "$BODY" "${API_URL}" 2>&1) || HTTP="error"
+            -d "$BODY" "${API_URL}" > "${HTTP_CODE_FILE}" 2>/dev/null || true
+          HTTP=$(cat "${HTTP_CODE_FILE}"); rm -f "${HTTP_CODE_FILE}"
 
           echo "Dashboard update: ${OVERALL} for ${LABEL} (${WF_NAME}) — http=${HTTP}"
 
