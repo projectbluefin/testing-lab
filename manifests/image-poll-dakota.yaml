@@ -1,0 +1,60 @@
+# CronWorkflow: polls ghcr.io/projectbluefin/dakota:latest hourly.
+# Triggers dakota-qa-pipeline only when OCI digest changes vs ConfigMap state.
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: image-poll-dakota
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+    bluefin.io/trigger: digest-poll
+spec:
+  schedules:
+    - "0 * * * *"
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  workflowSpec:
+    serviceAccountName: argo
+    podGC:
+      strategy: OnWorkflowCompletion
+    ttlStrategy:
+      secondsAfterSuccess: 3600
+      secondsAfterFailure: 86400
+    entrypoint: check-and-trigger
+    templates:
+      - name: check-and-trigger
+        dag:
+          tasks:
+            - name: check-digest
+              templateRef:
+                name: image-poller
+                template: poll-digest
+              arguments:
+                parameters:
+                  - name: image
+                    value: "ghcr.io/projectbluefin/dakota"
+                  - name: image-tag
+                    value: "latest"
+                  - name: state-key
+                    value: "digest-dakota-latest"
+            - name: run-pipeline
+              depends: "check-digest.Succeeded"
+              when: "{{tasks.check-digest.outputs.parameters.changed}} == true"
+              templateRef:
+                name: dakota-qa-pipeline
+                template: pipeline
+              arguments:
+                parameters:
+                  - name: image
+                    value: "ghcr.io/projectbluefin/dakota"
+                  - name: image-tag
+                    value: "latest"
+                  - name: containerdisk-tag
+                    value: "dakota-latest"
+                  - name: namespace
+                    value: "bluefin-test"
+                  - name: suites
+                    value: "smoke,developer,system"
+                  - name: variant
+                    value: "dakota"
