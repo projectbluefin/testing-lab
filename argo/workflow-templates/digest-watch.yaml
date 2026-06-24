@@ -5,14 +5,14 @@ metadata:
   namespace: argo
   annotations:
     description: |
-      Watch GHCR image digests for bluefin and bluefin-lts and trigger
-      build-containerdisk when the upstream source image changes.
-      Runs two parallel variant watchers (testing, lts-testing). Each watcher
-      fetches the live GHCR digest via anonymous curl, compares it against the
-      stored value in ConfigMap containerdisk-source-digests, and on mismatch
-      patches the ConfigMap and submits a build-containerdisk Workflow with
-      force=false (check will return "missing" since Zot lacks the new digest,
-      so install-to-disk runs reliably even after workflow-controller restarts).
+      Watch GHCR image digests for all variants and trigger build-containerdisk
+      when an upstream source image changes. Variants: bluefin:testing,
+      bluefin-lts:testing, bluefin:stable, bluefin-lts:stable, dakota:latest,
+      bazzite:testing, aurora:testing. Each watcher fetches the live GHCR digest
+      via skopeo (authenticated), compares against ConfigMap
+      containerdisk-source-digests, and on mismatch patches the ConfigMap and
+      submits a build-containerdisk Workflow. Zot stores blobs content-addressed
+      so shared Fedora base layers across variants are automatically deduplicated.
   labels:
     app.kubernetes.io/component: digest-watch
     app.kubernetes.io/part-of: bluefin-test-suite
@@ -90,6 +90,32 @@ spec:
                   value: "aurora-testing"
                 - name: disk-size
                   value: "40G"
+
+          - name: watch-bluefin-stable
+            template: watch-variant
+            arguments:
+              parameters:
+                - name: image
+                  value: "ghcr.io/projectbluefin/bluefin"
+                - name: image-tag
+                  value: "stable"
+                - name: containerdisk-tag
+                  value: "stable"
+                - name: disk-size
+                  value: "25G"
+
+          - name: watch-lts-stable
+            template: watch-variant
+            arguments:
+              parameters:
+                - name: image
+                  value: "ghcr.io/projectbluefin/bluefin-lts"
+                - name: image-tag
+                  value: "stable"
+                - name: containerdisk-tag
+                  value: "lts-stable"
+                - name: disk-size
+                  value: "25G"
 
     # ─── watch-variant ────────────────────────────────────────────────────────
     # Fetches the live GHCR digest via skopeo (authenticated — works for both

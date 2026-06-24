@@ -20,6 +20,9 @@ spec:
         value: "smoke,developer,system"
       - name: variant
         value: "bluefin"
+      # Zot containerdisk tag; defaults to image-tag when not set (works for bluefin:testing → "testing")
+      - name: containerdisk-tag
+        value: "{{workflow.parameters.image-tag}}"
 
   templates:
     - name: check-and-trigger

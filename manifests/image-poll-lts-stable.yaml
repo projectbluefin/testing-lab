@@ -1,4 +1,4 @@
-# CronWorkflow: polls ghcr.io/projectbluefin/bluefin-lts:stable weekly (Sunday 01:30 UTC).
+# CronWorkflow: polls ghcr.io/projectbluefin/bluefin-lts:stable hourly.
 # Triggers bluefin-qa-pipeline only when OCI digest changes vs ConfigMap state.
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
@@ -10,7 +10,7 @@ metadata:
     bluefin.io/trigger: digest-poll
 spec:
   schedules:
-    - "30 1 * * 0"
+    - "45 * * * *"
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300

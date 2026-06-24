@@ -53,6 +53,8 @@ spec:
            "projectbluefin/dakota"
            "projectbluefin/knuckle"
            "projectbluefin/testsuite"
+           "ublue-os/bazzite"
+           "ublue-os/aurora"
           )
 
           dispatch_pr() {
@@ -79,7 +81,7 @@ spec:
            else
              BRANCH="main"
            fi
-           REPO_SLUG=$(echo "$REPO" | sed 's|.*/||; s/bluefin-lts/lts/; s/bluefin/blu/; s/dakota/dak/; s/knuckle/knu/')
+           REPO_SLUG=$(echo "$REPO" | sed 's|.*/||; s/bluefin-lts/lts/; s/bluefin/blu/; s/dakota/dak/; s/knuckle/knu/; s/bazzite/baz/; s/aurora/aur/')
            TITLE=$(echo "$PR" | jq -r '.title')
            # Slugify title: lowercase, non-alnum to dash, truncate to 30 chars
            TITLE_SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' \
@@ -124,6 +126,34 @@ spec:
                              EXTRA_PARAMS="" ;;
              */knuckle)      TMPL="knuckle-qa-pipeline"
                              EXTRA_PARAMS="" ;;
+             */bazzite)      TMPL="bluefin-qa-pipeline"
+                             EXTRA_PARAMS="
+               - name: image
+                 value: ghcr.io/ublue-os/bazzite
+               - name: image-tag
+                 value: testing
+               - name: containerdisk-tag
+                 value: bazzite-testing
+               - name: namespace
+                 value: bazzite-test
+               - name: suites
+                 value: system
+               - name: vm-memory
+                 value: ${VM_MEM}" ;;
+             */aurora)       TMPL="bluefin-qa-pipeline"
+                             EXTRA_PARAMS="
+               - name: image
+                 value: ghcr.io/ublue-os/aurora
+               - name: image-tag
+                 value: testing
+               - name: containerdisk-tag
+                 value: aurora-testing
+               - name: namespace
+                 value: aurora-test
+               - name: suites
+                 value: system
+               - name: vm-memory
+                 value: ${VM_MEM}" ;;
              */bluefin-lts)  TMPL="bluefin-qa-pipeline"
                              EXTRA_PARAMS="
                - name: image
@@ -216,8 +246,8 @@ spec:
            done
           done
 
-          # --- Pass 2: label-based catch-all for other repos (dakota, knuckle, etc.) ---
-          LABEL_QUERY=$(jq -rn --arg q "org:projectbluefin is:pr is:open label:test-on-lab" '$q|@uri')
+          # --- Pass 2: label-based catch-all for other repos (both orgs) ---
+          LABEL_QUERY=$(jq -rn --arg q "org:projectbluefin org:ublue-os is:pr is:open label:test-on-lab" '$q|@uri')
           LABEL_RESULTS=$(curl -sf \
            -H "Authorization: token ${GITHUB_TOKEN}" \
            -H "Accept: application/vnd.github+json" \
