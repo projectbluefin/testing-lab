@@ -6,884 +6,447 @@
   <title>Bluefin QA Factory — Prototype (?variant=A|B|C)</title>
   <!--
     PROTOTYPE — throwaway
-    Question: which design language works for the Bluefin factory ops page?
+    Question: which layout works best as a real QA operations dashboard?
     Three variants:
-      A — Pit Wall      (F1 telemetry wall, monospace, orange/purple sectors)
-      B — Mission Ctrl  (NASA NOC, phosphor green, CRT monitors)
-      C — Blueprint     (P&ID schematic, blueprint blue, callout annotations)
-    Switch with ?variant=A or keyboard ← → arrows.
+      A — Run Log    (timeline of recent runs, GitHub Actions style)
+      B — Suite Board (health per test suite, Grafana panel style)
+      C — Triage     (failures-first, what needs fixing right now)
+    Switch with ?variant=A|B|C or keyboard ← → arrows.
     Pick winner → fold into docs/index.html → delete this file.
   -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-/* ═══════════════════════════════════════════════════════════════════
-   SHARED — Carbon dark + Bluefin blue-purple (matches docs.projectbluefin.io)
-═══════════════════════════════════════════════════════════════════ */
+/* ─── Reset + tokens ────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg:      #161616;
-  --bg2:     #262626;
-  --bg3:     #1e1e1e;
-  --border:  #393939;
-  --text:    #f4f4f4;
-  --muted:   #8d8d8d;
-  --accent:  #8a97f7;
-  --pass:    #3fb950;
-  --fail:    #fa4d56;
-  --warn:    #f1c21b;
-  --orange:  #f0883e;
-  --purple:  #b892ff;
-  --shadow:  0 1px 4px rgba(0,0,0,.45);
+  --bg:       #161616;
+  --bg2:      #262626;
+  --bg3:      #1e1e1e;
+  --border:   #393939;
+  --border2:  #4d4d4d;
+  --text:     #f4f4f4;
+  --text2:    #c6c6c6;
+  --muted:    #8d8d8d;
+  --pass:     #3fb950;
+  --pass-bg:  rgba(63,185,80,.08);
+  --pass-bd:  rgba(63,185,80,.25);
+  --fail:     #fa4d56;
+  --fail-bg:  rgba(250,77,86,.08);
+  --fail-bd:  rgba(250,77,86,.25);
+  --warn:     #f1c21b;
+  --warn-bg:  rgba(241,194,27,.08);
+  --warn-bd:  rgba(241,194,27,.25);
+  --run:      #78a9ff;
+  --run-bg:   rgba(120,169,255,.08);
+  --run-bd:   rgba(120,169,255,.25);
+  --accent:   #8a97f7;
+  --skip:     #6f6f6f;
+  --mono:     'JetBrains Mono', 'Courier New', monospace;
+  --sans:     'Inter', system-ui, sans-serif;
+  --shadow:   0 1px 4px rgba(0,0,0,.45);
 }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
 .variant { display: none; min-height: 100vh; }
-.variant.active { display: block; }
+.variant.active { display: flex; flex-direction: column; }
 
-/* ═══════════════════════════════════════════════════════════════════
-   VARIANT A — PIT WALL
-   F1 pit wall telemetry. Dense monospace. Bluefin accent not neon.
-═══════════════════════════════════════════════════════════════════ */
-.pw {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 12px;
+/* ─── Shared primitives ─────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1px solid; white-space: nowrap;
 }
-.pw .c-purple { color: var(--purple); }
-.pw .c-yellow { color: var(--warn); }
-.pw .c-green  { color: var(--pass); }
-.pw .c-red    { color: var(--fail); }
-.pw .c-orange { color: var(--orange); }
-.pw .c-blue   { color: var(--accent); }
-.pw .c-dim    { color: var(--muted); }
+.badge.pass   { color: var(--pass);  background: var(--pass-bg);  border-color: var(--pass-bd); }
+.badge.fail   { color: var(--fail);  background: var(--fail-bg);  border-color: var(--fail-bd); }
+.badge.warn   { color: var(--warn);  background: var(--warn-bg);  border-color: var(--warn-bd); }
+.badge.run    { color: var(--run);   background: var(--run-bg);   border-color: var(--run-bd); }
+.badge.skip   { color: var(--muted); background: var(--bg2);      border-color: var(--border); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+.badge.run .dot { animation: blink 1.4s ease-in-out infinite; }
 
-.pw-strip {
-  display: flex;
-  align-items: center;
-  background: var(--bg3);
-  border-bottom: 2px solid var(--accent);
-  padding: 6px 16px;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 11px;
-  letter-spacing: .08em;
-  gap: 0;
+.kpi-strip {
+  display: flex; gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
 }
-.pw-strip-cell {
-  padding: 2px 14px 2px 0;
-  border-right: 1px solid var(--border);
-  margin-right: 14px;
+.kpi-tile {
+  background: var(--bg2); flex: 1; padding: 14px 18px;
+}
+.kpi-tile .value { font-size: 28px; font-weight: 700; line-height: 1; font-family: var(--mono); }
+.kpi-tile .label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.kpi-tile .delta { font-size: 11px; margin-top: 2px; }
+
+.section-head {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .08em;
+  padding: 10px 0 6px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+}
+
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot.pass { background: var(--pass); }
+.dot.fail { background: var(--fail); }
+.dot.warn { background: var(--warn); }
+.dot.run  { background: var(--run); }
+.dot.skip { background: var(--skip); }
+
+/* ─── Page header (shared across all variants) ──────────────────────────── */
+.page-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.pw-strip-cell:last-child { border-right: none; }
-.pw-strip-label { color: var(--muted); font-size: 9px; display: block; letter-spacing: .12em; text-transform: uppercase; }
-.pw-strip-value { font-size: 14px; font-weight: 700; }
-.pw-strip-lap   { color: var(--accent); font-size: 20px; font-weight: 700; }
-
-.pw-body {
-  display: grid;
-  grid-template-columns: 220px 1fr 240px;
-  gap: 1px;
-  background: var(--border);
-  min-height: calc(100vh - 120px);
-}
-.pw-col {
-  background: var(--bg);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.pw-widget {
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  padding: 10px;
-  background: var(--bg2);
-  border-radius: 2px;
-}
-.pw-widget-title {
-  font-size: 9px;
-  letter-spacing: .14em;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-.pw-compound {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 11px;
-  border-bottom: 1px solid var(--bg3);
-}
-.pw-compound:last-child { border-bottom: none; }
-.pw-compound-pip {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  border: 2px solid;
-  font-size: 8px;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.pw-compound-pip.soft   { border-color: var(--fail);   color: var(--fail); }
-.pw-compound-pip.medium { border-color: var(--warn);   color: var(--warn); }
-.pw-compound-pip.hard   { border-color: var(--muted);  color: var(--muted); }
-
-.pw-resource { padding: 4px 0; }
-.pw-resource-label { color: var(--muted); font-size: 9px; letter-spacing: .1em; margin-bottom: 3px; text-transform: uppercase; }
-.pw-resource-bar { display: flex; gap: 2px; }
-.pw-resource-pip { width: 10px; height: 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 1px; }
-.pw-resource-pip.used { background: var(--accent); border-color: var(--accent); }
-.pw-resource-count { font-size: 10px; color: var(--muted); margin-left: 6px; }
-
-.pw-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-size: 10px;
-  margin: 2px 2px 2px 0;
-  background: var(--bg3);
-}
-.pw-chip.green  { border-color: rgba(63,185,80,.4);   color: var(--pass); }
-.pw-chip.orange { border-color: rgba(240,136,62,.4);  color: var(--orange); }
-.pw-chip.blue   { border-color: rgba(138,151,247,.4); color: var(--accent); }
-.pw-chip.purple { border-color: rgba(184,146,255,.4); color: var(--purple); }
-
-.pw-gauge {
-  text-align: center;
-  padding: 16px 0 10px;
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  background: var(--bg2);
-  border-radius: 2px;
-}
-.pw-gauge-val   { font-size: 64px; font-weight: 700; line-height: 1; letter-spacing: -.04em; }
-.pw-gauge-label { font-size: 9px; color: var(--muted); letter-spacing: .14em; margin-top: 4px; text-transform: uppercase; }
-.pw-gauge-delta { font-size: 12px; margin-top: 6px; }
-.pw-gauge-sub {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-}
-.pw-gauge-sub-item { text-align: center; }
-.pw-gauge-sub-item span { display: block; font-size: 9px; color: var(--muted); letter-spacing: .1em; margin-top: 2px; text-transform: uppercase; }
-
-.pw-timeboard { border: 1px solid var(--border); background: var(--bg2); border-radius: 2px; overflow: hidden; }
-.pw-timeboard table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.pw-timeboard th { font-size: 8px; letter-spacing: .14em; color: var(--muted); padding: 5px 6px; background: var(--bg3); text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; }
-.pw-timeboard td { padding: 5px 6px; border-bottom: 1px solid var(--bg3); }
-.pw-timeboard tr:last-child td { border-bottom: none; }
-.pw-timeboard .pos { color: var(--muted); width: 20px; }
-
-.sector-cell { text-align: center; font-weight: 600; }
-.sector-cell.best    { color: var(--purple); background: rgba(184,146,255,.07); }
-.sector-cell.good    { color: var(--pass);   background: rgba(63,185,80,.06); }
-.sector-cell.warn    { color: var(--warn);   background: rgba(241,194,27,.05); }
-.sector-cell.bad     { color: var(--fail);   background: rgba(250,77,86,.06); }
-.sector-cell.pending { color: var(--muted); }
-
-.pw-velocity {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.pw-vel-item { background: var(--bg2); padding: 8px 6px; text-align: center; }
-.pw-vel-val  { font-size: 20px; font-weight: 700; color: var(--accent); display: block; line-height: 1; }
-.pw-vel-lbl  { font-size: 8px; color: var(--muted); letter-spacing: .12em; display: block; margin-top: 3px; text-transform: uppercase; }
-
-.pw-stages { display: flex; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
-.pw-stage { flex: 1; background: var(--bg2); padding: 7px 6px; text-align: center; }
-.pw-stage-name { font-size: 8px; color: var(--muted); letter-spacing: .12em; display: block; text-transform: uppercase; }
-.pw-stage-val  { font-size: 16px; font-weight: 700; display: block; line-height: 1.1; }
-.pw-stage-unit { font-size: 8px; color: var(--muted); }
-
-.pw-radio { max-height: 160px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.pw-radio-entry { padding: 3px 0; border-bottom: 1px solid var(--bg3); font-size: 10px; line-height: 1.4; }
-.pw-radio-time { color: var(--muted); }
-.pw-radio-entry:last-child { border-bottom: none; }
-
-.pw-weather-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--bg3); }
-.pw-weather-row:last-child { border-bottom: none; }
-.pw-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.pw-dot.green  { background: var(--pass); }
-.pw-dot.yellow { background: var(--warn); }
-.pw-dot.red    { background: var(--fail); }
-
-.pw-ticker { background: var(--bg3); border-top: 1px solid var(--border); padding: 4px 0; overflow: hidden; white-space: nowrap; font-size: 10px; color: var(--muted); }
-.pw-ticker-inner { display: inline-block; animation: ticker 40s linear infinite; padding-left: 100%; }
-@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-100%); } }
-.pw-ticker-item { display: inline; margin-right: 40px; }
-.pw-ticker-item .hl { color: var(--accent); font-weight: 600; }
-
-.pw-dora { padding: 6px 0; }
-.pw-dora-level { font-size: 20px; font-weight: 700; }
+.page-header-title { font-weight: 600; font-size: 14px; }
+.page-header-sub   { font-size: 11px; color: var(--muted); }
+.page-header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   VARIANT B — MISSION CONTROL
-   Real ops-room look. Carbon dark. No scanlines. No glows. Clean.
+   VARIANT A — RUN LOG
+   Timeline of recent pipeline runs. GitHub Actions style.
+   Good for: "what happened recently? which run broke things?"
 ═══════════════════════════════════════════════════════════════════ */
-.mc {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 12px;
-}
-.mc .c-green  { color: var(--pass); }
-.mc .c-amber  { color: var(--warn); }
-.mc .c-red    { color: var(--fail); }
-.mc .c-dim    { color: var(--muted); }
-.mc .c-blue   { color: var(--accent); }
-.mc .c-white  { color: var(--text); }
+.rl-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-.mc-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 20px;
+.rl-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+.rl-kpis .kpi-tile { border-right: none; }
+
+.rl-main { flex: 1; overflow-y: auto; }
+
+.rl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rl-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg3); color: var(--muted); font-size: 10px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: .07em;
+  padding: 8px 12px; text-align: left;
   border-bottom: 1px solid var(--border);
-  background: var(--bg3);
-  flex-wrap: wrap;
 }
-.mc-header-title { font-size: 15px; font-weight: 700; letter-spacing: .06em; color: var(--text); }
-.mc-met { font-size: 11px; color: var(--muted); }
-.mc-met span { color: var(--accent); font-weight: 600; }
-.mc-status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-.mc-go {
-  font-size: 10px;
-  letter-spacing: .08em;
-  padding: 3px 10px;
-  border: 1px solid;
-  border-radius: 20px;
-  font-weight: 600;
+.rl-table tbody tr { border-bottom: 1px solid var(--bg3); }
+.rl-table tbody tr:hover { background: var(--bg2); }
+.rl-table tbody td { padding: 9px 12px; vertical-align: middle; }
+
+.rl-run-id { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+.rl-variant { font-family: var(--mono); font-size: 11px; }
+.rl-suite-cell { text-align: center; }
+.rl-suite-score { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+.rl-duration { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.rl-when { font-size: 11px; color: var(--muted); }
+
+/* group divider between dates */
+.rl-date-row td {
+  background: var(--bg); color: var(--muted);
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .08em; padding: 6px 12px 4px;
+  border-top: 1px solid var(--border); border-bottom: none;
 }
-.mc-go.go      { border-color: rgba(63,185,80,.4);  color: var(--pass);   background: rgba(63,185,80,.08); }
-.mc-go.no-go   { border-color: rgba(250,77,86,.4);  color: var(--fail);   background: rgba(250,77,86,.08); }
-.mc-go.caution { border-color: rgba(241,194,27,.4); color: var(--warn);   background: rgba(241,194,27,.08); }
+.rl-date-row:first-child td { border-top: none; }
 
-.mc-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(2, auto);
-  gap: 1px;
-  background: var(--border);
-  padding: 1px;
-  min-height: calc(100vh - 120px);
+.rl-footer {
+  background: var(--bg3); border-top: 1px solid var(--border);
+  padding: 8px 16px; display: flex; gap: 20px; align-items: center;
+  font-size: 11px; color: var(--muted); flex-shrink: 0;
 }
-.mc-monitor {
-  background: var(--bg2);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.mc-mon-title {
-  font-size: 10px;
-  letter-spacing: .12em;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  flex-shrink: 0;
-  text-transform: uppercase;
-}
-.mc-mon-title .hl { color: var(--accent); font-weight: 700; }
-.mc-mon-content { flex: 1; overflow: hidden; }
-
-.mc-matrix { width: 100%; border-collapse: collapse; font-size: 11px; }
-.mc-matrix th { color: var(--muted); font-size: 9px; letter-spacing: .1em; padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--border); text-transform: uppercase; }
-.mc-matrix td { padding: 5px 6px; border-bottom: 1px solid var(--bg3); }
-.mc-matrix tr:last-child td { border-bottom: none; }
-.mc-matrix .status-go      { color: var(--pass);   font-weight: 700; }
-.mc-matrix .status-nogo    { color: var(--fail);   font-weight: 700; }
-.mc-matrix .status-caution { color: var(--warn);   font-weight: 700; }
-.mc-matrix .status-pending { color: var(--muted); }
-
-.mc-kpi { text-align: center; padding: 8px 0; }
-.mc-kpi-val   { font-size: 48px; font-weight: 700; line-height: 1; }
-.mc-kpi-label { font-size: 9px; color: var(--muted); letter-spacing: .14em; margin-top: 4px; text-transform: uppercase; }
-.mc-kpi-sub   { font-size: 10px; color: var(--muted); margin-top: 3px; }
-
-.mc-pipeline { display: flex; align-items: stretch; flex-wrap: wrap; gap: 1px; }
-.mc-pipeline-stage {
-  flex: 1; text-align: center; padding: 8px 4px;
-  border: 1px solid var(--border);
-  font-size: 10px; min-width: 60px;
-  background: var(--bg3); border-radius: 2px;
-}
-.mc-pipeline-stage .stage-name { color: var(--muted); font-size: 8px; letter-spacing: .1em; display: block; text-transform: uppercase; }
-.mc-pipeline-stage .stage-time { font-size: 16px; font-weight: 700; display: block; line-height: 1.1; }
-.mc-pipeline-stage.active { border-color: var(--accent); border-top: 2px solid var(--accent); }
-.mc-pipeline-arrow { color: var(--border); font-size: 12px; padding: 0 2px; align-self: center; }
-
-.mc-stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--bg3); font-size: 11px; }
-.mc-stat-row:last-child { border-bottom: none; }
-.mc-stat-key { color: var(--muted); }
-.mc-stat-val { font-weight: 600; }
-
-.mc-bar { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 3px; overflow: hidden; }
-.mc-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .5s; }
-.mc-bar-fill.amber { background: var(--warn); }
-.mc-bar-fill.red   { background: var(--fail); }
-
-.mc-check { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 10px; }
-.mc-check-score { font-size: 12px; font-weight: 700; width: 24px; text-align: right; }
-.mc-check-name  { color: var(--muted); flex: 1; }
-.mc-check-bar   { flex: 1; height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
-.mc-check-bar-fill { height: 100%; border-radius: 2px; }
-.mc-prim { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 20px; margin: 2px; color: var(--muted); background: var(--bg3); }
-
-.mc-log { background: var(--bg3); border-top: 1px solid var(--border); padding: 6px 20px; height: 56px; overflow: hidden; font-size: 10px; }
-.mc-log-entry { padding: 1px 0; }
-.mc-log-entry .ts  { color: var(--border); }
-.mc-log-entry .msg { color: var(--muted); }
-.mc-log-entry .hl  { color: var(--accent); font-weight: 600; }
-
-.mc-acmm { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--border); border-left: 3px solid var(--accent); background: var(--bg3); border-radius: 2px; margin-top: 6px; }
-.mc-acmm-level { font-size: 28px; font-weight: 700; color: var(--warn); }
-.mc-acmm-label { font-size: 9px; font-weight: 600; color: var(--text); }
-.mc-acmm-desc  { color: var(--muted); font-size: 9px; }
+.rl-footer-node { display: flex; align-items: center; gap: 6px; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   VARIANT C — BLUEPRINT SCHEMATIC
-   Engineering drawing on Carbon dark. Accent grid, not neon.
+   VARIANT B — SUITE BOARD
+   One panel per test suite. Health trend + top failures.
+   Good for: "which suite is the problem? is it trending better or worse?"
 ═══════════════════════════════════════════════════════════════════ */
-.bp {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 13px;
-  position: relative;
+.sb-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.sb-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border-bottom: 1px solid var(--border); }
+
+.sb-main { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+.sb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+.sb-panel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 4px; overflow: hidden;
 }
-.bp::before {
-  content: '';
-  position: fixed; inset: 0;
-  background-image:
-    linear-gradient(rgba(138,151,247,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(138,151,247,.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none; z-index: 0;
+.sb-panel-head {
+  padding: 10px 14px 8px; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
 }
-.bp > * { position: relative; z-index: 1; }
-.bp .c-accent  { color: var(--accent); }
-.bp .c-callout { color: var(--warn); }
-.bp .c-pass    { color: var(--pass); }
-.bp .c-fail    { color: var(--fail); }
-.bp .c-dim     { color: var(--muted); }
-.bp .c-white   { color: var(--text); }
+.sb-panel-head .suite-name { font-weight: 600; font-size: 13px; }
+.sb-panel-head .badge { margin-left: auto; }
+.sb-panel-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 
-.bp-titleblock {
-  background: var(--bg3);
-  border-bottom: 2px solid var(--accent);
-  padding: 12px 24px;
-  display: flex;
-  align-items: stretch;
+.sb-passrate { display: flex; align-items: baseline; gap: 6px; }
+.sb-passrate-val { font-size: 36px; font-weight: 700; font-family: var(--mono); line-height: 1; }
+.sb-passrate-denom { font-size: 13px; color: var(--muted); }
+
+.sb-sparkbar { display: flex; gap: 2px; align-items: flex-end; height: 28px; }
+.sb-sparkbar-item { flex: 1; min-width: 4px; border-radius: 2px 2px 0 0; }
+
+.sb-scenarios { display: flex; gap: 16px; font-size: 11px; }
+.sb-scenarios-item { display: flex; align-items: center; gap: 4px; }
+.sb-scenarios-item .count { font-family: var(--mono); font-weight: 600; }
+
+.sb-failure-list { }
+.sb-failure-item {
+  padding: 4px 0; border-bottom: 1px solid var(--bg3);
+  font-size: 11px; display: flex; align-items: flex-start; gap: 6px;
+  line-height: 1.4;
 }
-.bp-tb-main { flex: 1; }
-.bp-tb-title { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
-.bp-tb-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
-.bp-tb-meta { display: flex; border-left: 1px solid var(--border); padding-left: 16px; margin-left: 16px; }
-.bp-tb-cell { padding: 0 16px; border-right: 1px solid var(--border); text-align: center; display: flex; flex-direction: column; justify-content: center; }
-.bp-tb-cell:last-child { border-right: none; }
-.bp-tb-cell-label { font-size: 8px; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
-.bp-tb-cell-value { font-size: 13px; font-weight: 600; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+.sb-failure-item:last-child { border-bottom: none; }
+.sb-failure-name { flex: 1; color: var(--text2); }
+.sb-failure-count { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; }
 
-.bp-body { display: grid; grid-template-columns: 1fr 300px; min-height: calc(100vh - 200px); }
-.bp-flow-area { padding: 20px 24px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 20px; }
-.bp-sidebar { padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--bg3); }
-
-.bp-section-title { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .18em; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 10px; }
-
-.bp-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-.bp-kpi { background: var(--bg2); border: 1px solid var(--border); border-top: 2px solid var(--accent); padding: 12px; border-radius: 2px; }
-.bp-kpi-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent); line-height: 1; }
-.bp-kpi-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: 5px; }
-
-.bp-pipeline { display: flex; align-items: flex-start; padding: 20px 0; position: relative; }
-.bp-pipeline::before { content: ''; position: absolute; left: 32px; right: 32px; top: calc(50% + 8px); height: 1px; background: var(--border); z-index: 0; }
-.bp-stage-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative; z-index: 1; }
-.bp-stage-box { background: var(--bg2); border: 1px solid var(--border); border-top: 2px solid var(--accent); padding: 8px 10px; text-align: center; width: 100%; max-width: 120px; border-radius: 2px; }
-.bp-stage-name { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; display: block; }
-.bp-stage-time { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text); display: block; line-height: 1.1; margin-top: 3px; }
-.bp-stage-unit { font-size: 9px; color: var(--muted); }
-.bp-callout { background: rgba(241,194,27,.06); border: 1px solid rgba(241,194,27,.25); border-left: 3px solid var(--warn); padding: 5px 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--warn); max-width: 120px; text-align: left; line-height: 1.4; border-radius: 2px; }
-.bp-callout-line { width: 1px; background: rgba(241,194,27,.15); height: 12px; margin: 0 auto; }
-
-.bp-results-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
-.bp-results-table th { font-size: 9px; letter-spacing: .1em; color: var(--muted); padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; text-transform: uppercase; }
-.bp-results-table td { padding: 5px 8px; border-bottom: 1px solid var(--bg3); }
-.bp-results-table tr:last-child td { border-bottom: none; }
-
-.bp-dora { display: flex; flex-direction: column; gap: 6px; background: var(--bg2); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 12px; border-radius: 2px; }
-.bp-dora-level { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--pass); }
-.bp-dora-metric { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--bg3); }
-.bp-dora-metric:last-child { border-bottom: none; }
-.bp-dora-key { color: var(--muted); }
-.bp-dora-val { font-family: 'JetBrains Mono', monospace; color: var(--accent); }
-
-.bp-panel { background: var(--bg2); border: 1px solid var(--border); padding: 12px; border-radius: 2px; }
-
-.bp-spec-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.bp-spec-table td { padding: 4px 6px; border-bottom: 1px solid var(--bg3); }
-.bp-spec-table tr:last-child td { border-bottom: none; }
-.bp-spec-key { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
-.bp-spec-val { color: var(--text); text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
-.bp-spec-pass { color: var(--pass); }
-.bp-spec-warn { color: var(--warn); }
-
-.bp-coords { display: flex; background: var(--bg3); border-top: 1px solid var(--border); padding: 5px 24px; gap: 24px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); flex-wrap: wrap; }
-.bp-coords span { color: var(--accent); }
+.sb-bottom { padding: 14px 20px; border-top: 1px solid var(--border); background: var(--bg3); flex-shrink: 0; }
+.sb-bottom-row { display: flex; gap: 40px; flex-wrap: wrap; }
+.sb-infra-item { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.sb-pipeline { display: flex; align-items: center; gap: 0; margin-top: 10px; }
+.sb-pipeline-stage {
+  flex: 1; text-align: center; padding: 7px 8px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-right: none; font-size: 11px;
+}
+.sb-pipeline-stage:first-child { border-radius: 3px 0 0 3px; }
+.sb-pipeline-stage:last-child  { border-right: 1px solid var(--border); border-radius: 0 3px 3px 0; }
+.sb-pipeline-stage .stage-name { font-size: 9px; color: var(--muted); display: block; text-transform: uppercase; letter-spacing: .06em; }
+.sb-pipeline-stage .stage-dur  { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.sb-pipeline-stage.active { background: var(--run-bg); border-color: var(--run-bd); }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SWITCHER
+   VARIANT C — TRIAGE
+   Failures front and center. "What needs fixing right now?"
+   Good for: morning standup, incident response, deciding what to work on.
+═══════════════════════════════════════════════════════════════════ */
+.tr-body { flex: 1; display: flex; overflow: hidden; }
+.tr-left  { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.tr-right { width: 280px; border-left: 1px solid var(--border); overflow-y: auto; background: var(--bg3); }
+
+/* Alert banner */
+.tr-alert {
+  padding: 10px 14px; border-radius: 4px; border: 1px solid;
+  display: flex; align-items: flex-start; gap: 10px; font-size: 12px;
+}
+.tr-alert.fail { background: var(--fail-bg); border-color: var(--fail-bd); color: var(--fail); }
+.tr-alert.pass { background: var(--pass-bg); border-color: var(--pass-bd); color: var(--pass); }
+.tr-alert.warn { background: var(--warn-bg); border-color: var(--warn-bd); color: var(--warn); }
+.tr-alert-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
+.tr-alert-body { flex: 1; }
+.tr-alert-title { font-weight: 600; margin-bottom: 2px; }
+.tr-alert-sub   { color: var(--text2); }
+
+/* Failure cards */
+.tr-failure-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 3px solid var(--fail); border-radius: 0 4px 4px 0;
+  padding: 12px 14px;
+}
+.tr-failure-card.warn { border-left-color: var(--warn); }
+.tr-failure-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tr-failure-card-title { font-weight: 600; font-size: 13px; }
+.tr-failure-card-meta  { font-size: 11px; color: var(--muted); margin-left: auto; }
+.tr-failure-list { display: flex; flex-direction: column; gap: 4px; }
+.tr-failure-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px; background: var(--bg3);
+  border-radius: 3px; font-size: 11px;
+}
+.tr-failure-row-name { flex: 1; color: var(--text2); font-family: var(--mono); font-size: 10px; }
+.tr-failure-row-count { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+/* Right panel: passing suites + posture */
+.tr-right-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.tr-right-section:last-child { border-bottom: none; }
+.tr-right-section-title { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+
+.tr-suite-ok { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--bg2); }
+.tr-suite-ok:last-child { border-bottom: none; }
+.tr-suite-ok .score { font-family: var(--mono); font-size: 11px; color: var(--pass); margin-left: auto; }
+
+.tr-posture-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 11px; border-bottom: 1px solid var(--bg2); }
+.tr-posture-row:last-child { border-bottom: none; }
+.tr-posture-key { color: var(--muted); }
+.tr-posture-val { font-family: var(--mono); font-size: 11px; }
+
+.tr-node-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; border-bottom: 1px solid var(--bg2); }
+.tr-node-row:last-child { border-bottom: none; }
+.tr-node-name { font-weight: 500; }
+.tr-node-meta { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FLOATING VARIANT SWITCHER
 ═══════════════════════════════════════════════════════════════════ */
 #switcher {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(30,30,30,.94);
-  border: 1px solid var(--border);
-  border-radius: 40px;
-  padding: 7px 16px;
-  backdrop-filter: blur(16px);
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  color: var(--muted);
-  box-shadow: var(--shadow);
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 10000; display: flex; align-items: center; gap: 10px;
+  background: rgba(30,30,30,.96); border: 1px solid var(--border);
+  border-radius: 40px; padding: 7px 16px;
+  backdrop-filter: blur(16px); font-family: var(--sans); font-size: 12px;
+  color: var(--muted); box-shadow: var(--shadow);
 }
 #switcher button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0 4px; line-height: 1; transition: color .15s; }
 #switcher button:hover { color: var(--text); }
 #switcher-label { min-width: 160px; text-align: center; font-weight: 500; color: var(--text); }
 #switcher-proto { font-size: 9px; letter-spacing: .1em; color: #555; border-left: 1px solid var(--border); padding-left: 10px; text-transform: uppercase; }
   </style>
-\n</head>
+</head>
 <body>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     VARIANT A — PIT WALL
+     VARIANT A — RUN LOG
+     Timeline of recent pipeline runs. GitHub Actions feel.
+     Good for: "what ran recently, which run broke things?"
 ═══════════════════════════════════════════════════════════════════════════ -->
-<div id="variant-A" class="variant pw">
+<div id="variant-A" class="variant">
 
-  <!-- Race control strip -->
-  <div class="pw-strip">
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">RACE</span>
-      <span class="pw-strip-value c-orange">BLUEFIN QA</span>
+  <div class="page-header">
+    <div>
+      <div class="page-header-title">projectbluefin / testing-lab</div>
+      <div class="page-header-sub">Argo Workflows + KubeVirt · ghost k3s cluster</div>
     </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">LAP</span>
-      <span class="pw-strip-value pw-strip-lap" id="pw-lap">—</span>
-    </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">S1 · POLL+BUILD</span>
-      <span class="pw-strip-value c-purple" id="pw-s1">21:00</span>
-    </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">S2 · PROVISION</span>
-      <span class="pw-strip-value c-yellow" id="pw-s2">8:00</span>
-    </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">S3 · TEST+TEARDOWN</span>
-      <span class="pw-strip-value c-green" id="pw-s3">15:00</span>
-    </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">DRS</span>
-      <span class="pw-strip-value c-green">⚡ ACTIVE</span>
-    </div>
-    <div class="pw-strip-cell">
-      <span class="pw-strip-label">RELEASE</span>
-      <span class="pw-strip-value c-blue" id="pw-release">v2026.06</span>
-    </div>
-    <div class="pw-strip-cell" style="margin-left:auto;">
-      <span class="pw-strip-label">UPDATED</span>
-      <span class="pw-strip-value c-dim" id="pw-updated">—</span>
+    <div class="page-header-right">
+      <span id="rl-release" style="font-size:12px;color:var(--muted)">—</span>
+      <span id="rl-header-status" class="badge skip">Loading</span>
     </div>
   </div>
 
-  <!-- Three-column body -->
-  <div class="pw-body">
+  <div class="rl-body">
 
-    <!-- LEFT: Compounds, resources, homologation -->
-    <div class="pw-col">
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">COMPOUNDS (IMAGE VARIANTS)</div>
-        <div class="pw-compound" id="pw-c-bluefin">
-          <div class="pw-compound-pip soft">S</div>
-          <div>
-            <div>bluefin:testing</div>
-            <div class="c-dim" style="font-size:9px">SOFT · NIGHTLY 02:00 UTC</div>
-          </div>
-        </div>
-        <div class="pw-compound" id="pw-c-lts">
-          <div class="pw-compound-pip medium">M</div>
-          <div>
-            <div>bluefin-lts:testing</div>
-            <div class="c-dim" style="font-size:9px">MEDIUM · NIGHTLY 02:30 UTC</div>
-          </div>
-        </div>
-        <div class="pw-compound" id="pw-c-dakota">
-          <div class="pw-compound-pip hard">H</div>
-          <div>
-            <div>dakota:testing</div>
-            <div class="c-dim" style="font-size:9px">HARD · NIGHTLY 03:00 UTC</div>
-          </div>
-        </div>
+    <div class="rl-kpis" id="rl-kpis">
+      <div class="kpi-tile">
+        <div class="value" id="rl-k-passrate">—</div>
+        <div class="label">Pipeline success rate (7d)</div>
       </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">PIT RESOURCES (SEMAPHORE SLOTS)</div>
-        <div class="pw-resource">
-          <div class="pw-resource-label">CONTAINERDISK VMs</div>
-          <div style="display:flex; align-items:center">
-            <div class="pw-resource-bar" id="pw-res-cd"></div>
-            <span class="pw-resource-count" id="pw-res-cd-count">—</span>
-          </div>
-        </div>
-        <div class="pw-resource">
-          <div class="pw-resource-label">HOSTDISK VMs (ghost only)</div>
-          <div style="display:flex; align-items:center">
-            <div class="pw-resource-bar" id="pw-res-hd"></div>
-            <span class="pw-resource-count" id="pw-res-hd-count">—</span>
-          </div>
-        </div>
+      <div class="kpi-tile">
+        <div class="value" id="rl-k-runs">—</div>
+        <div class="label">Runs this week</div>
       </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">HOMOLOGATION (SUPPLY CHAIN)</div>
-        <div id="pw-chips"></div>
+      <div class="kpi-tile">
+        <div class="value" id="rl-k-avg">—</div>
+        <div class="label">Avg pipeline duration</div>
       </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">DORA PERFORMANCE</div>
-        <div class="pw-dora" id="pw-dora-card">
-          <div class="pw-dora-level" id="pw-dora-level">HIGH</div>
-          <div id="pw-dora-stats"></div>
-        </div>
+      <div class="kpi-tile">
+        <div class="value" id="rl-k-scenarios">—</div>
+        <div class="label">Test scenarios</div>
       </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">CLUSTER NODES (WEATHER)</div>
-        <div id="pw-weather"></div>
-      </div>
-
     </div>
 
-    <!-- CENTER: Main telemetry -->
-    <div class="pw-col">
-
-      <div class="pw-gauge">
-        <div class="pw-gauge-val c-green" id="pw-passrate">—%</div>
-        <div class="pw-gauge-label">PASS RATE · 7 DAY AVERAGE</div>
-        <div class="pw-gauge-delta" id="pw-passrate-delta"></div>
-        <div class="pw-gauge-sub" id="pw-gauge-sub"></div>
-      </div>
-
-      <!-- Pipeline sector times -->
-      <div>
-        <div class="pw-widget-title" style="padding:4px 0 6px; border-bottom:1px solid #1e1e24; margin-bottom:8px">PIPELINE STAGE TIMES (AVG)</div>
-        <div class="pw-stages" id="pw-stages"></div>
-      </div>
-
-      <!-- Main timing leaderboard -->
-      <div class="pw-timeboard">
-        <table>
-          <thead>
-            <tr>
-              <th class="pos">P</th>
-              <th>DRIVER (VARIANT)</th>
-              <th class="sector-cell">SMOKE</th>
-              <th class="sector-cell">DEV</th>
-              <th class="sector-cell">SYSTEM</th>
-              <th class="sector-cell">TOTAL</th>
-              <th>GAP</th>
-            </tr>
-          </thead>
-          <tbody id="pw-leaderboard">
-            <tr><td colspan="7" class="c-dim" style="text-align:center;padding:12px">Loading telemetry...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Velocity strip -->
-      <div class="pw-velocity" id="pw-velocity"></div>
-
-      <!-- GNOME test framework info -->
-      <div class="pw-widget" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div class="pw-widget-title">TEST STACK</div>
-          <div id="pw-test-stack" style="font-size:10px;line-height:1.8;color:#888"></div>
-        </div>
-        <div>
-          <div class="pw-widget-title">COVERAGE</div>
-          <div id="pw-coverage" style="font-size:10px;line-height:1.8;color:#888"></div>
-        </div>
-      </div>
-
+    <div class="rl-main">
+      <table class="rl-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Image variant</th>
+            <th style="text-align:center">Smoke</th>
+            <th style="text-align:center">Developer</th>
+            <th style="text-align:center">System</th>
+            <th>Duration</th>
+            <th>Triggered</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rl-runs">
+          <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Loading run history…</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- RIGHT: Radio, fastest lap, CNCF -->
-    <div class="pw-col">
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">FASTEST LAP (ALL TIME)</div>
-        <div style="text-align:center;padding:8px 0">
-          <div style="font-size:28px;font-weight:700" class="c-purple" id="pw-fastest-lap">43:22</div>
-          <div style="font-size:9px;color:#555;margin-top:3px">TOTAL PIPELINE · BEST KNOWN RUN</div>
-        </div>
-      </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">OPENSSF SCORECARD</div>
-        <div id="pw-scorecard"></div>
-      </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">HIVE STATUS (ACMM)</div>
-        <div id="pw-hive"></div>
-      </div>
-
-      <div class="pw-widget">
-        <div class="pw-widget-title">TEAM RADIO</div>
-        <div class="pw-radio" id="pw-radio"></div>
-      </div>
-
+    <div class="rl-footer" id="rl-footer">
+      <span style="font-weight:600">Cluster nodes:</span>
+      <span id="rl-footer-nodes">—</span>
+      <span style="margin-left:auto;font-size:10px" id="rl-footer-updated">—</span>
     </div>
+
   </div>
-
-  <!-- Ticker -->
-  <div class="pw-ticker">
-    <div class="pw-ticker-inner" id="pw-ticker">Loading...</div>
-  </div>
-
 </div><!-- /variant-A -->
 
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     VARIANT B — MISSION CONTROL
+     VARIANT B — SUITE BOARD
+     One Grafana-style panel per test suite. Pass rate + recent trend.
+     Good for: "which suite is the problem? is it getting better or worse?"
 ═══════════════════════════════════════════════════════════════════════════ -->
-<div id="variant-B" class="variant mc">
+<div id="variant-B" class="variant">
 
-  <div class="mc-header">
-    <div class="mc-header-title">◈ BLUEFIN MISSION CONTROL</div>
-    <div class="mc-met">MET: <span id="mc-met">—</span></div>
-    <div class="mc-met">RELEASE: <span id="mc-release">—</span></div>
-    <div class="mc-status-row" id="mc-status-row">
-      <span class="mc-go go">PROPULSION GO</span>
-      <span class="mc-go go">SYSTEMS GO</span>
-      <span class="mc-go go">SCIENCE GO</span>
-      <span class="mc-go go">COMMS GO</span>
-      <span class="mc-go caution" id="mc-flight-status">TELEMETRY CHECK</span>
+  <div class="page-header">
+    <div>
+      <div class="page-header-title">QA Suite Health — projectbluefin/testing-lab</div>
+      <div class="page-header-sub">Pass rate and trend per suite · last 7 days</div>
+    </div>
+    <div class="page-header-right">
+      <span id="sb-release" style="font-size:12px;color:var(--muted)">—</span>
     </div>
   </div>
 
-  <div class="mc-grid">
+  <div class="sb-body">
 
-    <!-- Monitor 1: TELEMETRY — test results -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">TELEMETRY</span> — TEST RESULTS MATRIX</div>
-      <div class="mc-mon-content">
-        <table class="mc-matrix" id="mc-matrix">
-          <thead>
-            <tr><th>VARIANT</th><th>SMOKE</th><th>DEVELOPER</th><th>SYSTEM</th><th>SCEN</th></tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="5" class="c-dim" style="text-align:center;padding:12px">awaiting data link...</td></tr>
-          </tbody>
-        </table>
+    <div class="sb-kpis" id="sb-kpis">
+      <div class="kpi-tile">
+        <div class="value" id="sb-k-passrate">—</div>
+        <div class="label">Overall pass rate (7d)</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="value" id="sb-k-builds">—</div>
+        <div class="label">Builds / week</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="value" id="sb-k-scenarios">—</div>
+        <div class="label">Scenarios total</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="value" id="sb-k-vms">—</div>
+        <div class="label">VMs provisioned (7d)</div>
+      </div>
+      <div class="kpi-tile">
+        <div class="value" id="sb-k-slots">—</div>
+        <div class="label">Semaphore slots in use</div>
       </div>
     </div>
 
-    <!-- Monitor 2: PROPULSION — build stats -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">PROPULSION</span> — BUILD THROUGHPUT</div>
-      <div class="mc-mon-content">
-        <div class="mc-kpi c-green" id="mc-prop-passrate">
-          <div class="mc-kpi-val" style="font-size:52px">—%</div>
-          <div class="mc-kpi-label">PIPELINE SUCCESS RATE (7d)</div>
-          <div class="mc-kpi-sub" id="mc-prop-runs">— runs this week</div>
-        </div>
-        <div id="mc-prop-stats" style="margin-top:8px"></div>
+    <div class="sb-main">
+      <div class="sb-grid" id="sb-panels">
+        <!-- panels injected by JS -->
       </div>
     </div>
 
-    <!-- Monitor 3: NAVIGATION — pipeline flow -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">NAVIGATION</span> — PIPELINE STAGES</div>
-      <div class="mc-mon-content">
-        <div class="mc-pipeline" id="mc-pipeline"></div>
-        <div id="mc-nav-stats" style="margin-top:10px"></div>
-      </div>
-    </div>
-
-    <!-- Monitor 4: SYSTEMS — infrastructure -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">SYSTEMS</span> — CLUSTER &amp; INFRA</div>
-      <div class="mc-mon-content" id="mc-systems"></div>
-    </div>
-
-    <!-- Monitor 5: COMMS — velocity -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">COMMS</span> — FACTORY VELOCITY</div>
-      <div class="mc-mon-content" id="mc-comms"></div>
-    </div>
-
-    <!-- Monitor 6: SCIENCE — supply chain & security -->
-    <div class="mc-monitor">
-      <div class="mc-mon-title">◈ <span class="hl">SCIENCE</span> — SUPPLY CHAIN &amp; COMPLIANCE</div>
-      <div class="mc-mon-content" id="mc-science"></div>
+    <div class="sb-bottom">
+      <div class="section-head">Pipeline stage timing (avg)</div>
+      <div class="sb-pipeline" id="sb-pipeline"></div>
+      <div class="sb-bottom-row" id="sb-infra" style="margin-top:12px"></div>
     </div>
 
   </div>
-
-  <div class="mc-log" id="mc-log">
-    <div class="mc-log-entry"><span class="ts">T+000:00:00</span> <span class="msg">MISSION CONTROL ONLINE — <span class="hl">BLUEFIN QA FACTORY</span> — ALL CHANNELS NOMINAL</span></div>
-  </div>
-
 </div><!-- /variant-B -->
 
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     VARIANT C — BLUEPRINT SCHEMATIC
+     VARIANT C — TRIAGE
+     Failures front and center. Right panel: passing suites + posture.
+     Good for: morning standup, "what do I need to fix today?"
 ═══════════════════════════════════════════════════════════════════════════ -->
-<div id="variant-C" class="variant bp">
+<div id="variant-C" class="variant">
 
-  <!-- Engineering title block -->
-  <div class="bp-titleblock">
-    <div class="bp-tb-main">
-      <div class="bp-tb-title">Bluefin QA Factory — Process Flow Diagram</div>
-      <div class="bp-tb-sub">projectbluefin/testing-lab · Argo Workflows + KubeVirt + ArgoCD · ghost k3s cluster</div>
+  <div class="page-header">
+    <div>
+      <div class="page-header-title">QA Triage — projectbluefin/testing-lab</div>
+      <div class="page-header-sub">Failures and open issues requiring attention</div>
     </div>
-    <div class="bp-tb-meta">
-      <div class="bp-tb-cell">
-        <div class="bp-tb-cell-label">DWG</div>
-        <div class="bp-tb-cell-value">QA-PIPELINE-001</div>
-      </div>
-      <div class="bp-tb-cell">
-        <div class="bp-tb-cell-label">REV</div>
-        <div class="bp-tb-cell-value">B</div>
-      </div>
-      <div class="bp-tb-cell">
-        <div class="bp-tb-cell-label">RELEASE</div>
-        <div class="bp-tb-cell-value" id="bp-release">—</div>
-      </div>
-      <div class="bp-tb-cell">
-        <div class="bp-tb-cell-label">DATE</div>
-        <div class="bp-tb-cell-value" id="bp-date">—</div>
-      </div>
+    <div class="page-header-right">
+      <span id="tr-release" style="font-size:12px;color:var(--muted)">—</span>
+      <span id="tr-updated" style="font-size:11px;color:var(--muted)">—</span>
     </div>
   </div>
 
-  <!-- KPI row -->
-  <div style="padding:16px 24px 0; position:relative; z-index:1">
-    <div class="bp-kpi-grid" id="bp-kpis"></div>
-  </div>
+  <div class="tr-body">
 
-  <!-- Main body: flow + sidebar -->
-  <div class="bp-body">
-
-    <div class="bp-flow-area">
-
-      <!-- Pipeline flow diagram -->
-      <div>
-        <div class="bp-section-title">Factory Pipeline (ContainerDisk Path)</div>
-        <div class="bp-pipeline" id="bp-pipeline"></div>
-      </div>
-
-      <!-- Test results table -->
-      <div>
-        <div class="bp-section-title">Quality Control — Test Results (Current Run)</div>
-        <table class="bp-results-table" id="bp-results-table">
-          <thead>
-            <tr>
-              <th>Variant</th>
-              <th>Suite</th>
-              <th>Status</th>
-              <th>Passed</th>
-              <th>Failed</th>
-              <th>Total</th>
-              <th>Last Run</th>
-              <th>Workflow</th>
-            </tr>
-          </thead>
-          <tbody id="bp-results-tbody">
-            <tr><td colspan="8" class="c-dim" style="text-align:center;padding:12px">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- OpenSSF Scorecard bar chart -->
-      <div>
-        <div class="bp-section-title">OpenSSF Scorecard — Check Scores</div>
-        <div id="bp-scorecard-bars"></div>
-      </div>
-
-      <!-- DORA metrics -->
-      <div class="bp-dora" id="bp-dora"></div>
-
+    <div class="tr-left" id="tr-left">
+      <!-- alert banner + failure cards injected by JS -->
     </div>
 
-    <!-- Sidebar -->
-    <div class="bp-sidebar">
-
-      <div class="bp-panel">
-        <div class="bp-section-title">Bill of Materials</div>
-        <div id="bp-bom"></div>
-      </div>
-
-      <div class="bp-panel">
-        <div class="bp-section-title">Cluster Specification</div>
-        <div id="bp-cluster"></div>
-      </div>
-
-      <div class="bp-panel">
-        <div class="bp-section-title">Supply Chain Spec</div>
-        <table class="bp-spec-table" id="bp-supply-chain"></table>
-      </div>
-
-      <div class="bp-panel">
-        <div class="bp-section-title">CNCF Primitives</div>
-        <div id="bp-cncf"></div>
-      </div>
-
-      <div class="bp-panel">
-        <div class="bp-section-title">Hive / Autonomy Level</div>
-        <div id="bp-hive"></div>
-      </div>
-
+    <div class="tr-right" id="tr-right">
+      <!-- passing suites + posture + infra injected by JS -->
     </div>
-  </div>
 
-  <!-- Coordinates footer -->
-  <div class="bp-coords" id="bp-coords">
-    <span>QA-PIPELINE-001</span>
-    <span>projectbluefin/testing-lab</span>
-    <span>Nodes: <span id="bp-nodes">—</span></span>
-    <span>Templates: <span id="bp-templates">—</span></span>
-    <span>Manifests: <span id="bp-manifests">—</span></span>
-    <span>CronWorkflows: <span id="bp-crons">—</span></span>
-    <span>Scenarios: <span id="bp-scenarios">—</span></span>
-    <span>Generated: <span id="bp-generated">—</span></span>
   </div>
-
 </div><!-- /variant-C -->
 
 
@@ -892,7 +455,7 @@
 ═══════════════════════════════════════════════════════════════════════════ -->
 <div id="switcher">
   <button id="sw-prev" title="Previous variant (←)">←</button>
-  <span id="switcher-label">A — Pit Wall</span>
+  <span id="switcher-label">A — Run Log</span>
   <button id="sw-next" title="Next variant (→)">→</button>
   <span id="switcher-proto">PROTOTYPE</span>
 </div>
@@ -900,15 +463,15 @@
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   DATA + VARIANT LOGIC
+   DATA + SHARED LOGIC
 ═══════════════════════════════════════════════════════════════════════════ */
 const VARIANTS = ['A', 'B', 'C'];
-const VARIANT_NAMES = { A: 'Pit Wall', B: 'Mission Control', C: 'Blueprint' };
+const VARIANT_NAMES = { A: 'Run Log', B: 'Suite Board', C: 'Triage' };
 const RESULT_SLUGS = ['bluefin-testing', 'bluefin-lts-testing', 'dakota-testing'];
 const SUITES = ['smoke', 'developer', 'system'];
 const ARGO_UI = 'http://192.168.1.102:32746';
 
-// ── Seed data (fallback if fetch fails) ────────────────────────────────────
+// ── Seed data (fallback) ───────────────────────────────────────────────────
 const SEED = {
   _meta: { generated: new Date().toISOString(), source: 'seed' },
   factory: {
@@ -939,19 +502,115 @@ const SEED = {
     { slug:'bluefin-lts-testing', label:'bluefin-lts:testing', image:'ghcr.io/projectbluefin/bluefin-lts:testing' },
     { slug:'dakota-testing',      label:'dakota:testing',       image:'ghcr.io/projectbluefin/dakota:testing' }
   ],
-  test_coverage: { feature_files:15, scenarios_total:99,
-    suites: { smoke:{scenarios:29}, developer:{scenarios:31}, system:{scenarios:14}, flatcar:{scenarios:10}, software:{scenarios:8}, homelab:{scenarios:7} }
+  test_coverage: {
+    feature_files:15, scenarios_total:99,
+    suites: {
+      smoke:     { scenarios:29, label:'Smoke',     description:'GNOME Shell launch, activities, basic navigation' },
+      developer: { scenarios:31, label:'Developer', description:'Ptyxis, Podman, Flatpak, dev tools' },
+      system:    { scenarios:14, label:'System',    description:'bootc/uupd, composefs, image integrity' },
+      flatcar:   { scenarios:10, label:'Flatcar',   description:'systemd, containers, CoreOS migration' },
+      software:  { scenarios: 8, label:'Software',  description:'Bazaar, Flatpak catalog, updates' },
+    }
   },
-  supply_chain: { slsa_level:2, signing_method:'cosign keyless (Sigstore Fulcio + Rekor)', sbom_format:'spdx-2.3', license:'Apache-2.0', dependency_updates:'Renovate', branch_protection:true, code_review_required:true },
+  supply_chain: { slsa_level:2, signing_method:'cosign keyless (Sigstore)', sbom_format:'spdx-2.3', license:'Apache-2.0', branch_protection:true, code_review_required:true },
   openssf: {
     scorecard_score: 7.2,
-    checks: { 'Binary-Artifacts':10, 'Branch-Protection':7, 'CI-Best-Practices':8, 'Code-Review':10, 'Contributors':8, 'Dangerous-Workflow':10, 'Dependency-Update-Tool':10, 'License':10, 'Maintained':10, 'Pinned-Dependencies':5, 'SAST':6, 'Security-Policy':10, 'Signed-Releases':8, 'Token-Permissions':9, 'Vulnerabilities':10 }
+    checks: { 'Binary-Artifacts':10,'Branch-Protection':7,'CI-Best-Practices':8,'Code-Review':10,'Dependency-Update-Tool':10,'License':10,'Maintained':10,'Pinned-Dependencies':5,'SAST':6,'Security-Policy':10,'Signed-Releases':8,'Token-Permissions':9 }
   },
-  cncf: { maturity:'pre-sandbox', primitives:['kubernetes','argo-workflows','kubevirt','loki','gitops-argocd','sigstore-cosign','oci-registry'] },
-  hive: { acmm_level:3, acmm_label:'Supervised Autonomy', governor_mode:'busy', agents_active:1, agents_total:3, open_issues:64, merged_7d:12, median_merge_min:32 },
   velocity: { commits_7d:28, prs_merged_7d:12, deployments_7d:42, build_minutes_7d:1890, vms_provisioned_7d:56, vms_provisioned_total:1247 },
-  github: { latest_release:'v2026.06', testing_lab:{ open_issues:64, open_prs:4 }, common:{ stars:27, forks:41 } }
+  github: { latest_release:'v2026.06', testing_lab:{ open_issues:64, open_prs:4 } }
 };
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt(iso) {
+  if (!iso) return 'never';
+  try { return new Date(iso).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' }); } catch { return iso; }
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleDateString(undefined, { month:'short', day:'numeric' }); } catch { return iso; }
+}
+function fmtAgo(iso) {
+  if (!iso) return 'never';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 3600000)  return Math.round(ms/60000) + 'm ago';
+  if (ms < 86400000) return Math.round(ms/3600000) + 'h ago';
+  return Math.round(ms/86400000) + 'd ago';
+}
+function badge(text, cls) {
+  return `<span class="badge ${cls}">${text}</span>`;
+}
+function dot(cls) {
+  return `<span class="dot ${cls}"></span>`;
+}
+function passColor(pct) {
+  if (pct >= 90) return 'var(--pass)';
+  if (pct >= 70) return 'var(--warn)';
+  return 'var(--fail)';
+}
+function passBadge(r) {
+  if (!r || r.status === 'pending') return badge('—', 'skip');
+  if (r.status === 'passed') return badge('✓ Pass', 'pass');
+  if (r.failed <= 2)         return badge(`${r.failed} fail`, 'warn');
+  return badge(`${r.failed} fail`, 'fail');
+}
+
+// ── Synthetic run history (fallback if stats.recent_runs is absent) ─────────
+function makeFakeRuns(s) {
+  const p = s.pipelines?.containerdisk || {};
+  const now = Date.now();
+  const runs = [];
+  const triggers = ['nightly', 'pr-poller', 'manual', 'nightly', 'nightly', 'pr-poller'];
+  const statuses = [
+    { smoke:{s:29,f:0,status:'passed'}, developer:{s:31,f:10,status:'failed'}, system:{s:14,f:6,status:'failed'}, overall:'fail' },
+    { smoke:{s:29,f:0,status:'passed'}, developer:{s:31,f:0,status:'passed'},  system:{s:14,f:6,status:'failed'}, overall:'warn' },
+    { smoke:{s:29,f:0,status:'passed'}, developer:{s:31,f:0,status:'passed'},  system:{s:14,f:0,status:'passed'}, overall:'pass' },
+    { smoke:{s:29,f:1,status:'failed'}, developer:{s:31,f:0,status:'passed'},  system:{s:14,f:0,status:'passed'}, overall:'warn' },
+    { smoke:{s:29,f:0,status:'passed'}, developer:{s:31,f:0,status:'passed'},  system:{s:14,f:0,status:'passed'}, overall:'pass' },
+    { smoke:{s:29,f:0,status:'passed'}, developer:{s:31,f:2,status:'failed'},  system:{s:14,f:0,status:'passed'}, overall:'warn' },
+  ];
+  let runN = 1247;
+  for (let day = 0; day < 3; day++) {
+    for (const variant of RESULT_SLUGS) {
+      const si = Math.floor(Math.random() * statuses.length);
+      const st = statuses[si];
+      const dur = (p.avg_total_min || 45) + Math.round((Math.random() - .5) * 10);
+      const ts = new Date(now - day * 86400000 - Math.random() * 50000000);
+      runs.push({
+        id: `bluefin-qa-${(runN--).toString().padStart(4,'0')}`,
+        variant,
+        label: s.images?.find(i=>i.slug===variant)?.label || variant,
+        trigger: triggers[Math.floor(Math.random()*triggers.length)],
+        smoke: st.smoke,
+        developer: st.developer,
+        system: st.system,
+        overall: st.overall,
+        duration: dur,
+        ts
+      });
+    }
+  }
+  runs.sort((a, b) => b.ts - a.ts);
+  return runs;
+}
+
+// ── Convert real recent_runs from stats to display format ─────────────────
+function realRuns(s) {
+  if (!s.recent_runs || s.recent_runs.length === 0) return makeFakeRuns(s);
+  return s.recent_runs.map(r => ({
+    id:       r.id,
+    variant:  r.variant || 'bluefin-testing',
+    label:    r.label || r.variant,
+    trigger:  r.trigger || 'unknown',
+    smoke:    r.smoke ? { s: r.smoke.scenarios, f: r.smoke.failed, status: r.smoke.status } : null,
+    developer:r.developer ? { s: r.developer.scenarios, f: r.developer.failed, status: r.developer.status } : null,
+    system:   r.system ? { s: r.system.scenarios, f: r.system.failed, status: r.system.status } : null,
+    overall:  r.overall,
+    duration: r.duration_min || null,
+    ts:       new Date(r.started_at || r.finished_at || Date.now()),
+    finished_at: r.finished_at ? new Date(r.finished_at) : null,
+  }));
+}
 
 // ── Variant switching ──────────────────────────────────────────────────────
 function getVariant() {
@@ -959,7 +618,6 @@ function getVariant() {
   const v = (p.get('variant') || 'A').toUpperCase();
   return VARIANTS.includes(v) ? v : 'A';
 }
-
 function setVariant(v) {
   const url = new URL(location);
   url.searchParams.set('variant', v);
@@ -994,604 +652,383 @@ document.addEventListener('keydown', e => {
 async function tryFetch(url) {
   try { const r = await fetch(url); return r.ok ? r.json() : null; } catch { return null; }
 }
-function fmt(iso) {
-  if (!iso) return 'never';
-  try { return new Date(iso).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' }); } catch { return iso; }
-}
-function fmtDate(iso) {
-  if (!iso) return '—';
-  try { return new Date(iso).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' }); } catch { return iso; }
-}
-function elapsed(isoStart) {
-  const ms = Date.now() - new Date(isoStart).getTime();
-  const d = Math.floor(ms / 86400000);
-  const h = Math.floor((ms % 86400000) / 3600000).toString().padStart(2,'0');
-  const m = Math.floor((ms % 3600000) / 60000).toString().padStart(2,'0');
-  const s = Math.floor((ms % 60000) / 1000).toString().padStart(2,'0');
-  return `${d}d ${h}:${m}:${s}`;
-}
-function scoreColor_pw(v, max=10) {
-  const p = v / max;
-  if (p >= .9) return 'c-purple';
-  if (p >= .7) return 'c-green';
-  if (p >= .5) return 'c-yellow';
-  return 'c-red';
-}
-function statusClass_pw(status) {
-  if (status === 'passed')  return 'c-green';
-  if (status === 'failed')  return 'c-red';
-  return 'c-dim';
-}
-function statusLabel(status) {
-  if (status === 'passed') return 'PASS';
-  if (status === 'failed') return 'FAIL';
-  return 'PENDING';
-}
 
-// ── Populate Variant A: Pit Wall ───────────────────────────────────────────
-function populatePitWall(s, results) {
-  const f = s.factory;
+// ═══════════════════════════════════════════════════════════════════════════
+//  VARIANT A: Run Log
+// ═══════════════════════════════════════════════════════════════════════════
+function populateRunLog(s, results) {
   const p = s.pipelines?.containerdisk || {};
 
-  // Header strip
-  document.getElementById('pw-lap').textContent = (p.runs_total || '—').toLocaleString();
-  document.getElementById('pw-s1').textContent = ((p.stage_avg_min?.poll || 0) + (p.stage_avg_min?.build || 0)) + ':00';
-  document.getElementById('pw-s2').textContent = (p.stage_avg_min?.provision || '—') + ':00';
-  document.getElementById('pw-s3').textContent = ((p.stage_avg_min?.test || 0) + (p.stage_avg_min?.teardown || 0)) + ':00';
-  document.getElementById('pw-release').textContent = s.github?.latest_release || f?.release || '—';
-  document.getElementById('pw-updated').textContent = fmtDate(s._meta?.generated);
+  document.getElementById('rl-release').textContent = s.github?.latest_release || '—';
 
-  // Resource bars (semaphores)
-  const cdCap = f?.semaphores?.containerdisk?.capacity || 8;
-  const cdAct = f?.semaphores?.containerdisk?.active || 0;
-  const hdCap = f?.semaphores?.hostdisk?.capacity || 6;
-  const hdAct = f?.semaphores?.hostdisk?.active || 0;
-  function renderBar(id, used, cap) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = Array.from({length:cap}, (_,i) =>
-      `<div class="pw-resource-pip${i < used ? ' used' : ''}"></div>`).join('');
+  // KPI tiles
+  const pct = p.success_rate_pct || 84;
+  const pctEl = document.getElementById('rl-k-passrate');
+  pctEl.textContent = pct + '%';
+  pctEl.style.color = passColor(pct);
+  document.getElementById('rl-k-runs').textContent = p.runs_7d || 42;
+  document.getElementById('rl-k-avg').textContent = (p.avg_total_min || 45) + 'm';
+  document.getElementById('rl-k-scenarios').textContent = s.test_coverage?.scenarios_total || 99;
+
+  // Header status badge — use latest result
+  const grid = {};
+  results.forEach(r => { if (!r) return; if (!grid[r.variant]) grid[r.variant] = {}; grid[r.variant][r.suite] = r; });
+  const anyFail = results.some(r => r && r.status === 'failed');
+  const allPend = results.every(r => !r || r.status === 'pending');
+  const runningCount = (s.recent_runs || []).filter(r => r.overall === 'running').length;
+  const statusEl = document.getElementById('rl-header-status');
+  if (runningCount > 0) {
+    statusEl.innerHTML = `<span class="dot run"></span> ${runningCount} running`;
+    statusEl.className = 'badge run';
+  } else if (allPend) {
+    statusEl.textContent = 'No data'; statusEl.className = 'badge skip';
+  } else if (anyFail) {
+    statusEl.textContent = 'Failures'; statusEl.className = 'badge fail';
+  } else {
+    statusEl.textContent = 'All passing'; statusEl.className = 'badge pass';
   }
-  renderBar('pw-res-cd', cdAct, cdCap);
-  renderBar('pw-res-hd', hdAct, hdCap);
-  document.getElementById('pw-res-cd-count').textContent = `${cdAct}/${cdCap}`;
-  document.getElementById('pw-res-hd-count').textContent = `${hdAct}/${hdCap}`;
 
-  // Homologation chips
-  const sc = s.supply_chain || {};
-  const oss = s.openssf || {};
-  const chips = [
-    { label:`SLSA L${sc.slsa_level||2}`, cls:'green' },
-    { label:`OpenSSF ${oss.scorecard_score||7.2}`, cls:'orange' },
-    { label:`Apache-2.0`, cls:'green' },
-    { label:'cosign ✓', cls:'blue' },
-    { label:'SBOM spdx-2.3', cls:'blue' },
-    { label:`DORA ${(s.dora?.level||'high').toUpperCase()}`, cls:'purple' },
-    { label:`Renovate ✓`, cls:'orange' },
-    { label:`ArgoCD GitOps`, cls:'blue' }
-  ];
-  document.getElementById('pw-chips').innerHTML = chips.map(c => `<div class="pw-chip ${c.cls}">${c.label}</div>`).join('');
+  // Run table
+  const runs = realRuns(s);
+  let lastDay = '';
+  const rows = [];
+  for (const run of runs) {
+    const day = run.ts.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+    if (day !== lastDay) {
+      rows.push(`<tr class="rl-date-row"><td colspan="8">${day}</td></tr>`);
+      lastDay = day;
+    }
+    const suiteCell = (d) => {
+      if (!d) {
+        const isRunning = run.overall === 'running';
+        return `<td class="rl-suite-cell"><span style="color:var(--${isRunning?'run':'muted'})">—</span></td>`;
+      }
+      const score = d.s - d.f;
+      const cls = d.status === 'passed' ? 'var(--pass)' : d.f <= 2 ? 'var(--warn)' : 'var(--fail)';
+      return `<td class="rl-suite-cell"><span class="rl-suite-score" style="color:${cls}">${score}/${d.s}</span></td>`;
+    };
+    const overallBadge = run.overall === 'pass'    ? badge('Pass','pass')
+      : run.overall === 'warn'    ? badge('Partial','warn')
+      : run.overall === 'running' ? badge('<span class="dot run"></span> Running','run')
+      : badge('Fail','fail');
+    const durText = run.overall === 'running'
+      ? `<span style="color:var(--run)">${run.ts ? Math.round((Date.now() - run.ts.getTime())/60000)+'m…' : '—'}</span>`
+      : (run.duration ? run.duration+'m' : '—');
+    rows.push(`<tr>
+      <td><a class="rl-run-id" href="${ARGO_UI}/workflows/argo/${run.id}" target="_blank">${run.id}</a></td>
+      <td><span class="rl-variant">${run.label}</span></td>
+      ${suiteCell(run.smoke)}
+      ${suiteCell(run.developer)}
+      ${suiteCell(run.system)}
+      <td class="rl-duration">${durText}</td>
+      <td class="rl-when">${run.trigger} · ${run.ts.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${overallBadge}</td>
+    </tr>`);
+  }
+  document.getElementById('rl-runs').innerHTML = rows.join('');
 
-  // DORA card
-  const dora = s.dora || {};
-  document.getElementById('pw-dora-level').textContent = (dora.level||'high').toUpperCase();
-  document.getElementById('pw-dora-card').style.color = dora.level === 'elite' ? '#b892ff' : dora.level === 'high' ? '#3fb950' : '#f0b429';
-  document.getElementById('pw-dora-stats').innerHTML = `
-    <div style="font-size:10px;color:#555;margin-top:4px;line-height:1.9">
-      <span class="c-orange">${dora.deploy_frequency_per_week||42}</span> deploys/wk
-      &nbsp;·&nbsp; CFR <span class="c-yellow">${dora.change_failure_rate_pct||16}%</span>
-      &nbsp;·&nbsp; MTTR <span class="c-green">${dora.mean_recovery_time_min||18}m</span>
-      &nbsp;·&nbsp; LT <span class="c-blue">${dora.lead_time_hours||0.75}h</span>
-    </div>`;
+  // Footer nodes
+  const nodes = s.factory?.cluster?.nodes || [];
+  document.getElementById('rl-footer-nodes').innerHTML = nodes.map(n =>
+    `<span class="rl-footer-node">${dot(n.status==='ready'?'pass':'fail')} ${n.name}</span>`
+  ).join('');
+  document.getElementById('rl-footer-updated').textContent = 'Fetched: ' + fmt(s._meta?.generated);
+}
 
-  // Cluster weather
-  const nodes = f?.cluster?.nodes || [];
-  document.getElementById('pw-weather').innerHTML = nodes.map(n => `
-    <div class="pw-weather-row">
-      <div class="pw-dot ${n.status==='ready'?'green':'red'}"></div>
-      <div><strong>${n.name}</strong> <span class="c-dim">${n.role}</span></div>
-      <div class="c-dim" style="margin-left:auto;font-size:10px">${n.ram_gb||'?'}GB · ${n.cpu_threads||'?'}t</div>
-    </div>`).join('');
-
-  // Pass rate gauge
-  const passRates = results.map(r => {
-    if (!r || !r.scenarios) return null;
-    return r.scenarios > 0 ? ((r.scenarios - r.failed) / r.scenarios * 100) : null;
-  }).filter(x => x !== null);
-  const avgPass = passRates.length ? Math.round(passRates.reduce((a,b)=>a+b,0)/passRates.length) : null;
-  const pipelinePass = p.success_rate_pct || 84;
-  const el = document.getElementById('pw-passrate');
-  el.textContent = (avgPass !== null ? avgPass : pipelinePass) + '%';
-  el.className = 'pw-gauge-val ' + (avgPass >= 90 ? 'c-purple' : avgPass >= 70 ? 'c-green' : avgPass >= 50 ? 'c-yellow' : 'c-red');
-  document.getElementById('pw-gauge-sub').innerHTML = `
-    <div class="pw-gauge-sub-item"><strong class="c-orange">${pipelinePass}%</strong><span>PIPELINE SR</span></div>
-    <div class="pw-gauge-sub-item"><strong class="c-green">${p.runs_7d||42}</strong><span>BUILDS/7d</span></div>
-    <div class="pw-gauge-sub-item"><strong class="c-blue">${p.runs_total?.toLocaleString()||'—'}</strong><span>TOTAL RUNS</span></div>`;
-
-  // Stage timing
-  const stages = p.stages || ['poll','build','provision','test','teardown'];
-  const avgMin = p.stage_avg_min || {};
-  const bestMin = p.stage_best_min || {};
-  const stageColors = ['c-dim','c-purple','c-yellow','c-green','c-dim'];
-  document.getElementById('pw-stages').innerHTML = stages.map((st,i) => `
-    <div class="pw-stage">
-      <span class="pw-stage-name">${st.toUpperCase()}</span>
-      <span class="pw-stage-val ${stageColors[i]}">${avgMin[st]||'—'}</span>
-      <span class="pw-stage-unit">MIN AVG</span>
-    </div>
-    ${i < stages.length-1 ? '<div class="pw-stage-arrow">▶</div>' : ''}`).join('');
-
-  // Timing leaderboard
-  const variantResults = {};
-  RESULT_SLUGS.forEach((slug,i) => {
-    // results is flat across all variants × suites; we need to group
-    variantResults[slug] = {};
-  });
-  // results are per-suite (smoke, developer, system) for each slug
-  // We fetched them as 9 separate fetches: slug[0] suite[0], slug[0] suite[1], ...
-  const grid = {};
-  results.forEach((r) => {
-    if (!r) return;
-    if (!grid[r.variant]) grid[r.variant] = {};
-    grid[r.variant][r.suite] = r;
-  });
-
-  const rows = RESULT_SLUGS.map((slug,pos) => {
-    const suiteData = grid[slug] || {};
-    const label = s.images?.find(im=>im.slug===slug)?.label || slug;
-    let totalPass = 0, totalScen = 0;
-    const cells = SUITES.map(suite => {
-      const d = suiteData[suite];
-      if (!d || d.status === 'pending') return `<td class="sector-cell pending">—</td>`;
-      totalPass += (d.scenarios - d.failed);
-      totalScen += d.scenarios;
-      const cls = d.status === 'passed' ? 'good' : d.failed <= 2 ? 'warn' : 'bad';
-      return `<td class="sector-cell ${cls}">${d.scenarios - d.failed}/${d.scenarios}</td>`;
-    });
-    const gap = totalScen > 0 ? `${totalPass}/${totalScen}` : '—';
-    const gapCls = totalScen > 0 ? (totalPass === totalScen ? 'c-green' : totalPass/totalScen > .7 ? 'c-yellow' : 'c-red') : 'c-dim';
-    return `<tr>
-      <td class="pos c-dim">${pos+1}</td>
-      <td>${label}</td>
-      ${cells.join('')}
-      <td class="${gapCls}" style="font-weight:700">${gap}</td>
-      <td class="c-dim">—</td>
-    </tr>`;
-  });
-  document.getElementById('pw-leaderboard').innerHTML = rows.join('');
-
-  // Velocity strip
-  const v = s.velocity || {};
-  const velItems = [
-    { val: v.deployments_7d||42, lbl:'BUILDS/WK' },
-    { val: v.prs_merged_7d||12,  lbl:'PRs MERGED' },
-    { val: v.commits_7d||28,     lbl:'COMMITS/7d' },
-    { val: v.build_minutes_7d?.toLocaleString()||1890, lbl:'BUILD MINS' },
-    { val: v.vms_provisioned_7d||56, lbl:'VMs SPUN/7d' },
-    { val: v.vms_provisioned_total?.toLocaleString()||1247, lbl:'VMs TOTAL' },
-    { val: (s.github?.testing_lab?.open_issues||64), lbl:'OPEN ISSUES' },
-    { val: s.test_coverage?.scenarios_total||99, lbl:'SCENARIOS' }
-  ];
-  document.getElementById('pw-velocity').innerHTML = velItems.map(it => `
-    <div class="pw-vel-item">
-      <span class="pw-vel-val">${it.val}</span>
-      <span class="pw-vel-lbl">${it.lbl}</span>
-    </div>`).join('');
-
-  // Test stack + coverage
-  document.getElementById('pw-test-stack').innerHTML = ['behave','qecore','dogtail','AT-SPI','KubeVirt','ArgoCD','k3s'].map(t=>`· ${t}`).join('<br>');
+// ═══════════════════════════════════════════════════════════════════════════
+//  VARIANT B: Suite Board
+// ═══════════════════════════════════════════════════════════════════════════
+function populateSuiteBoard(s, results) {
+  const p = s.pipelines?.containerdisk || {};
   const cov = s.test_coverage || {};
-  const suiteList = Object.entries(cov.suites||{}).map(([k,v])=>`· ${k}: ${v.scenarios}s`).join('<br>');
-  document.getElementById('pw-coverage').innerHTML = `· ${cov.feature_files||15} features<br>· ${cov.scenarios_total||99} scenarios<br>${suiteList}`;
 
-  // OpenSSF scorecard
-  const checks = s.openssf?.checks || {};
-  const checkHtml = Object.entries(checks).slice(0,8).map(([k,v]) => `
-    <div style="display:flex;align-items:center;gap:5px;padding:2px 0;font-size:10px">
-      <span class="${scoreColor_pw(v)}" style="font-weight:700;width:18px;text-align:right">${v}</span>
-      <span class="c-dim">${k.replace(/-/g,' ')}</span>
-    </div>`).join('');
-  document.getElementById('pw-scorecard').innerHTML = `
-    <div style="font-size:22px;font-weight:700" class="c-orange">${s.openssf?.scorecard_score||7.2}<span style="font-size:11px;color:#555">/10</span></div>
-    ${checkHtml}`;
-
-  // Hive
-  const hive = s.hive || {};
-  const acmmColors = { 1:'#555', 2:'#4a69bd', 3:'#d29922', 4:'#f0883e', 5:'#b892ff' };
-  document.getElementById('pw-hive').innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0">
-      <span style="font-size:24px;font-weight:700;color:${acmmColors[hive.acmm_level||3]}">${hive.acmm_level||3}</span>
-      <div>
-        <div style="font-size:11px;font-weight:600">${hive.acmm_label||'Supervised Autonomy'}</div>
-        <div class="c-dim" style="font-size:9px">Governor: ${hive.governor_mode||'busy'} · ${hive.agents_active||1}/${hive.agents_total||3} agents active</div>
-      </div>
-    </div>
-    <div style="font-size:10px;color:#555">Merged/7d: <span class="c-green">${hive.merged_7d||12}</span> · Issues: <span class="c-yellow">${hive.open_issues||64}</span> · Median merge: <span class="c-orange">${hive.median_merge_min||32}m</span></div>`;
-
-  // Radio
-  document.getElementById('pw-radio').innerHTML = [
-    { t:'03:56', msg:'<span class="c-green">PASS</span> bluefin-testing smoke 29/29' },
-    { t:'03:56', msg:'<span class="c-red">FAIL</span> bluefin-testing system 8/14' },
-    { t:'03:56', msg:'<span class="c-red">FAIL</span> bluefin-testing developer 21/31' },
-    { t:'02:30', msg:'<span class="c-dim">PEND</span> bluefin-lts-testing nightly queued' },
-    { t:'02:00', msg:'<span class="c-orange">BUILD</span> containerdisk build started (testing)' },
-    { t:'yesterday', msg:'v2026.06 shipped — 12 PRs merged' },
-  ].map(e=>`<div class="pw-radio-entry"><span class="pw-radio-time">[${e.t}]</span> ${e.msg}</div>`).join('');
-
-  // Ticker
-  const items = [
-    `<span class="hl">BLUEFIN QA FACTORY</span>`,
-    `LAP ${p.runs_total?.toLocaleString()||1247}`,
-    `SUCCESS RATE <span class="hl">${pipelinePass}%</span>`,
-    `SLSA L${sc.slsa_level||2} · OpenSSF ${s.openssf?.scorecard_score||7.2}/10`,
-    `${p.runs_7d||42} BUILDS THIS WEEK`,
-    `${v.vms_provisioned_total?.toLocaleString()||1247} VMs PROVISIONED LIFETIME`,
-    `DORA <span class="hl">${(s.dora?.level||'HIGH').toUpperCase()}</span> · ${s.dora?.deploy_frequency_per_week||42}×/WK DEPLOYS`,
-    `ACMM LEVEL ${s.hive?.acmm_level||3} — ${s.hive?.acmm_label||'SUPERVISED AUTONOMY'}`,
-    `CLUSTER: ghost(64GB) + exo-1(32GB) + bazzite(32GB) = 128GB TOTAL`,
-    `CNCF PRIMITIVES: kubernetes · argo-workflows · kubevirt · loki · sigstore · argocd`,
-    `${s.test_coverage?.scenarios_total||99} TEST SCENARIOS ACROSS ${s.test_coverage?.feature_files||15} FEATURE FILES`,
-  ];
-  document.getElementById('pw-ticker').innerHTML = items.map(i=>`<span class="pw-ticker-item">${i}</span>`).join(' ● ');
-}
-
-// ── Populate Variant B: Mission Control ────────────────────────────────────
-function populateMissionControl(s, results) {
-  const f = s.factory;
-  const p = s.pipelines?.containerdisk || {};
-
-  // Header
-  document.getElementById('mc-met').textContent = elapsed(f?.uptime_start || '2026-01-01T00:00:00Z');
-  document.getElementById('mc-release').textContent = s.github?.latest_release || '—';
-
-  // Telemetry matrix
-  const grid = {};
-  results.forEach(r => {
-    if (!r) return;
-    if (!grid[r.variant]) grid[r.variant] = {};
-    grid[r.variant][r.suite] = r;
-  });
-
-  const rows = RESULT_SLUGS.map(slug => {
-    const label = (s.images?.find(im=>im.slug===slug)?.label||slug).replace(':testing','');
-    const suiteData = grid[slug] || {};
-    let totalS=0, totalF=0;
-    const cells = SUITES.map(suite => {
-      const d = suiteData[suite];
-      if (!d || d.status==='pending') return `<td class="status-pending">—</td>`;
-      totalS += d.scenarios; totalF += d.failed;
-      const cls = d.status==='passed' ? 'status-go' : d.failed <= 2 ? 'status-caution' : 'status-nogo';
-      const lbl = d.status==='passed' ? 'GO' : d.failed <= 2 ? 'CAUTION' : 'NO-GO';
-      return `<td class="${cls}">${lbl}<span style="font-size:9px;color:#8d8d8d;display:block">${d.scenarios-d.failed}/${d.scenarios}</span></td>`;
-    });
-    const overall = totalS>0 ? (totalF===0 ? 'status-go' : totalF/totalS<.2 ? 'status-caution' : 'status-nogo') : 'status-pending';
-    return `<tr>
-      <td class="c-white">${label}</td>
-      ${cells.join('')}
-      <td class="${overall}" style="font-weight:700">${totalS>0?`${totalS-totalF}/${totalS}`:'—'}</td>
-    </tr>`;
-  });
-  document.getElementById('mc-matrix').querySelector('tbody').innerHTML = rows.join('');
-
-  // Propulsion
-  document.getElementById('mc-prop-passrate').querySelector('.mc-kpi-val').textContent = (p.success_rate_pct||84)+'%';
-  document.getElementById('mc-prop-passrate').querySelector('.mc-kpi-val').className = 'mc-kpi-val c-' + ((p.success_rate_pct||84) >= 85 ? 'green' : 'amber');
-  document.getElementById('mc-prop-runs').textContent = `${p.runs_7d||42} pipeline runs this week`;
-  document.getElementById('mc-prop-stats').innerHTML = [
-    { k:'Success rate (30d)', v:((p.success_rate_pct||84)-2)+'%', cls:'c-green' },
-    { k:'Avg pipeline time', v:(p.avg_total_min||45)+'m', cls:'c-green' },
-    { k:'Best pipeline time', v:(p.best_total_min||38)+'m', cls:'c-amber' },
-    { k:'Total runs (all time)', v:(p.runs_total||1247).toLocaleString(), cls:'c-white' },
-    { k:'VMs provisioned (total)', v:(s.velocity?.vms_provisioned_total||1247).toLocaleString(), cls:'c-white' },
-    { k:'Build minutes (7d)', v:(s.velocity?.build_minutes_7d||1890).toLocaleString()+'m', cls:'c-amber' },
-  ].map(r=>`<div class="mc-stat-row"><span class="mc-stat-key">${r.k}</span><span class="mc-stat-val ${r.cls}">${r.v}</span></div>`).join('');
-
-  // Navigation (pipeline)
-  const stages = p.stages || ['poll','build','provision','test','teardown'];
-  const avgMin = p.stage_avg_min || {};
-  document.getElementById('mc-pipeline').innerHTML = stages.map((st,i) => `
-    <div class="mc-pipeline-stage ${i===2?'active':''}">
-      <span class="stage-name">${st.toUpperCase()}</span>
-      <span class="stage-time">${avgMin[st]||'—'}</span>
-      <span style="font-size:8px;color:#8d8d8d">MIN</span>
-    </div>
-    ${i<stages.length-1?'<div class="mc-pipeline-arrow">▶</div>':''}`).join('');
-
-  document.getElementById('mc-nav-stats').innerHTML = [
-    { k:'ContainerDisk VMs', v:`${f?.semaphores?.containerdisk?.active||2} active / ${f?.semaphores?.containerdisk?.capacity||8} slots` },
-    { k:'HostDisk VMs (ghost)', v:`${f?.semaphores?.hostdisk?.active||1} active / ${f?.semaphores?.hostdisk?.capacity||6} slots` },
-    { k:'Active deadline', v:'60m (CD) / 120m (HD)' },
-    { k:'ArgoCD sync interval', v:'3 min (auto)' },
-  ].map(r=>`<div class="mc-stat-row"><span class="mc-stat-key">${r.k}</span><span class="mc-stat-val c-green">${r.v}</span></div>`).join('');
-
-  // Systems
-  const nodes = f?.cluster?.nodes || [];
-  document.getElementById('mc-systems').innerHTML = `
-    ${nodes.map(n=>`
-      <div class="mc-stat-row">
-        <span class="mc-stat-key">◈ ${n.name.toUpperCase()}</span>
-        <span class="mc-stat-val c-green">GO · ${n.ram_gb||'?'}GB · ${n.cpu_threads||'?'}t</span>
-      </div>
-      <div class="mc-bar"><div class="mc-bar-fill" style="width:${Math.round(Math.random()*40+20)}%"></div></div>`).join('')}
-    <div class="mc-stat-row" style="margin-top:8px"><span class="mc-stat-key">TOTAL RAM</span><span class="mc-stat-val c-white">${f?.cluster?.total_ram_gb||128} GB</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">CPU THREADS</span><span class="mc-stat-val c-white">${f?.cluster?.total_cpu_threads||64}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">WORKFLOW TEMPLATES</span><span class="mc-stat-val c-amber">${f?.orchestration?.workflow_templates||21}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">MANIFESTS (GitOps)</span><span class="mc-stat-val c-amber">${f?.orchestration?.manifests||38}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">CRON WORKFLOWS</span><span class="mc-stat-val c-amber">${f?.orchestration?.cron_workflows||12}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">ARGOCD APPS</span><span class="mc-stat-val c-green">${f?.orchestration?.argocd_apps||4}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">LLM (ghost)</span><span class="mc-stat-val c-blue">${s.factory?.llm?.model||'Qwen3.6-35B-A3B'} @ ${s.factory?.llm?.speed_tok_per_sec||60}tok/s</span></div>
-    ${['mc-acmm'].map(()=>`
-      <div class="mc-acmm" style="margin-top:8px">
-        <div class="mc-acmm-level">${s.hive?.acmm_level||3}</div>
-        <div>
-          <div class="mc-acmm-label">${s.hive?.acmm_label||'Supervised Autonomy'}</div>
-          <div class="mc-acmm-desc">Governor: ${s.hive?.governor_mode||'busy'} · ${s.hive?.agents_active||1}/${s.hive?.agents_total||3} active</div>
-        </div>
-      </div>`).join('')}`;
-
-  // Comms (velocity)
-  const v = s.velocity || {};
-  document.getElementById('mc-comms').innerHTML = [
-    { k:'Commits (7d)',       v:v.commits_7d||28,     cls:'c-green' },
-    { k:'PRs merged (7d)',    v:v.prs_merged_7d||12,  cls:'c-green' },
-    { k:'Issues closed (7d)', v:6,                    cls:'c-amber' },
-    { k:'Deployments (7d)',   v:v.deployments_7d||42, cls:'c-green' },
-    { k:'Build mins (7d)',    v:(v.build_minutes_7d||1890).toLocaleString(), cls:'c-amber' },
-    { k:'VMs spun (7d)',      v:v.vms_provisioned_7d||56, cls:'c-green' },
-    { k:'Open issues',        v:s.github?.testing_lab?.open_issues||64, cls:'c-amber' },
-    { k:'Open PRs',           v:s.github?.testing_lab?.open_prs||4, cls:'c-green' },
-    { k:'common stars',       v:s.github?.common?.stars||27, cls:'c-white' },
-    { k:'common forks',       v:s.github?.common?.forks||41, cls:'c-white' },
-    { k:'Median merge time',  v:(s.hive?.median_merge_min||32)+'m', cls:'c-amber' },
-    { k:'DORA level',         v:(s.dora?.level||'high').toUpperCase(), cls:'c-green' },
-  ].map(r=>`<div class="mc-stat-row"><span class="mc-stat-key">${r.k}</span><span class="mc-stat-val ${r.cls}">${r.v}</span></div>`).join('');
-
-  // Science (supply chain + OpenSSF)
-  const sc = s.supply_chain || {};
-  const oss = s.openssf || {};
-  const cncf = s.cncf || {};
-  const checks = oss.checks || {};
-  const checkItems = Object.entries(checks).map(([k,v]) => {
-    const pct = v/10*100;
-    const col = v>=8?'#3fb950':v>=6?'#f1c21b':'#fa4d56';
-    return `<div class="mc-check">
-      <span class="mc-check-score" style="color:${col}">${v}</span>
-      <span class="mc-check-name">${k.replace(/-/g,' ')}</span>
-      <div class="mc-check-bar"><div class="mc-check-bar-fill" style="width:${pct}%;background:${col}"></div></div>
-    </div>`;
-  }).join('');
-  document.getElementById('mc-science').innerHTML = `
-    <div class="mc-stat-row"><span class="mc-stat-key">OpenSSF Score</span><span class="mc-stat-val c-amber">${oss.scorecard_score||7.2}/10</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">SLSA level</span><span class="mc-stat-val c-green">${sc.slsa_level||2}</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">Signing</span><span class="mc-stat-val c-green">cosign keyless</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">SBOM</span><span class="mc-stat-val c-green">spdx-2.3</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">License</span><span class="mc-stat-val c-green">Apache-2.0</span></div>
-    <div class="mc-stat-row"><span class="mc-stat-key">CNCF maturity</span><span class="mc-stat-val c-amber">${cncf.maturity||'pre-sandbox'}</span></div>
-    <div class="mc-stat-row" style="margin-top:8px"><span class="mc-stat-key">CNCF primitives</span><span></span></div>
-    <div>${(cncf.primitives||[]).map(p=>`<span class="mc-prim">${p}</span>`).join('')}</div>
-    <div style="margin-top:8px">${checkItems}</div>`;
-
-  // Event log (update live)
-  const log = document.getElementById('mc-log');
-  const start = f?.uptime_start||'2026-01-01T00:00:00Z';
-  setInterval(() => {
-    const met = elapsed(start);
-    document.getElementById('mc-met').textContent = met;
-  }, 1000);
-
-  const events = [
-    'bluefin-testing smoke PASSED (29/29)',
-    'bluefin-testing system FAILED (8/14) — uupd assertions',
-    'v2026.06 shipped — 12 PRs merged — DORA HIGH',
-    'semaphore-tuner recalculated: CD=8 HD=6',
-    'nightly-dakota queued for 03:00 UTC',
-    'orphan-vm-cleanup: 0 VMs found (clean)',
-    'ArgoCD sync: testing-lab in sync @ HEAD',
-  ];
-  log.innerHTML = events.map((msg,i) => {
-    const ts = `T+${String(Math.floor(i*0.3)).padStart(3,'0')}:${String(Math.floor(Math.random()*59)).padStart(2,'0')}:00`;
-    return `<div class="mc-log-entry"><span class="ts">${ts}</span> <span class="msg">${msg}</span></div>`;
-  }).join('');
-}
-
-// ── Populate Variant C: Blueprint ──────────────────────────────────────────
-function populateBlueprint(s, results) {
-  const f = s.factory;
-  const p = s.pipelines?.containerdisk || {};
-  const v = s.velocity || {};
-  const sc = s.supply_chain || {};
-  const oss = s.openssf || {};
-  const dora = s.dora || {};
-
-  // Title block
-  document.getElementById('bp-release').textContent = s.github?.latest_release || '—';
-  document.getElementById('bp-date').textContent = fmtDate(s._meta?.generated);
+  document.getElementById('sb-release').textContent = s.github?.latest_release || '—';
 
   // KPIs
-  const kpis = [
-    { val: (p.runs_total||1247).toLocaleString(), lbl: 'Total Pipeline Runs' },
-    { val: (p.success_rate_pct||84)+'%', lbl: 'Pipeline Success Rate' },
-    { val: (s.test_coverage?.scenarios_total||99), lbl: 'Test Scenarios' },
-    { val: (s.test_coverage?.feature_files||15), lbl: 'Feature Files' },
-    { val: (p.avg_total_min||45)+'m', lbl: 'Avg Pipeline Time' },
-    { val: oss.scorecard_score||7.2, lbl: 'OpenSSF Score /10' },
-    { val: `L${sc.slsa_level||2}`, lbl: 'SLSA Level' },
-    { val: f?.orchestration?.workflow_templates||21, lbl: 'Workflow Templates' },
-    { val: f?.cluster?.nodes?.length||3, lbl: 'Cluster Nodes' },
-  ];
-  document.getElementById('bp-kpis').innerHTML = kpis.map(k => `
-    <div class="bp-kpi">
-      <div class="bp-kpi-val">${k.val}</div>
-      <div class="bp-kpi-lbl">${k.lbl}</div>
-    </div>`).join('');
+  const pct = p.success_rate_pct || 84;
+  const pctEl = document.getElementById('sb-k-passrate');
+  pctEl.textContent = pct + '%';
+  pctEl.style.color = passColor(pct);
+  document.getElementById('sb-k-builds').textContent = p.runs_7d || 42;
+  document.getElementById('sb-k-scenarios').textContent = cov.scenarios_total || 99;
+  document.getElementById('sb-k-vms').textContent = s.velocity?.vms_provisioned_7d || 56;
+  const cdA = s.factory?.semaphores?.containerdisk?.active || 2;
+  const cdC = s.factory?.semaphores?.containerdisk?.capacity || 8;
+  document.getElementById('sb-k-slots').textContent = `${cdA}/${cdC}`;
 
-  // Pipeline flow
+  // Build result grid
+  const grid = {};
+  results.forEach(r => { if (!r) return; if (!grid[r.variant]) grid[r.variant] = {}; grid[r.variant][r.suite] = r; });
+
+  // One panel per suite
+  const suiteOrder = ['smoke', 'developer', 'system', 'flatcar', 'software'];
+  const suiteDefs = cov.suites || {};
+
+  // For each suite, collect pass rates across variants
+  const panels = suiteOrder.map(suite => {
+    const def = suiteDefs[suite] || { scenarios: 0, label: suite, description: '' };
+
+    // Collect results across all variants for this suite
+    const variantResults = RESULT_SLUGS.map(slug => grid[slug]?.[suite]).filter(Boolean);
+    const totalScen  = variantResults.reduce((a,r) => a + (r.scenarios||0), 0);
+    const totalFail  = variantResults.reduce((a,r) => a + (r.failed||0), 0);
+    const totalPass  = totalScen - totalFail;
+    const pct        = totalScen > 0 ? Math.round(totalPass / totalScen * 100) : null;
+    const overallSt  = variantResults.length === 0 ? 'pending' : variantResults.every(r => r.status === 'passed') ? 'passed' : variantResults.some(r => r.status === 'failed') ? 'failed' : 'partial';
+
+    // Fake sparkbar: 7 runs, last one is current
+    const sparkVals = [88,92,85,90,95,88, pct ?? 0].map(v => Math.max(4, v));
+    const maxV = Math.max(...sparkVals);
+    const sparkHtml = sparkVals.map((v, i) => {
+      const h = Math.round(v / maxV * 24) + 4;
+      const col = i === sparkVals.length-1 ? passColor(v) : 'var(--bg3)';
+      const borderCol = i === sparkVals.length-1 ? passColor(v) : 'var(--border)';
+      return `<div class="sb-sparkbar-item" style="height:${h}px;background:${col};border:1px solid ${borderCol}"></div>`;
+    }).join('');
+
+    // Status badge
+    const statusBadge = overallSt === 'passed' ? badge('Passing','pass')
+      : overallSt === 'failed' ? badge('Failing','fail')
+      : overallSt === 'partial' ? badge('Partial','warn')
+      : badge('No data','skip');
+
+    // Failure list (fake for prototype)
+    const knownFailures = {
+      system:    ['uupd: staged deployment assertion', 'composefs integrity check timeout', 'bootc status parse error'],
+      developer: ['Ptyxis: tab count race condition', 'podman pull timeout (registry mirror)', 'Flatpak install: storage full'],
+      smoke:     [],
+      flatcar:   ['container start race on first boot'],
+      software:  [],
+    };
+    const failures = knownFailures[suite] || [];
+    const failHtml = failures.length === 0
+      ? `<div style="font-size:11px;color:var(--muted);font-style:italic">No recent failures</div>`
+      : failures.map(f => `<div class="sb-failure-item">${dot('fail')}<span class="sb-failure-name">${f}</span><span class="sb-failure-count">×${Math.ceil(Math.random()*3+1)}</span></div>`).join('');
+
+    return `<div class="sb-panel">
+      <div class="sb-panel-head">
+        <span class="dot ${overallSt === 'passed' ? 'pass' : overallSt === 'failed' ? 'fail' : overallSt === 'partial' ? 'warn' : 'skip'}"></span>
+        <span class="suite-name">${def.label || suite}</span>
+        ${statusBadge}
+      </div>
+      <div class="sb-panel-body">
+        <div>
+          <div class="sb-passrate">
+            <span class="sb-passrate-val" style="color:${pct !== null ? passColor(pct) : 'var(--muted)'}">${pct !== null ? pct + '%' : '—'}</span>
+            <span class="sb-passrate-denom">${totalPass}/${totalScen} pass</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">${def.description || ''}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Last 7 runs</div>
+          <div class="sb-sparkbar">${sparkHtml}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Recent failures</div>
+          <div class="sb-failure-list">${failHtml}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('sb-panels').innerHTML = panels.join('');
+
+  // Pipeline timing
   const stages = p.stages || ['poll','build','provision','test','teardown'];
   const avgMin = p.stage_avg_min || {};
-  const stageAnnotations = {
-    poll:      'Image digest\npolled / 5min\ncron',
-    build:     'bootc-image-builder\n+ cosign sign\n+ SBOM syft',
-    provision: 'KubeVirt VM\naccessCredentials\nqemu-guest-agent',
-    test:      'behave+qecore\ndogtail AT-SPI\nGNOME Shell 50',
-    teardown:  'VM deleted\ndisk GC\nonExit handler',
-  };
-  document.getElementById('bp-pipeline').innerHTML = stages.map((st,i) => `
-    <div class="bp-stage-wrap">
-      <div class="bp-callout">${stageAnnotations[st]||st}</div>
-      <div class="bp-callout-line"></div>
-      <div class="bp-stage-box">
-        <span class="bp-stage-name">${st.toUpperCase()}</span>
-        <span class="bp-stage-time">${avgMin[st]||'—'}</span>
-        <span class="bp-stage-unit">min avg</span>
-      </div>
-    </div>
-    ${i < stages.length-1 ? '' : ''}`).join('');
+  document.getElementById('sb-pipeline').innerHTML = stages.map((st, i) => `
+    <div class="sb-pipeline-stage ${i===2?'active':''}">
+      <span class="stage-name">${st}</span>
+      <span class="stage-dur">${avgMin[st]||'—'}</span>
+      <span style="font-size:9px;color:var(--muted)">min avg</span>
+    </div>`).join('');
 
-  // Test results table
+  // Infra
+  const nodes = s.factory?.cluster?.nodes || [];
+  document.getElementById('sb-infra').innerHTML = nodes.map(n =>
+    `<div class="sb-infra-item">${dot(n.status==='ready'?'pass':'fail')}<strong>${n.name}</strong><span style="color:var(--muted)">${n.role} · ${n.ram_gb}GB</span></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  VARIANT C: Triage
+// ═══════════════════════════════════════════════════════════════════════════
+function populateTriage(s, results) {
+  const cov = s.test_coverage || {};
+  const sc  = s.supply_chain || {};
+  const oss = s.openssf || {};
+
+  document.getElementById('tr-release').textContent = s.github?.latest_release || '—';
+  document.getElementById('tr-updated').textContent = 'Updated: ' + fmtAgo(s._meta?.generated);
+
   const grid = {};
-  results.forEach(r => {
-    if (!r) return;
-    if (!grid[r.variant]) grid[r.variant] = {};
-    grid[r.variant][r.suite] = r;
-  });
-  const tbody = [];
-  RESULT_SLUGS.forEach(slug => {
-    const label = s.images?.find(im=>im.slug===slug)?.label || slug;
-    const suiteData = grid[slug] || {};
-    SUITES.forEach(suite => {
-      const d = suiteData[suite];
-      const pass = d?.scenarios > 0 ? d.scenarios - d.failed : 0;
-      const cls = !d || d.status==='pending' ? 'c-dim' : d.status==='passed' ? 'c-pass' : d.failed<=2 ? 'c-callout' : 'c-fail';
-      const lbl = !d || d.status==='pending' ? '—' : d.status==='passed' ? '✓ PASS' : `✗ FAIL`;
-      tbody.push(`<tr>
-        <td class="c-accent">${label}</td>
-        <td>${suite}</td>
-        <td class="${cls}" style="font-weight:600;font-family:'JetBrains Mono',monospace">${lbl}</td>
-        <td class="c-pass">${d?.scenarios > 0 ? pass : '—'}</td>
-        <td class="${d?.failed>0?'c-fail':'c-dim'}">${d?.failed||0}</td>
-        <td>${d?.scenarios||0}</td>
-        <td class="c-dim">${d?.last_run ? fmt(d.last_run) : 'never'}</td>
-        <td class="c-dim" style="font-size:10px">${d?.workflow_name||'—'}</td>
-      </tr>`);
-    });
-  });
-  document.getElementById('bp-results-tbody').innerHTML = tbody.join('');
+  results.forEach(r => { if (!r) return; if (!grid[r.variant]) grid[r.variant] = {}; grid[r.variant][r.suite] = r; });
 
-  // OpenSSF bars
-  const checks = oss.checks || {};
-  document.getElementById('bp-scorecard-bars').innerHTML = Object.entries(checks).map(([k,v]) => {
-    const col = v>=8?'#00e676':v>=6?'#ffb300':'#ff5252';
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
-      <span style="width:170px;color:#3a5070;flex-shrink:0">${k}</span>
-      <div style="flex:1;height:8px;background:#0f1e2e;border:1px solid #1a3050">
-        <div style="height:100%;width:${v*10}%;background:${col}"></div>
+  // Classify suites
+  const suiteDefs = cov.suites || {};
+  const failingSuites = [];
+  const passingSuites = [];
+
+  const knownFailures = {
+    system:    ['uupd: staged deployment assertion', 'composefs integrity check timeout', 'bootc status parse error'],
+    developer: ['Ptyxis: tab count race condition', 'podman pull timeout (registry mirror)'],
+    smoke:     [],
+    flatcar:   ['container start race on first boot'],
+    software:  [],
+  };
+
+  for (const suite of SUITES) {
+    const def = suiteDefs[suite] || { label: suite };
+    const variantResults = RESULT_SLUGS.map(slug => grid[slug]?.[suite]).filter(Boolean);
+    const totalScen = variantResults.reduce((a,r) => a + (r.scenarios||0), 0);
+    const totalFail = variantResults.reduce((a,r) => a + (r.failed||0), 0);
+    const totalPass = totalScen - totalFail;
+    const pct = totalScen > 0 ? Math.round(totalPass / totalScen * 100) : null;
+    const hasFail = variantResults.some(r => r.status === 'failed');
+
+    if (hasFail || (knownFailures[suite]||[]).length > 0) {
+      failingSuites.push({ suite, def, totalScen, totalFail, totalPass, pct, variantResults });
+    } else {
+      passingSuites.push({ suite, def, totalScen, totalFail, totalPass, pct });
+    }
+  }
+
+  // Alert banner
+  const left = document.getElementById('tr-left');
+  const openIssues = s.github?.testing_lab?.open_issues || 64;
+  let alertHtml = '';
+  if (failingSuites.length > 0) {
+    alertHtml = `<div class="tr-alert fail">
+      <div class="tr-alert-icon">✗</div>
+      <div class="tr-alert-body">
+        <div class="tr-alert-title">${failingSuites.length} suite${failingSuites.length>1?'s':''} have failures</div>
+        <div class="tr-alert-sub">${failingSuites.map(f=>f.def.label||f.suite).join(', ')} · ${openIssues} open issues</div>
       </div>
-      <span style="width:20px;text-align:right;color:${col};font-weight:700">${v}</span>
+    </div>`;
+  } else {
+    alertHtml = `<div class="tr-alert pass">
+      <div class="tr-alert-icon">✓</div>
+      <div class="tr-alert-body">
+        <div class="tr-alert-title">All suites passing</div>
+        <div class="tr-alert-sub">${openIssues} open issues to work through</div>
+      </div>
+    </div>`;
+  }
+
+  // Failure cards
+  const cards = failingSuites.map(({ suite, def, totalScen, totalFail, totalPass, pct, variantResults }) => {
+    const failures = knownFailures[suite] || [];
+    const failRows = failures.map(f =>
+      `<div class="tr-failure-row">${dot('fail')}<span class="tr-failure-row-name">${f}</span><span class="tr-failure-row-count">×${Math.ceil(Math.random()*3+1)}</span></div>`
+    ).join('');
+
+    // Which variants are affected?
+    const affected = variantResults.filter(r=>r.status==='failed').length;
+    const cardCls = totalFail > 3 ? '' : 'warn';
+
+    return `<div class="tr-failure-card ${cardCls}">
+      <div class="tr-failure-card-head">
+        <span class="dot ${totalFail>3?'fail':'warn'}"></span>
+        <span class="tr-failure-card-title">${def.label || suite}</span>
+        ${badge(pct !== null ? pct+'% pass' : 'no data', totalFail > 3 ? 'fail' : 'warn')}
+        <span class="tr-failure-card-meta">${totalPass}/${totalScen} · ${affected}/${RESULT_SLUGS.length} variants affected</span>
+      </div>
+      ${failures.length > 0 ? `<div class="tr-failure-list">${failRows}</div>` : '<div style="font-size:11px;color:var(--muted)">Variant failures without known scenario breakdown.</div>'}
     </div>`;
   }).join('');
 
-  // DORA card
-  const doraCol = dora.level==='elite'?'#b892ff':dora.level==='high'?'#00e676':dora.level==='medium'?'#ffb300':'#ff5252';
-  document.getElementById('bp-dora').innerHTML = `
-    <div class="bp-section-title" style="margin-bottom:8px">DORA Performance Metrics</div>
-    <div class="bp-dora-level" style="color:${doraCol}">${(dora.level||'HIGH').toUpperCase()}</div>
-    ${[
-      ['Deploy frequency', `${dora.deploy_frequency_per_week||42}×/week`],
-      ['Lead time', `${dora.lead_time_hours||0.75}h avg`],
-      ['Change failure rate', `${dora.change_failure_rate_pct||16}%`],
-      ['Mean recovery time', `${dora.mean_recovery_time_min||18} min`],
-    ].map(([k,v])=>`<div class="bp-dora-metric"><span class="bp-dora-key">${k}</span><span class="bp-dora-val">${v}</span></div>`).join('')}`;
+  // Pipeline run summary (compact)
+  const p = s.pipelines?.containerdisk || {};
+  const pipelineCard = `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px 14px">
+    <div class="section-head">Pipeline health (7d)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:12px">
+      <div style="color:var(--muted)">Success rate</div>
+      <div style="font-family:var(--mono);color:${passColor(p.success_rate_pct||84)}">${p.success_rate_pct||84}%</div>
+      <div style="color:var(--muted)">Runs (7d)</div>
+      <div style="font-family:var(--mono)">${p.runs_7d||42}</div>
+      <div style="color:var(--muted)">Avg duration</div>
+      <div style="font-family:var(--mono)">${p.avg_total_min||45}m</div>
+      <div style="color:var(--muted)">VMs / week</div>
+      <div style="font-family:var(--mono)">${s.velocity?.vms_provisioned_7d||56}</div>
+    </div>
+  </div>`;
 
-  // BOM
-  const images = s.images || [];
-  document.getElementById('bp-bom').innerHTML = `
-    <table class="bp-spec-table">
-      ${images.map(im=>`<tr>
-        <td class="bp-spec-key">${im.label}</td>
-        <td class="bp-spec-val" style="font-size:9px">${im.image?.split('/').pop()||''}</td>
-      </tr>`).join('')}
-      <tr><td class="bp-spec-key">Base</td><td class="bp-spec-val">bootc/ostree</td></tr>
-      <tr><td class="bp-spec-key">FS</td><td class="bp-spec-val">composefs+fs-verity</td></tr>
-      <tr><td class="bp-spec-key">Release</td><td class="bp-spec-val">monthly</td></tr>
-    </table>`;
+  left.innerHTML = alertHtml + (cards || '') + pipelineCard;
 
-  // Cluster spec
-  const nodes = f?.cluster?.nodes || [];
-  document.getElementById('bp-cluster').innerHTML = `
-    <table class="bp-spec-table">
-      ${nodes.map(n=>`<tr>
-        <td class="bp-spec-key">${n.name}</td>
-        <td class="bp-spec-val">${n.ram_gb||'?'}GB · ${n.cpu_threads||'?'}t</td>
-      </tr>`).join('')}
-      <tr><td class="bp-spec-key">CD slots</td><td class="bp-spec-val">${f?.semaphores?.containerdisk?.capacity||8}</td></tr>
-      <tr><td class="bp-spec-key">HD slots</td><td class="bp-spec-val">${f?.semaphores?.hostdisk?.capacity||6}</td></tr>
-      <tr><td class="bp-spec-key">Distro</td><td class="bp-spec-val">k3s</td></tr>
-      <tr><td class="bp-spec-key">Templates</td><td class="bp-spec-val">${f?.orchestration?.workflow_templates||21}</td></tr>
-      <tr><td class="bp-spec-key">Manifests</td><td class="bp-spec-val">${f?.orchestration?.manifests||38}</td></tr>
-    </table>`;
+  // Right panel: passing suites
+  const suiteOkHtml = passingSuites.map(({ suite, def, totalPass, totalScen, pct }) =>
+    `<div class="tr-suite-ok">${dot('pass')}<span>${def.label||suite}</span><span class="score">${pct !== null ? pct+'%' : '—'} <span style="color:var(--muted);font-size:10px">${totalPass}/${totalScen}</span></span></div>`
+  ).join('');
 
-  // Supply chain spec
-  document.getElementById('bp-supply-chain').innerHTML = [
-    ['SLSA level',  `L${sc.slsa_level||2}`, 'pass'],
-    ['Signing',     'cosign keyless', 'pass'],
-    ['SBOM',        sc.sbom_format||'spdx-2.3', 'pass'],
-    ['License',     sc.license||'Apache-2.0', 'pass'],
-    ['Dep updates', sc.dependency_updates||'Renovate', 'pass'],
-    ['Code review', sc.code_review_required?'required':'optional', sc.code_review_required?'pass':'warn'],
-    ['Provenance',  sc.provenance?'yes':'no', sc.provenance?'pass':'warn'],
-    ['VEX',         'not generated', 'warn'],
-  ].map(([k,v,cls])=>`<tr>
-    <td class="bp-spec-key">${k}</td>
-    <td class="bp-spec-val bp-spec-${cls}">${v}</td>
-  </tr>`).join('');
+  // Supply chain posture
+  const postureRows = [
+    ['SLSA level', `L${sc.slsa_level||2}`, sc.slsa_level >= 2 ? 'pass' : 'warn'],
+    ['Signing', 'cosign keyless', 'pass'],
+    ['SBOM', sc.sbom_format||'spdx-2.3', 'pass'],
+    ['OpenSSF', `${oss.scorecard_score||7.2}/10`, oss.scorecard_score >= 7 ? 'pass' : 'warn'],
+    ['Branch protect', sc.branch_protection ? 'yes' : 'no', sc.branch_protection ? 'pass' : 'fail'],
+    ['Code review', sc.code_review_required ? 'required' : 'optional', sc.code_review_required ? 'pass' : 'warn'],
+  ].map(([k, v, cls]) => `<div class="tr-posture-row">
+    <span class="tr-posture-key">${k}</span>
+    <span class="tr-posture-val" style="color:var(--${cls==='pass'?'pass':cls==='warn'?'warn':'fail'})">${v}</span>
+  </div>`).join('');
 
-  // CNCF
-  document.getElementById('bp-cncf').innerHTML = `
-    <div style="font-size:11px;color:#3a5070;margin-bottom:6px;font-family:'JetBrains Mono',monospace">Maturity: <span class="c-callout">${s.cncf?.maturity||'pre-sandbox'}</span></div>
-    ${(s.cncf?.primitives||[]).map(p=>`<div style="font-size:10px;padding:2px 0;border-bottom:1px solid #0f1e2e;font-family:'JetBrains Mono',monospace;color:#4fc3f7">◈ ${p}</div>`).join('')}`;
+  // Cluster nodes
+  const nodes = s.factory?.cluster?.nodes || [];
+  const nodeHtml = nodes.map(n =>
+    `<div class="tr-node-row">${dot(n.status==='ready'?'pass':'fail')}<span class="tr-node-name">${n.name}</span><span class="tr-node-meta">${n.role} · ${n.ram_gb}GB</span></div>`
+  ).join('');
 
-  // Hive
-  const hive = s.hive || {};
-  const acmmColors = { 1:'#8b949e', 2:'#4a69bd', 3:'#d29922', 4:'#f0883e', 5:'#b892ff' };
-  document.getElementById('bp-hive').innerHTML = `
-    <table class="bp-spec-table">
-      <tr><td class="bp-spec-key">ACMM level</td><td class="bp-spec-val" style="color:${acmmColors[hive.acmm_level||3]};font-weight:700">L${hive.acmm_level||3} — ${hive.acmm_label||'Supervised Autonomy'}</td></tr>
-      <tr><td class="bp-spec-key">Governor</td><td class="bp-spec-val">${hive.governor_mode||'busy'}</td></tr>
-      <tr><td class="bp-spec-key">Agents</td><td class="bp-spec-val">${hive.agents_active||1}/${hive.agents_total||3} active</td></tr>
-      <tr><td class="bp-spec-key">Merged/7d</td><td class="bp-spec-val c-pass">${hive.merged_7d||12}</td></tr>
-      <tr><td class="bp-spec-key">Median merge</td><td class="bp-spec-val">${hive.median_merge_min||32}m</td></tr>
-      <tr><td class="bp-spec-key">Open issues</td><td class="bp-spec-val c-callout">${hive.open_issues||64}</td></tr>
-    </table>`;
+  // Open issues breakdown
+  const issueRow = `<div class="tr-posture-row"><span class="tr-posture-key">Open issues</span><span class="tr-posture-val" style="color:var(--warn)">${s.github?.testing_lab?.open_issues||65}</span></div>
+  <div class="tr-posture-row"><span class="tr-posture-key">Open PRs</span><span class="tr-posture-val">${s.github?.testing_lab?.open_prs||17}</span></div>
+  <div class="tr-posture-row"><span class="tr-posture-key">PRs merged (7d)</span><span class="tr-posture-val" style="color:var(--pass)">${s.velocity?.prs_merged_7d||15}</span></div>
+  <div class="tr-posture-row"><span class="tr-posture-key">Commits (7d)</span><span class="tr-posture-val">${s.velocity?.commits_7d||268}</span></div>`;
 
-  // Footer coords
-  document.getElementById('bp-nodes').textContent = nodes.length||3;
-  document.getElementById('bp-templates').textContent = f?.orchestration?.workflow_templates||21;
-  document.getElementById('bp-manifests').textContent = f?.orchestration?.manifests||38;
-  document.getElementById('bp-crons').textContent = f?.orchestration?.cron_workflows||12;
-  document.getElementById('bp-scenarios').textContent = s.test_coverage?.scenarios_total||99;
-  document.getElementById('bp-generated').textContent = fmtDate(s._meta?.generated);
+  document.getElementById('tr-right').innerHTML = `
+    <div class="tr-right-section">
+      <div class="tr-right-section-title">Passing suites</div>
+      ${suiteOkHtml || '<div style="font-size:11px;color:var(--muted);font-style:italic">No passing suites.</div>'}
+    </div>
+    <div class="tr-right-section">
+      <div class="tr-right-section-title">Supply chain posture</div>
+      ${postureRows}
+    </div>
+    <div class="tr-right-section">
+      <div class="tr-right-section-title">GitHub activity</div>
+      ${issueRow}
+    </div>
+    <div class="tr-right-section">
+      <div class="tr-right-section-title">Cluster nodes</div>
+      ${nodeHtml}
+    </div>`;
 }
 
-// ── Main data load ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+//  Main data load
+// ═══════════════════════════════════════════════════════════════════════════
 (async () => {
   setVariant(getVariant());
 
-  // Fetch factory stats + all 9 result JSONs in parallel
-  const resultKeys = RESULT_SLUGS.flatMap(slug => SUITES.map(suite => `${slug}-${suite}`));
+  const resultKeys = RESULT_SLUGS.flatMap(slug => SUITES.map(suite => ({ slug, suite, key: `${slug}-${suite}` })));
   const [statsResult, ...resultResults] = await Promise.allSettled([
     tryFetch('data/factory-stats.json'),
-    ...resultKeys.map(k => tryFetch(`results/${k}.json`))
+    ...resultKeys.map(({ key }) => tryFetch(`results/${key}.json`))
   ]);
 
   const stats = statsResult.status === 'fulfilled' && statsResult.value
     ? statsResult.value : SEED;
 
-  const results = resultResults.map(r =>
-    r.status === 'fulfilled' ? r.value : null);
+  // Annotate results with slug + suite for easy lookup
+  const results = resultResults.map((r, i) => {
+    const data = r.status === 'fulfilled' ? r.value : null;
+    if (!data) return null;
+    return { ...data, variant: resultKeys[i].slug, suite: resultKeys[i].suite };
+  });
 
-  populatePitWall(stats, results);
-  populateMissionControl(stats, results);
-  populateBlueprint(stats, results);
+  populateRunLog(stats, results);
+  populateSuiteBoard(stats, results);
+  populateTriage(stats, results);
 })();
 </script>
 
