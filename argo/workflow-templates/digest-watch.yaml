@@ -158,13 +158,17 @@ spec:
           echo "Digest changed — updating ConfigMap and triggering rebuild"
 
           # Upsert ConfigMap key via k8s API (patch; create if 404)
-          HTTP=$(curl -sf -w "%{http_code}" -o /dev/null --cacert "${CACERT}" \
+          # Write http_code to a tmpfile to avoid stdout contamination from || fallback
+          HTTP_CODE_FILE=$(mktemp)
+          curl -s -w "%{http_code}" -o /dev/null --cacert "${CACERT}" \
             -H "Authorization: Bearer ${SA_TOKEN}" \
             -H "Content-Type: application/merge-patch+json" \
             -X PATCH \
             "${KS}/api/v1/namespaces/argo/configmaps/containerdisk-source-digests" \
-            -d "{\"data\":{\"${CD_TAG}\":\"${LIVE_DIGEST}\"}}" 2>/dev/null || echo "000")
-          if [[ "${HTTP}" == "404" || "${HTTP}" == "000" ]]; then
+            -d "{\"data\":{\"${CD_TAG}\":\"${LIVE_DIGEST}\"}}" 2>/dev/null \
+            > "${HTTP_CODE_FILE}" || true
+          HTTP=$(cat "${HTTP_CODE_FILE}"); rm -f "${HTTP_CODE_FILE}"
+          if [[ "${HTTP}" == "404" || "${HTTP}" == "000" || -z "${HTTP}" ]]; then
             curl -sf --cacert "${CACERT}" \
               -H "Authorization: Bearer ${SA_TOKEN}" \
               -H "Content-Type: application/json" \
