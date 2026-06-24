@@ -1,11 +1,18 @@
 {
   "variant": "bluefin-testing",
   "suite": "system",
-  "last_run": null,
-  "workflow_name": null,
-  "status": "pending",
-  "scenarios": 0,
-  "failed": 0,
+  "last_run": "2026-06-24T03:56:24.961355Z",
+  "workflow_name": "bluefin-qa-fresh-8lnfn",
+  "status": "failed",
+  "scenarios": 14,
+  "failed": 6,
   "screenshot_url": "https://projectbluefin.github.io/testing-lab/screenshots/bluefin-testing-system-latest.png",
-  "history": []
+  "history": [
+    {
+      "run": "2026-06-24T03:56:24.961355Z",
+      "status": "failed",
+      "scenarios": 14,
+      "failed": 6
+    }
+  ]
 }
