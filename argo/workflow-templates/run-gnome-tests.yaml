@@ -222,14 +222,25 @@ spec:
               echo '[ROOT] sshd -T (global):'
               sshd -T 2>/dev/null | grep -i 'authorizedkeysfile\|allowusers\|denyusers\|permituserenv\|usepam\|passwordauth' | head -10 || echo 'sshd -T unavailable'
               echo '[ROOT] sshd -T -C user=bluefin-test (per-user):'
-              sshd -T -C user=bluefin-test,addr=127.0.0.1,host=localhost,laddr=127.0.0.1,lport=22 2>/dev/null | grep -i 'authorizedkeysfile\|allowusers\|denyusers\|passwordauth' | head -10 || echo 'sshd -T -C unavailable'
-              echo '[ROOT] sshd_config drop-ins:'
-              grep -r 'AuthorizedKeys\|AllowUsers\|DenyUsers' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/ 2>/dev/null || echo '(none found)'
+              sshd -T -C user=bluefin-test,addr=127.0.0.1,host=localhost,laddr=127.0.0.1,lport=22 2>/dev/null | \
+                grep -i 'authorizedkeysfile\|allowusers\|denyusers\|passwordauth\|pubkeyauth\|strictmodes\|usepam\|match' | head -15 || echo 'sshd -T -C unavailable'
+              echo '[ROOT] full sshd_config (all files):'
+              cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null
               # Enable user lingering so rootless Podman services survive login/logout.
               # Required by the developer suite 'User lingering is enabled' assertion.
               loginctl enable-linger bluefin-test 2>/dev/null || true
               echo '[ROOT] user lingering enabled for bluefin-test'
             "
+            # Verbose single SSH attempt as bluefin-test to capture exact server refusal reason.
+            echo "Verbose SSH probe (bluefin-test)..." >&2
+            ssh -vvv -i "${SSH_KEY}" \
+              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 -o PasswordAuthentication=no \
+              bluefin-test@${VM_IP} 'echo ok' 2>&1 | \
+              grep -iE 'debug1|error|denied|accept|authenticat|offer|send_pubkey|server refuse' | head -30 || true
+            echo "---" >&2
+            # Capture sshd journal from the VM's perspective.
+            ${ROOT_SSH} "journalctl -u sshd --since '2 minutes ago' --no-pager 2>/dev/null | tail -30 || true"
             # Wait for bluefin-test SSH to work (short retry loop).
             echo "Verifying bluefin-test SSH..." >&2
             timeout 120 bash -c "
