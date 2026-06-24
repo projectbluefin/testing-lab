@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k3s-firewalld-config
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: k3s-firewalld-config
+    app.kubernetes.io/component: node-tuning
+    app.kubernetes.io/part-of: bluefin-test-suite
+  annotations:
+    bluefin.io/description: |
+      Configures firewalld on every node to allow k3s pod and service traffic.
+      Per k3s docs (https://docs.k3s.io/installation/requirements), firewalld
+      must have the pod CIDR (10.42.0.0/16) and service CIDR (10.43.0.0/16)
+      added to the trusted zone, or cross-node pod connectivity will be blocked.
+      The init container runs firewall-cmd in the host namespace via nsenter;
+      it is a no-op if firewalld is not active. Applies to every node at boot,
+      so new nodes joining the cluster are automatically configured.
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k3s-firewalld-config
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k3s-firewalld-config
+        app.kubernetes.io/component: node-tuning
+        app.kubernetes.io/part-of: bluefin-test-suite
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      hostPID: true
+      initContainers:
+        - name: configure-firewalld
+          image: quay.io/fedora/fedora:latest
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Run firewall-cmd in the host mount namespace via nsenter.
+              # If firewalld is not active (e.g. ghost, exo-1 run no firewall)
+              # firewall-cmd exits non-zero; we treat that as a no-op.
+              if nsenter -t 1 -m -- firewall-cmd --state 2>/dev/null | grep -q running; then
+                nsenter -t 1 -m -- firewall-cmd --permanent --zone=trusted --add-source=10.42.0.0/16
+                nsenter -t 1 -m -- firewall-cmd --permanent --zone=trusted --add-source=10.43.0.0/16
+                nsenter -t 1 -m -- firewall-cmd --reload
+                echo "firewalld configured for k3s"
+              else
+                echo "firewalld not active on this node, skipping"
+              fi
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              cpu: 10m
+              memory: 16Mi
+      terminationGracePeriodSeconds: 5
