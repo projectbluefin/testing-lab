@@ -120,10 +120,10 @@ tests/
 | `just run-titan-developer` | `developer` suite against both titans        | ~7 min          |
 | `just run-titan-software`  | `software` suite against both titans         | ~7 min          |
 
-Titans skip BIB and provisioning entirely. Dependency install is idempotent and skipped on
+Titans skip provisioning entirely. Dependency install is idempotent and skipped on
 re-runs.
 
-### Full pipeline (fresh VM, BIB build + provisioning)
+### Full pipeline (fresh VM, provisioning)
 
 | Command                          | Notes                                                         |
 |----------------------------------|---------------------------------------------------------------|

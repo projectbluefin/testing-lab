@@ -126,8 +126,8 @@ This is the [recommended Argo CD GitOps model](https://argo-cd.readthedocs.io/en
 ## 6. Create the SSH Key Secret
 
 The test pipeline uses an ed25519 keypair to SSH into freshly-booted test VMs.
-The public key is baked into the golden disk by BIB; the private key lives in a
-Kubernetes Secret.
+The public key is injected into the running VM by KubeVirt accessCredentials via
+qemuGuestAgent at boot; the private key lives in a Kubernetes Secret.
 
 ```bash
 just setup-ssh-secret
@@ -193,11 +193,10 @@ just run-tests
 ```
 
 This will:
-1. Build (or reuse) the golden disk via BIB
-2. Reflink-clone the golden disk (~24ms)
-3. Boot a KubeVirt VM
-4. SSH in, run behave + qecore GNOME tests
-5. Delete the VM and disk clone on exit
+1. Pull (or reuse) the containerDisk from Zot
+2. Boot a KubeVirt VM from the containerDisk
+3. SSH in, run behave + qecore GNOME tests
+4. Delete the VM on exit
 
 ---
 

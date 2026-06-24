@@ -9,9 +9,9 @@ metadata:
   annotations:
     bluefin.io/description: |
       Clears stale podman containers-storage lock files left behind by killed
-      BIB build workflows. These locks block subsequent podman/BIB runs with
+      workflow pods. These locks block subsequent podman runs with
       "acquiring lock N for container ...: file exists". Safe to run when no
-      BIB workflows are actively executing (ghost-heavy-compute mutex is free).
+      containerdisk build workflows are actively executing (ghost-heavy-compute mutex is free).
 spec:
   entrypoint: clear-locks
   serviceAccountName: argo

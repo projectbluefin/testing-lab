@@ -241,7 +241,7 @@ Use these in order:
 5. `kubernetes-mcp-pods_top all_namespaces=true`
 
 Answer three questions in order:
-1. Are one or more `bib-img-*` builds saturating ghost?
+1. Are one or more `build-containerdisk-*` pods saturating ghost?
 2. Are `virt-launcher-*` pods consuming capacity with no corresponding live workflow?
 3. Are runner pods pending because CPU or memory is exhausted?
 

@@ -392,10 +392,6 @@ plural form. Confirmed via Context7 docs.
 
 | Template | CPU req/limit | Memory req/limit |
 |---|---|---|
-| `bib-img-build` | 4 / 8 | 8Gi / 16Gi |
-| `bib-img-pull` | 2 / 4 | 2Gi / 4Gi |
-| `bib-disk-configure` | 2 / 4 | 4Gi / 8Gi |
-| `bib-disk-check` | 100m / 500m | 128Mi / 512Mi |
 | `run-gnome-tests` | 1 / 2 | 1Gi / 2Gi |
 | `reflink-disk` | 100m / 500m | 128Mi / 512Mi |
 

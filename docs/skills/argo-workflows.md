@@ -15,7 +15,7 @@ metadata:
 ## When to Use
 
 - Editing any `argo/workflow-templates/*.yaml` or `argo/bootstrap/*.yaml`
-- Writing a new pipeline (bib-build, provision, test, teardown)
+- Writing a new pipeline (provision, test, teardown)
 - Adding a new `argo/*.yaml` submit-time Workflow
 - Debugging a stuck or failed workflow
 - Adding a CronWorkflow to `manifests/`
@@ -230,25 +230,6 @@ One-shot bootstrap templates (`install-*`, `setup-*`, `titan-disk-cleanup`) shou
 
 Two CronWorkflows at the same schedule covering overlapping namespaces → consolidate into one. Check `kubectl get cronworkflows -n argo` before adding a new cleanup job.
 
-### 10. BIB build failures — stale containers-storage locks
-
-When a BIB workflow is force-killed mid-run, podman lock files remain at
-`/var/lib/containers/storage/overlay-containers/*/userdata/*.lock`. Subsequent
-BIB runs fail immediately with:
-
-```
-acquiring lock N for container <sha>: file exists
-Error: ghcr.io/projectbluefin/bluefin-lts: image not known
-```
-
-Fix: submit the `ghost-cleanup` WorkflowTemplate before resubmitting:
-```bash
-just run-ghost-cleanup
-```
-
-This is safe to run any time no active BIB workflows are running. The `ghost-heavy-compute`
-Argo mutex serializes BIB builds but does not clean stale locks from killed workflows.
-
 ### 11. Templates snapshot at submit time — always sync before resubmit
 
 Argo snapshots the full WorkflowTemplate body into the Workflow object at submit time.
@@ -308,7 +289,7 @@ spec:
 
 ### 14. Decoupling slow build steps from test pipelines (image-sync pattern)
 
-Any pipeline step that conditionally runs a slow build (BIB, compilation, disk conversion)
+Any pipeline step that conditionally runs a slow build (compilation, disk conversion)
 belongs in a **separate CronWorkflow**, not inline in the test pipeline. The test pipeline
 asserts the artifact exists and fails fast — it never triggers a rebuild.
 
@@ -349,7 +330,7 @@ asserts the artifact exists and fails fast — it never triggers a rebuild.
   HTTP=$(cat "${HTTP_CODE_FILE}"); rm -f "${HTTP_CODE_FILE}"
   ```
 - The ConfigMap (`containerdisk-source-digests`) stores **GHCR source digests**, not Zot
-  containerdisk digests — the two images are different (source bootc OCI vs BIB-built qcow2 OCI)
+  containerdisk digests — the two images are different (source bootc OCI vs qcow2 OCI containerDisk)
 - ConfigMap is patched by the workflow, NOT managed by ArgoCD. Do not put it in `manifests/`.
   Create it in the first workflow run via POST if PATCH returns 404.
 - Submitting a build via k8s API (no extra image dependency):

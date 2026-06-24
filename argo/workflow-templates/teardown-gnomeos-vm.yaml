@@ -20,12 +20,6 @@ spec:
                   value: "{{inputs.parameters.vm-name}}"
                 - name: namespace
                   value: "{{inputs.parameters.namespace}}"
-        - - name: delete-hostdisk
-            template: delete-hostdisk
-            arguments:
-              parameters:
-                - name: vm-name
-                  value: "{{inputs.parameters.vm-name}}"
 
     - name: delete-vm
       inputs:
@@ -40,33 +34,3 @@ spec:
           metadata:
             name: "{{inputs.parameters.vm-name}}"
             namespace: "{{inputs.parameters.namespace}}"
-
-    - name: delete-hostdisk
-      inputs:
-        parameters:
-          - name: vm-name
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      volumes:
-        - name: gnomeos-vms
-          hostPath:
-            path: /var/mnt/ghost-data/gnomeos-test
-      script:
-        image: cgr.dev/chainguard/bash:latest
-        securityContext:
-          runAsUser: 0
-        command: [bash]
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 200m
-            memory: 128Mi
-        volumeMounts:
-          - name: gnomeos-vms
-            mountPath: /var/mnt/ghost-data/gnomeos-test
-        source: |
-          DISK="/var/mnt/ghost-data/gnomeos-test/{{inputs.parameters.vm-name}}.raw"
-          rm -f "${DISK}"
-          echo "Cleaned: ${DISK}"

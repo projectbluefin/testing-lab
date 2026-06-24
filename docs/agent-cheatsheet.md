@@ -86,7 +86,6 @@ Loki: <http://192.168.1.102:30100>. Pod label: `app.kubernetes.io/part-of=bluefi
 
 | Symptom | Action |
 |---|---|
-| Many `bib-img-*` pods Running | Avoid starting another fresh-VM lane until the current BIB workload finishes |
 | Workflows `Pending` | Use `kubernetes-mcp-pods_top` to identify the current CPU hog before submitting more work |
 | Many `virt-launcher-*` pods with no corresponding live workflow | Use Kubernetes MCP to create a one-shot cleanup Job from `orphan-vm-cleanup` |
 

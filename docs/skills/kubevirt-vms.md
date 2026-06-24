@@ -106,7 +106,7 @@ root=UUID=<disk-uuid> rw selinux=0 ostree=/ostree/boot.1/default/<hash>/0
 ```
 
 **The minimum required disk prep is `bootc install to-disk`.** This can be done:
-1. As a pre-built containerdisk (current: BIB pipeline → Zot → containerDisk) — schedulable on any node
+1. As a pre-built containerdisk (current: build-containerdisk → Zot → containerDisk) — schedulable on any node
 2. Inline in the workflow: `bootc install to-disk /path/to/disk.raw` → `hostDisk` — ghost-local only
 
 **Diagnosing kernel/initramfs paths in a running VM (guest-agent):**
@@ -631,7 +631,6 @@ That is the osbuild Fedora 38 runner PCRE2 mismatch. Switch to `bootc install to
 | "containerDisk VMs must pin to ghost." | Only hostDisk VMs need ghost. ContainerDisk VMs can schedule on bazzite too. |
 | "The zot image from yesterday is still there." | Zot-writable loses its index.json on pod restart. Always check before running the pipeline. |
 | "HostDisk feature gate is probably already on." | Verify with `kubectl get kubevirt kubevirt -n kubevirt -o jsonpath='{.spec.configuration}'`. Don't assume. |
-| "The PCRE2 mismatch means the host needs upgrading." | BIB is fully containerized — stale cached image layer, not the host. Force-pull the image. |
 | "inotify limits are a kernel concern, not a k8s concern." | KubeVirt virt-handler + containerd exhaust defaults at scale. The `inotify-tuning` DaemonSet is required. |
 | "Writing to /mnt/btroot/var/ injects SSH keys into the live system." | `btrfs subvolume list` returns EMPTY for bootc disks — there are no named subvolumes. But disk injection is still unreliable: use KubeVirt accessCredentials instead. |
 | "Baking SSH keys into the disk is reliable." | ostree resets etc/ files that exist in image's usr/etc/ at first boot. var/ writes may not survive qemu-img sparse conversion. Use accessCredentials. |

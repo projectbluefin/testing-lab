@@ -6,8 +6,10 @@ metadata:
   annotations:
     description: |
       GNOME OS spike provisioning path.
-      Downloads and verifies a nightly artifact into a cached raw base disk on ghost,
-      reflinks a per-run hostDisk clone, boots a KubeVirt VM, and returns the VM pod IP.
+      Downloads a nightly artifact, wraps the raw disk as a containerDisk OCI image (pushed
+      to the local Zot registry at 192.168.1.102:30500/gnomeos-containerdisk:latest), boots a
+      KubeVirt VM using that containerDisk, and returns the VM pod IP.
+      VMs float freely across any KubeVirt-capable node (no ghost pin).
       This template intentionally does not assume SSH, cloud-init, guest agent, or qecore.
       The published GNOME OS nightly is currently a hybrid GPT ISO that is usable as a raw disk.
 spec:
@@ -82,42 +84,33 @@ spec:
           - name: image-sha256
           - name: image-format
           - name: console-hook-config-map
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       volumes:
-        - name: gnomeos-cache
-          hostPath:
-            path: /var/mnt/ghost-data/gnomeos-nightly-cache
-            type: DirectoryOrCreate
-        - name: gnomeos-vms
-          hostPath:
-            path: /var/mnt/ghost-data/gnomeos-test
-            type: DirectoryOrCreate
+        - name: work
+          emptyDir:
+            sizeLimit: 40Gi
       script:
-        image: quay.io/fedora/fedora:latest
+        image: quay.io/buildah/stable:latest
         command: [bash]
         securityContext:
+          privileged: true
           runAsUser: 0
         resources:
           requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: "2"
+            cpu: "1"
             memory: 2Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi
         volumeMounts:
-          - name: gnomeos-cache
-            mountPath: /var/mnt/ghost-data/gnomeos-nightly-cache
-          - name: gnomeos-vms
-            mountPath: /var/mnt/ghost-data/gnomeos-test
+          - name: work
+            mountPath: /mnt/work
         source: |
           set -euo pipefail
-          VM="{{inputs.parameters.vm-name}}"
           URL="{{inputs.parameters.image-url}}"
           SHA="{{inputs.parameters.image-sha256}}"
           FORMAT="{{inputs.parameters.image-format}}"
-          CACHE_DIR="/var/mnt/ghost-data/gnomeos-nightly-cache"
-          DEST="/var/mnt/ghost-data/gnomeos-test/${VM}.raw"
+          WORK="/mnt/work"
+          CONTAINERDISK="192.168.1.102:30500/gnomeos-containerdisk:latest"
 
           if [[ -z "${URL}" ]]; then
             echo "ERROR: image-url is required" >&2
@@ -178,73 +171,49 @@ spec:
           }
 
           ARTIFACT_NAME="$(basename "${URL%%\?*}")"
-          DOWNLOADED="${CACHE_DIR}/${ARTIFACT_NAME}"
-          CACHE_KEY="${ARTIFACT_NAME}"
+          DOWNLOADED="${WORK}/${ARTIFACT_NAME}"
           case "${FORMAT}" in
             raw)
-              if [[ "${CACHE_KEY}" == *.raw ]]; then
-                BASE_RAW="${CACHE_DIR}/${CACHE_KEY}"
+              if [[ "${ARTIFACT_NAME}" == *.raw ]]; then
+                BASE_RAW="${WORK}/${ARTIFACT_NAME}"
               else
-                BASE_RAW="${CACHE_DIR}/${CACHE_KEY}.raw"
+                BASE_RAW="${WORK}/${ARTIFACT_NAME}.raw"
               fi
               ;;
             raw.xz)
-              BASE_RAW="${CACHE_DIR}/${CACHE_KEY%.xz}"
+              BASE_RAW="${WORK}/${ARTIFACT_NAME%.xz}"
               ;;
             *)
               echo "ERROR: unsupported image-format '${FORMAT}' (expected raw or raw.xz)" >&2
               exit 1
               ;;
           esac
-          DIGEST_MARKER="${BASE_RAW}.source-digest"
 
-          needs_refresh=0
-          if [[ ! -f "${BASE_RAW}" ]]; then
-            needs_refresh=1
-          elif [[ -n "${SHA}" ]]; then
-            if [[ ! -f "${DIGEST_MARKER}" ]] || [[ "$(cat "${DIGEST_MARKER}")" != "${SHA}" ]]; then
-              needs_refresh=1
-            fi
-          else
-            needs_refresh=1
+          echo "Downloading GNOME OS artifact: ${URL}" >&2
+          download_file "${URL}" "${DOWNLOADED}"
+
+          if [[ -n "${SHA}" ]]; then
+            echo "${SHA}  ${DOWNLOADED}" | sha256sum -c -
           fi
 
-          if (( needs_refresh )); then
-            rm -f "${DOWNLOADED}" "${BASE_RAW}" "${DIGEST_MARKER}"
-            TMP_DOWNLOAD="${DOWNLOADED}.part"
-            TMP_RAW="${BASE_RAW}.part"
+          case "${FORMAT}" in
+            raw)
+              [[ "${DOWNLOADED}" != "${BASE_RAW}" ]] && mv "${DOWNLOADED}" "${BASE_RAW}"
+              ;;
+            raw.xz)
+              raw_from_xz "${DOWNLOADED}" "${BASE_RAW}"
+              rm -f "${DOWNLOADED}"
+              ;;
+          esac
 
-            echo "Downloading GNOME OS artifact: ${URL}" >&2
-            download_file "${URL}" "${TMP_DOWNLOAD}"
-            mv "${TMP_DOWNLOAD}" "${DOWNLOADED}"
-
-            if [[ -n "${SHA}" ]]; then
-              echo "${SHA}  ${DOWNLOADED}" | sha256sum -c -
-            fi
-
-            case "${FORMAT}" in
-              raw)
-                mv "${DOWNLOADED}" "${TMP_RAW}"
-                ;;
-              raw.xz)
-                raw_from_xz "${DOWNLOADED}" "${TMP_RAW}"
-                ;;
-            esac
-
-            mv "${TMP_RAW}" "${BASE_RAW}"
-            if [[ -n "${SHA}" ]]; then
-              printf "%s" "${SHA}" > "${DIGEST_MARKER}"
-            fi
-            chown 107:107 "${BASE_RAW}"
-            chmod 664 "${BASE_RAW}"
-            chcon -t svirt_sandbox_file_t "${BASE_RAW}" 2>/dev/null || true
-          fi
-
-          cp --reflink=auto "${BASE_RAW}" "${DEST}"
-          chown 107:107 "${DEST}"
-          chmod 664 "${DEST}"
-          chcon -t svirt_sandbox_file_t "${DEST}" 2>/dev/null || true
-          echo "Prepared GNOME OS spike disk: ${DEST}" >&2
+          echo "Wrapping ${BASE_RAW} as containerDisk OCI image..." >&2
+          CTR=$(buildah from scratch)
+          buildah copy --chown 107:107 "${CTR}" "${BASE_RAW}" /disk/gnomeos.raw
+          buildah commit "${CTR}" "${CONTAINERDISK}"
+          echo "Pushing to ${CONTAINERDISK}..." >&2
+          buildah push --tls-verify=false "${CONTAINERDISK}"
+          buildah rm "${CTR}" 2>/dev/null || true
+          echo "GNOME OS containerDisk ready: ${CONTAINERDISK}" >&2
 
     - name: create-gnomeos-vm
       inputs:
@@ -269,8 +238,6 @@ spec:
                 labels:
                   kubevirt.io/vm: "{{inputs.parameters.vm-name}}"
               spec:
-                nodeSelector:
-                  kubernetes.io/hostname: ghost
                 domain:
                   firmware:
                     bootloader:
@@ -296,9 +263,8 @@ spec:
                     pod: {}
                 volumes:
                   - name: rootdisk
-                    hostDisk:
-                      path: /var/mnt/ghost-data/gnomeos-test/{{inputs.parameters.vm-name}}.raw
-                      type: Disk
+                    containerDisk:
+                      image: 192.168.1.102:30500/gnomeos-containerdisk:latest
 
     - name: create-gnomeos-vm-with-hook
       inputs:
@@ -327,8 +293,6 @@ spec:
                   hooks.kubevirt.io/hookSidecars: >-
                     [{"args":["--version","v1alpha2"],"configMap":{"name":"{{inputs.parameters.console-hook-config-map}}","key":"onDefineDomain","hookPath":"/usr/bin/onDefineDomain"}}]
               spec:
-                nodeSelector:
-                  kubernetes.io/hostname: ghost
                 domain:
                   firmware:
                     bootloader:
@@ -354,9 +318,8 @@ spec:
                     pod: {}
                 volumes:
                   - name: rootdisk
-                    hostDisk:
-                      path: /var/mnt/ghost-data/gnomeos-test/{{inputs.parameters.vm-name}}.raw
-                      type: Disk
+                    containerDisk:
+                      image: 192.168.1.102:30500/gnomeos-containerdisk:latest
 
     - name: wait-for-gnomeos-boot
       inputs:
