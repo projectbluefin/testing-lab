@@ -119,7 +119,7 @@ spec:
             if [[ -f /tmp/results/results.json && -n "${GITHUB_TOKEN:-}" ]]; then
               NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
               N_TOTAL=$(jq '[.[].elements | length] | add // 0' /tmp/results/results.json)
-              N_FAILED=$(jq '[.[].elements[].steps[].result.status] | map(select(. == "failed")) | length' /tmp/results/results.json)
+              N_FAILED=$(jq '[.[].elements[] | select(.status=="failed")] | length' /tmp/results/results.json)
               RUN_STATUS=$( [[ "$N_FAILED" -gt 0 ]] && echo failed || echo passed )
               FAILED_NAMES=$(jq -c '[.[].elements[] | select(.status=="failed") | .name] | unique' \
                 /tmp/results/results.json 2>/dev/null || echo "[]")

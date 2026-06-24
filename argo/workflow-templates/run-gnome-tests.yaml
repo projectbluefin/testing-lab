@@ -387,7 +387,7 @@ spec:
               API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/results/${IMG_SLUG}-${SUITE}.json"
               NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
               N_TOTAL=$(jq '[.[].elements | length] | add // 0' /tmp/results/results.json)
-              N_FAILED=$(jq '[.[].elements[].steps[].result.status] | map(select(. == "failed")) | length' /tmp/results/results.json)
+              N_FAILED=$(jq '[.[].elements[] | select(.status=="failed")] | length' /tmp/results/results.json)
               RUN_STATUS=$( [[ "$N_FAILED" -gt 0 ]] && echo failed || echo passed )
 
               # GET current file for sha + history
