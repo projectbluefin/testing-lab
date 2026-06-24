@@ -88,15 +88,18 @@ spec:
           set -euo pipefail
           CHANNEL="{{inputs.parameters.flatcar-channel}}"
           VERSION="{{inputs.parameters.flatcar-version}}"
-          URL="https://stable.release.flatcar-container.net/amd64-usr/${VERSION}/flatcar_production_qemu_image.img"
+          URL="https://stable.release.flatcar-linux.net/amd64-usr/${VERSION}/flatcar_production_qemu_image.img.bz2"
           CONTAINERDISK="192.168.1.102:30500/flatcar-containerdisk:latest"
           # ponytail: :latest tag is fine — no nightly CronWorkflow, runs are sequential
 
-          echo "Installing qemu-img..." >&2
-          dnf install -y -q qemu-img 2>&1 | tail -3
+          echo "Installing qemu-img and bzip2..." >&2
+          dnf install -y -q qemu-img bzip2 2>&1 | tail -3
 
           echo "Downloading Flatcar ${CHANNEL} ${VERSION}..." >&2
-          curl -L --fail --retry 3 -o /mnt/work/flatcar.img "${URL}"
+          curl -L --fail --retry 3 -o /mnt/work/flatcar.img.bz2 "${URL}"
+
+          echo "Decompressing bz2..." >&2
+          bzip2 -d /mnt/work/flatcar.img.bz2
 
           echo "Converting qcow2 → raw..." >&2
           qemu-img convert -f qcow2 -O raw /mnt/work/flatcar.img /mnt/work/flatcar.raw
