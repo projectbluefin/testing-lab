@@ -267,8 +267,17 @@ nodeSelector:
   kubernetes.io/hostname: ghost
 ```
 
-KubeVirt nodes: `ghost` (control-plane, primary compute) and `bazzite` (worker, 12 CPU, 30GB RAM).
+KubeVirt nodes: `ghost` (control-plane, primary compute, 32 CPU, 64 GB RAM) and
+`bazzite` (permanent full-time worker, 12 CPU, 30 GB RAM, k3s-agent enabled at boot).
 Both have `kubevirt.io/schedulable: "true"` and virt-handler running.
+No Argo global parallelism cap — Kubernetes pod scheduling (8 Gi/VM request) is the
+real backpressure. ghost + bazzite fit ~11 concurrent 8 Gi VM pods before the scheduler
+queues naturally.
+
+**VM memory by image type:**
+- bluefin `:testing` → 8 Gi (full GNOME + Wayland + AT-SPI + dogtail)
+- bluefin-lts `:testing` → 8 Gi (same desktop stack — 4 Gi was wrong)
+- LTS smoke PRs do NOT get a reduced allocation; same 8 Gi applies
 
 ### 4. hwprofile: standard vs full-hw
 
