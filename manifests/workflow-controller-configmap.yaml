@@ -38,14 +38,10 @@ metadata:
   name: workflow-controller-configmap
   namespace: argo
 data:
-  # High ceiling — Kubernetes pod scheduling (node RAM limits) is the real
-  # backpressure. This cap is a last-resort guard against runaway agents.
-  # ghost (64 GB) + bazzite (30 GB) can physically fit ~11 concurrent 8 Gi VM
-  # pods before the scheduler queues them. 50 is unreachable in practice.
-  parallelism: "50"
-
-  # Same cap scoped to the argo namespace.
-  namespaceParallelism: "50"
+  # Parallelism: no global cap — Kubernetes pod scheduling is the real
+  # backpressure. Pod resource requests (8 Gi per VM) mean nodes fill up
+  # naturally and the scheduler queues pods. Removing this key lets Argo
+  # start all submitted workflows immediately; the cluster self-limits.
 
   # Token-bucket rate limit on k8s resource creation by the controller.
   # limit: 10 ops/s, burst: 10 — allows a fresh workflow to spin up its
