@@ -16,6 +16,15 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
+  volumeClaimTemplates:
+    - metadata:
+        name: knuckle-test
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 30Gi
   synchronization:
     semaphores:
       - configMapKeyRef:
@@ -41,11 +50,7 @@ spec:
     - name: pipeline
       dag:
         tasks:
-          - name: create-workspace
-            template: create-workspace
-
           - name: clone-source
-            depends: "create-workspace.Succeeded"
             template: resolve-source
             arguments:
               parameters:
@@ -64,8 +69,16 @@ spec:
                 - name: vm-name
                   value: "knuckle-test-{{workflow.uid}}"
 
-          - name: provision-target-vm
+          - name: push-iso-containerdisk
             depends: "build-installer.Succeeded"
+            template: push-iso-containerdisk
+            arguments:
+              parameters:
+                - name: vm-name
+                  value: "knuckle-test-{{workflow.uid}}"
+
+          - name: provision-target-vm
+            depends: "push-iso-containerdisk.Succeeded"
             template: provision-target-vm
             arguments:
               parameters:
@@ -140,32 +153,49 @@ spec:
                 - name: branch
                   value: "{{workflow.parameters.tests-branch}}"
 
-    - name: create-workspace
-      resource:
-        action: create
-        setOwnerReference: true
-        manifest: |
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: "{{workflow.name}}-workspace"
-            namespace: argo
-          spec:
-            accessModes: [ReadWriteOnce]
-            storageClassName: local-path
-            resources:
-              requests:
-                storage: 30Gi
+    - name: push-iso-containerdisk
+      inputs:
+        parameters:
+          - name: vm-name
+      script:
+        image: quay.io/fedora/fedora:latest
+        command: [bash]
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        volumeMounts:
+          - name: knuckle-test
+            mountPath: /var/mnt/ghost-data/knuckle-test
+        source: |
+          set -euo pipefail
+          dnf install -y --quiet curl 2>&1 | tail -2
+          VM="{{inputs.parameters.vm-name}}"
+          WORK="/var/mnt/ghost-data/knuckle-test/.crane-${VM}"
+          mkdir -p "${WORK}"
 
-    - name: delete-workspace
-      resource:
-        action: delete
-        manifest: |
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: "{{workflow.name}}-workspace"
-            namespace: argo
+          curl -fsSL \
+            https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz \
+            | tar xz -C "${WORK}" crane
+          chmod +x "${WORK}/crane"
+
+          ISO="/var/mnt/ghost-data/knuckle-test/${VM}-installer.iso"
+          IMAGE="192.168.1.102:30500/knuckle-iso-${VM}:latest"
+
+          mkdir -p "${WORK}/disk"
+          cp "${ISO}" "${WORK}/disk/installer.iso"
+          tar -C "${WORK}" -czf "${WORK}/layer.tar.gz" disk/installer.iso
+
+          "${WORK}/crane" append \
+            --base scratch \
+            --new_layer "${WORK}/layer.tar.gz" \
+            --image "${IMAGE}" \
+            --insecure
+          rm -rf "${WORK}"
+          echo "Pushed containerDisk: ${IMAGE}" >&2
 
     - name: resolve-source
       inputs:
@@ -214,9 +244,6 @@ spec:
           - name: ghost-heavy-compute
       activeDeadlineSeconds: 3600
       volumes:
-        - name: knuckle-test
-          persistentVolumeClaim:
-            claimName: "{{workflow.name}}-workspace"
         - name: src
           emptyDir: {}
       initContainers:
@@ -287,12 +314,22 @@ spec:
                   value: "{{inputs.parameters.vm-name}}"
                 - name: ssh-key-secret
                   value: "{{inputs.parameters.ssh-key-secret}}"
-        - - name: prepare-target-disk
-            template: prepare-target-disk
+          - name: create-rootdisk-pvc
+            template: create-rootdisk-pvc
             arguments:
               parameters:
                 - name: vm-name
                   value: "{{inputs.parameters.vm-name}}"
+                - name: namespace
+                  value: "{{inputs.parameters.namespace}}"
+        - - name: init-rootdisk
+            template: init-rootdisk
+            arguments:
+              parameters:
+                - name: vm-name
+                  value: "{{inputs.parameters.vm-name}}"
+                - name: namespace
+                  value: "{{inputs.parameters.namespace}}"
         - - name: apply-installer-vm
             template: apply-installer-vm
             arguments:
@@ -315,9 +352,6 @@ spec:
             valueFrom:
               path: /work/ignition.json
       volumes:
-        - name: knuckle-test
-          persistentVolumeClaim:
-            claimName: "{{workflow.name}}-workspace"
         - name: work
           emptyDir: {}
       script:
@@ -357,40 +391,74 @@ spec:
             "/var/mnt/ghost-data/knuckle-test/{{inputs.parameters.vm-name}}-installer.ign"
           echo "Wrote ignition for {{inputs.parameters.vm-name}}" >&2
 
-    - name: prepare-target-disk
+    - name: create-rootdisk-pvc
       inputs:
         parameters:
           - name: vm-name
-      volumes:
-        - name: knuckle-test
-          persistentVolumeClaim:
-            claimName: "{{workflow.name}}-workspace"
-      script:
-        image: quay.io/kubevirt/virt-launcher:v1.8.2
-        command: [bash]
-        securityContext:
-          runAsUser: 0
-        resources:
-          requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: "2"
-            memory: 2Gi
-        volumeMounts:
-          - name: knuckle-test
-            mountPath: /var/mnt/ghost-data/knuckle-test
-        source: |
-          set -euo pipefail
-          TARGET="/var/mnt/ghost-data/knuckle-test/{{inputs.parameters.vm-name}}.raw"
-          if [[ -f "${TARGET}" ]]; then
-            rm -f "${TARGET}"
-          fi
-          qemu-img create -f raw "${TARGET}" 20G
-          chown 107:107 "${TARGET}"
-          chmod 664 "${TARGET}"
-          chcon -t container_file_t "${TARGET}" 2>/dev/null || true
-          echo "Prepared target disk: ${TARGET}" >&2
+          - name: namespace
+      resource:
+        action: apply
+        manifest: |
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: "{{inputs.parameters.vm-name}}-rootdisk"
+            namespace: "{{inputs.parameters.namespace}}"
+          spec:
+            accessModes: [ReadWriteOnce]
+            storageClassName: local-path
+            resources:
+              requests:
+                storage: 25Gi
+
+    - name: init-rootdisk
+      inputs:
+        parameters:
+          - name: vm-name
+          - name: namespace
+      resource:
+        action: apply
+        successCondition: status.succeeded == 1
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: "{{inputs.parameters.vm-name}}-init-rootdisk"
+            namespace: "{{inputs.parameters.namespace}}"
+          spec:
+            ttlSecondsAfterFinished: 300
+            template:
+              spec:
+                containers:
+                  - name: init
+                    image: quay.io/kubevirt/virt-launcher:v1.8.2
+                    command: [bash, -c]
+                    args:
+                      - |
+                        set -euo pipefail
+                        qemu-img create -f raw /mnt/disk.img 20G
+                        chown 107:107 /mnt/disk.img
+                        chmod 664 /mnt/disk.img
+                        chcon -t container_file_t /mnt/disk.img 2>/dev/null || true
+                        echo "Initialized rootdisk at /mnt/disk.img" >&2
+                    securityContext:
+                      runAsUser: 0
+                    resources:
+                      requests:
+                        cpu: 500m
+                        memory: 512Mi
+                      limits:
+                        cpu: "2"
+                        memory: 2Gi
+                    volumeMounts:
+                      - name: rootdisk
+                        mountPath: /mnt
+                volumes:
+                  - name: rootdisk
+                    persistentVolumeClaim:
+                      claimName: "{{inputs.parameters.vm-name}}-rootdisk"
+                restartPolicy: Never
 
     - name: apply-installer-vm
       inputs:
@@ -448,11 +516,11 @@ spec:
                     pod: {}
                 volumes:
                   - name: installeriso
-                    persistentVolumeClaim:
-                      claimName: "{{workflow.name}}-workspace"
+                    containerDisk:
+                      image: "192.168.1.102:30500/knuckle-iso-{{inputs.parameters.vm-name}}:latest"
                   - name: rootdisk
                     persistentVolumeClaim:
-                      claimName: "{{workflow.name}}-workspace"
+                      claimName: "{{inputs.parameters.vm-name}}-rootdisk"
 
     - name: boot-installer
       inputs:
@@ -465,9 +533,6 @@ spec:
         hostNetwork: true
         dnsPolicy: ClusterFirstWithHostNet
       volumes:
-        - name: knuckle-test
-          persistentVolumeClaim:
-            claimName: "{{workflow.name}}-workspace"
         - name: ssh-key
           secret:
             secretName: "{{inputs.parameters.ssh-key-secret}}"
@@ -684,7 +749,7 @@ spec:
                 volumes:
                   - name: rootdisk
                     persistentVolumeClaim:
-                      claimName: {{workflow.name}}-workspace
+                      claimName: ${VM}-rootdisk
           EOF
 
           virtctl -n "${NS}" start "${VM}"
@@ -774,47 +839,57 @@ spec:
                 - name: namespace
                   value: "{{workflow.parameters.namespace}}"
 
-          - name: cleanup-installer-artifacts
-            depends: "teardown-vm.Succeeded"
-            template: cleanup-installer-artifacts
+          - name: delete-rootdisk-pvc
+            depends: "teardown-vm.Succeeded || teardown-vm.Failed"
+            template: delete-rootdisk-pvc
+            arguments:
+              parameters:
+                - name: vm-name
+                  value: "knuckle-test-{{workflow.uid}}"
+                - name: namespace
+                  value: "{{workflow.parameters.namespace}}"
+
+          - name: delete-iso-containerdisk
+            depends: "teardown-vm.Succeeded || teardown-vm.Failed"
+            template: delete-iso-containerdisk
             arguments:
               parameters:
                 - name: vm-name
                   value: "knuckle-test-{{workflow.uid}}"
 
-          - name: delete-workspace
-            depends: "cleanup-installer-artifacts.Succeeded || cleanup-installer-artifacts.Failed"
-            template: delete-workspace
-
-    - name: cleanup-installer-artifacts
+    - name: delete-rootdisk-pvc
       inputs:
         parameters:
           - name: vm-name
-      volumes:
-        - name: knuckle-test
-          persistentVolumeClaim:
-            claimName: "{{workflow.name}}-workspace"
+          - name: namespace
+      resource:
+        action: delete
+        manifest: |
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: "{{inputs.parameters.vm-name}}-rootdisk"
+            namespace: "{{inputs.parameters.namespace}}"
+
+    - name: delete-iso-containerdisk
+      inputs:
+        parameters:
+          - name: vm-name
       script:
-        image: registry.access.redhat.com/ubi9/ubi-minimal:9.5
+        image: quay.io/fedora/fedora:latest
         command: [bash]
-        securityContext:
-          runAsUser: 0
         resources:
           requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 200m
+            cpu: 100m
             memory: 128Mi
-        volumeMounts:
-          - name: knuckle-test
-            mountPath: /var/mnt/ghost-data/knuckle-test
+          limits:
+            cpu: 500m
+            memory: 256Mi
         source: |
           set -euo pipefail
-          VM="{{inputs.parameters.vm-name}}"
-          rm -f \
-            "/var/mnt/ghost-data/knuckle-test/${VM}-installer.iso" \
-            "/var/mnt/ghost-data/knuckle-test/${VM}-installer.ign" \
-            "/var/mnt/ghost-data/knuckle-test/${VM}-knuckle" \
-            "/var/mnt/ghost-data/knuckle-test/${VM}-qa.json"
-          echo "Cleaned installer artifacts for ${VM}" >&2
+          dnf install -y --quiet skopeo 2>&1 | tail -2
+          skopeo delete \
+            --tls-verify=false \
+            "docker://192.168.1.102:30500/knuckle-iso-{{inputs.parameters.vm-name}}:latest" \
+            || true
+          echo "Deleted containerDisk for {{inputs.parameters.vm-name}}" >&2
