@@ -6,7 +6,7 @@ metadata:
   annotations:
     description: |
       Build a KubeVirt containerDisk from a bootc image.
-      Flow: check (zot existence) → install-to-disk → convert-and-push
+      Flow: check (zot existence; short-circuits to "missing" when force=true) → install-to-disk → convert-and-push
       Replaces bib-build-and-push + golden-disk hostDisk approach.
       All build steps are pinned to ghost (loop devices + /var/mnt/ghost-data staging).
 spec:
@@ -54,21 +54,20 @@ spec:
             value: "25G"
       dag:
         tasks:
-          # Skipped when force=true (digest-watch already confirmed a rebuild is needed).
+          # check always runs; when force=true it short-circuits to "missing" inside the script.
           - name: check
             template: check
-            when: "'{{inputs.parameters.force}}' != 'true'"
             arguments:
               parameters:
                 - name: containerdisk-tag
                   value: "{{inputs.parameters.containerdisk-tag}}"
+                - name: force
+                  value: "{{inputs.parameters.force}}"
 
-          # Skipped when check=exists.
-          # When force=true, check is Skipped and has no outputs, so reference its
-          # output directly — instead gate on the force param.
+          # Skipped only when check outputs "exists" (already up-to-date).
           - name: install-to-disk
-            depends: "(check.Succeeded || check.Skipped)"
-            when: "'{{inputs.parameters.force}}' == 'true' || '{{tasks.check.outputs.result}}' != 'exists'"
+            depends: "check.Succeeded"
+            when: "'{{tasks.check.outputs.result}}' != 'exists'"
             template: install-to-disk
             arguments:
               parameters:
@@ -97,11 +96,14 @@ spec:
     # ─── check ────────────────────────────────────────────────────────────────
     # Checks whether the containerDisk image already exists in the local Zot registry.
     # Outputs: "exists" | "missing"
+    # When force=true, always outputs "missing" without a network call.
 
     - name: check
       inputs:
         parameters:
           - name: containerdisk-tag
+          - name: force
+            value: "false"
       nodeSelector:
         kubernetes.io/hostname: ghost
       script:
@@ -116,6 +118,10 @@ spec:
             memory: 512Mi
         source: |
           set -euo pipefail
+          if [[ "{{inputs.parameters.force}}" == "true" ]]; then
+            echo "missing"
+            exit 0
+          fi
           TAG="{{inputs.parameters.containerdisk-tag}}"
           CD_IMAGE="192.168.1.102:30500/bluefin-containerdisk:${TAG}"
           EXISTS=$(skopeo inspect --tls-verify=false --format '{{.Digest}}' \
