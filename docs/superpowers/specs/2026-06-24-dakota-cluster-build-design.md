@@ -35,12 +35,14 @@ benefit `build-bluefin-nvidia` immediately — shared artifact pool.
 
 ## Cluster Topology
 
-| Node  | CPUs | RAM    | Role                     |
-|-------|------|--------|--------------------------|
-| ghost | 32   | 62.5Gi | casd PVC, heavy builds   |
-| bazzite | 12 | 30.5Gi | overflow build pods      |
+| Node    | CPUs | RAM    | BST eligible | Notes                                      |
+|---------|------|--------|--------------|-------------------------------------------|
+| ghost   | 32   | 62.5Gi | yes          | casd PVC lives here; 16Gi reserved for BST |
+| bazzite | 12   | 30.5Gi | yes          | overflow build pods                        |
+| bluefin | 16   | 31.2Gi | no           | hamilton workstation — excluded via nodeAffinity NotIn |
+| exo-1   | 22   | 15.1Gi | no           | 15.1Gi allocatable — below 16Gi request   |
 
-exo-1 is NotReady — excluded.
+BST builds schedule on ghost and bazzite only. `bluefin` is excluded via `nodeAffinity NotIn [bluefin]` (workstation). exo-1 is auto-excluded by the 16Gi memory request.
 
 ## Components
 

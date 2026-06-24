@@ -108,8 +108,9 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 | Host | Role | IP | Specs |
 |---|---|---|---|
 | ghost | k3s control-plane + KubeVirt compute | 192.168.1.102 | Ryzen AI MAX+ 395, 16c/32t, 64GB RAM |
-| exo-1 | k3s worker (workflow pods only) | 192.168.1.239 | — |
+| exo-1 | k3s worker | 192.168.1.239 | 22c/15.1Gi — ready; low RAM excludes it from BST builds (16Gi request) |
 | bazzite | k3s worker | 192.168.1.223 | Gaming machine — fully schedulable (no taint); k3s-agent enabled and running at boot |
+| bluefin | k3s worker | 192.168.1.x | hamilton workstation — 16c/31.2Gi; VM scheduling ok; excluded from BST builds (nodeAffinity) |
 | Argo UI | — | http://192.168.1.102:32746 | NodePort; also http://192.168.1.102:2746 on host |
 | Loki | log aggregation | http://192.168.1.102:30100 | Scrapes pods labeled `app.kubernetes.io/part-of=bluefin-test-suite` |
 | ArgoCD | GitOps controller | https://192.168.1.102 (argocd NS) | Two Applications: `testing-lab` + `testing-lab-infra` |
