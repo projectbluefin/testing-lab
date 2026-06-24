@@ -81,9 +81,12 @@ spec:
                   value: "aurora-testing"
 
     # ─── watch-variant ────────────────────────────────────────────────────────
-    # Fetches the live GHCR digest (anonymous token, no image pull).
+    # Fetches the live GHCR digest via skopeo (authenticated — works for both
+    # projectbluefin and ublue-os images).
     # Compares against stored digest in ConfigMap containerdisk-source-digests.
     # On mismatch: patches ConfigMap + submits build-containerdisk with force=true.
+    # Uses quay.io/skopeo/stable:latest (has skopeo + curl) and calls k8s API
+    # directly (in-cluster SA token) to avoid needing a separate kubectl image.
 
     - name: watch-variant
       inputs:
@@ -92,7 +95,7 @@ spec:
           - name: image-tag       # e.g. testing
           - name: containerdisk-tag  # ConfigMap key + Zot tag: e.g. testing, lts-testing
       script:
-        image: cgr.dev/chainguard/kubectl:latest-dev
+        image: quay.io/skopeo/stable:latest
         command: [bash]
         resources:
           requests:
@@ -101,44 +104,50 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-token
+                key: token
         source: |
           set -euo pipefail
           IMAGE="{{inputs.parameters.image}}"
           IMAGE_TAG="{{inputs.parameters.image-tag}}"
           CD_TAG="{{inputs.parameters.containerdisk-tag}}"
 
-          # Extract <org>/<repo> from full registry path for GHCR token scope
-          REPO="${IMAGE#ghcr.io/}"
+          # In-cluster k8s API helpers
+          KS="https://kubernetes.default.svc"
+          CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 
-          # Fetch anonymous bearer token scoped to this repo
-          TOKEN=$(curl -sL \
-            "https://ghcr.io/token?scope=repository:${REPO}:pull" \
-            | tr ',' '\n' | grep '"token"' \
-            | sed 's/.*"token":"\([^"]*\)".*/\1/')
-
-          if [[ -z "${TOKEN}" ]]; then
-            echo "ERROR: could not obtain GHCR token for ${REPO}" >&2
-            exit 1
-          fi
-
-          # Fetch the OCI image index digest (single HEAD request, ~100ms)
-          LIVE_DIGEST=$(curl -sI \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Accept: application/vnd.oci.image.index.v1+json" \
-            "https://ghcr.io/v2/${REPO}/manifests/${IMAGE_TAG}" \
-            | grep -i "^docker-content-digest:" \
-            | awk '{print $2}' | tr -d '\r\n')
+          # Fetch the live digest via skopeo (authenticated — handles both public
+          # and org-restricted GHCR images; anonymous token API is unreliable).
+          LIVE_DIGEST=""
+          for i in 1 2 3; do
+            LIVE_DIGEST=$(skopeo inspect \
+              --no-tags \
+              --format '{{.Digest}}' \
+              --creds "_token:${GITHUB_TOKEN}" \
+              "docker://${IMAGE}:${IMAGE_TAG}" 2>/dev/null || true)
+            [[ -n "${LIVE_DIGEST}" ]] && break
+            echo "skopeo attempt ${i}/3 failed for ${IMAGE}:${IMAGE_TAG}; retrying in $(( i * 15 ))s" >&2
+            sleep $(( i * 15 ))
+          done
 
           if [[ -z "${LIVE_DIGEST}" ]]; then
-            echo "ERROR: could not fetch digest for ${IMAGE}:${IMAGE_TAG}" >&2
-            exit 1
+            echo "ERROR: could not fetch digest for ${IMAGE}:${IMAGE_TAG} after 3 attempts" >&2
+            echo "false" > /tmp/changed
+            exit 0
           fi
           echo "Live digest for ${IMAGE}:${IMAGE_TAG}: ${LIVE_DIGEST}"
 
-          # Read stored digest from ConfigMap (key = containerdisk-tag)
-          STORED_DIGEST=$(kubectl get configmap containerdisk-source-digests \
-            -n argo \
-            -o "jsonpath={.data.${CD_TAG}}" 2>/dev/null || true)
+          # Read stored digest from ConfigMap via k8s API
+          STORED_DIGEST=$(curl -sf --cacert "${CACERT}" \
+            -H "Authorization: Bearer ${SA_TOKEN}" \
+            "${KS}/api/v1/namespaces/argo/configmaps/containerdisk-source-digests" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('${CD_TAG}',''))" \
+            2>/dev/null || true)
           echo "Stored digest for ${CD_TAG}: ${STORED_DIGEST:-<none>}"
 
           if [[ "${LIVE_DIGEST}" == "${STORED_DIGEST}" ]]; then
@@ -148,34 +157,45 @@ spec:
 
           echo "Digest changed — updating ConfigMap and triggering rebuild"
 
-          # Upsert ConfigMap entry (create if absent, patch key if present)
-          kubectl patch configmap containerdisk-source-digests \
-            -n argo --type merge \
-            -p "{\"data\":{\"${CD_TAG}\":\"${LIVE_DIGEST}\"}}" 2>/dev/null \
-          || kubectl create configmap containerdisk-source-digests \
-               -n argo \
-               --from-literal="${CD_TAG}=${LIVE_DIGEST}"
+          # Upsert ConfigMap key via k8s API (patch; create if 404)
+          HTTP=$(curl -sf -w "%{http_code}" -o /dev/null --cacert "${CACERT}" \
+            -H "Authorization: Bearer ${SA_TOKEN}" \
+            -H "Content-Type: application/merge-patch+json" \
+            -X PATCH \
+            "${KS}/api/v1/namespaces/argo/configmaps/containerdisk-source-digests" \
+            -d "{\"data\":{\"${CD_TAG}\":\"${LIVE_DIGEST}\"}}" 2>/dev/null || echo "000")
+          if [[ "${HTTP}" == "404" || "${HTTP}" == "000" ]]; then
+            curl -sf --cacert "${CACERT}" \
+              -H "Authorization: Bearer ${SA_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -X POST \
+              "${KS}/api/v1/namespaces/argo/configmaps" \
+              -d "{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\",\"metadata\":{\"name\":\"containerdisk-source-digests\",\"namespace\":\"argo\"},\"data\":{\"${CD_TAG}\":\"${LIVE_DIGEST}\"}}" \
+              > /dev/null
+            echo "Created ConfigMap with ${CD_TAG}=${LIVE_DIGEST}" >&2
+          else
+            echo "Patched ConfigMap ${CD_TAG}=${LIVE_DIGEST} (http=${HTTP})" >&2
+          fi
 
-          # Submit build-containerdisk with force=true (skip Zot existence check)
-          cat > /tmp/build.yaml << EOF
-          apiVersion: argoproj.io/v1alpha1
-          kind: Workflow
-          metadata:
-            generateName: build-cd-sync-${CD_TAG}-
-            namespace: argo
-          spec:
-            workflowTemplateRef:
-              name: build-containerdisk
-            arguments:
-              parameters:
-              - name: image
-                value: "${IMAGE}"
-              - name: image-tag
-                value: "${IMAGE_TAG}"
-              - name: containerdisk-tag
-                value: "${CD_TAG}"
-              - name: force
-                value: "true"
-          EOF
-          kubectl create -f /tmp/build.yaml
+          # Submit build-containerdisk workflow via Argo API
+          curl -sf --cacert "${CACERT}" \
+            -H "Authorization: Bearer ${SA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "${KS}/apis/argoproj.io/v1alpha1/namespaces/argo/workflows" \
+            -d "{
+              \"apiVersion\": \"argoproj.io/v1alpha1\",
+              \"kind\": \"Workflow\",
+              \"metadata\": {\"generateName\": \"build-cd-sync-${CD_TAG}-\", \"namespace\": \"argo\"},
+              \"spec\": {
+                \"workflowTemplateRef\": {\"name\": \"build-containerdisk\"},
+                \"arguments\": {\"parameters\": [
+                  {\"name\": \"image\", \"value\": \"${IMAGE}\"},
+                  {\"name\": \"image-tag\", \"value\": \"${IMAGE_TAG}\"},
+                  {\"name\": \"containerdisk-tag\", \"value\": \"${CD_TAG}\"},
+                  {\"name\": \"force\", \"value\": \"true\"}
+                ]}
+              }
+            }" > /dev/null
           echo "Build workflow submitted for ${IMAGE}:${IMAGE_TAG} → containerdisk:${CD_TAG}"
+
