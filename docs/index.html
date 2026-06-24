@@ -1049,6 +1049,10 @@ function buildFailures(allData, stats) {
     const criticalBadge = isSystem
       ? `<span class="badge-critical" title="System suite validates bootc integrity, composefs, fs-verity, and uupd — platform contracts">PLATFORM CONTRACT</span>`
       : '';
+    const runPipelineLink = WORKFLOW_TEMPLATES[f.image.slug]
+      ? `<a href="${ARGO_UI}/workflow-templates/argo/${WORKFLOW_TEMPLATES[f.image.slug]}" target="_blank" rel="noopener"
+             style="font-size:11px;color:var(--link);margin-left:auto" title="Submit a new pipeline run for this image">▶ Re-run pipeline</a>`
+      : '';
 
     return `<div class="failure-card"${isSystem?' style="border-color:#8b2020;border-left-color:#ff6b6b"':''}>
       <div class="failure-title">
@@ -1056,6 +1060,7 @@ function buildFailures(allData, stats) {
         <span class="failure-suite">${f.suite}</span>
         ${criticalBadge}
         <span class="failure-count">${d.failed} of ${d.scenarios} scenarios failing</span>
+        ${runPipelineLink}
       </div>
       <div class="failure-meta">
         ${spark}
@@ -1140,8 +1145,15 @@ function buildStatusTable(images, allData) {
       : '';
 
     const rowStatus = hasFailure ? 'fail' : neverRun ? 'untested' : 'ok';
+    // "Run pipeline" link for images with failures or no data
+    const tmpl = WORKFLOW_TEMPLATES[img.slug];
+    const runLink = (hasFailure || neverRun) && tmpl
+      ? `<a href="${ARGO_UI}/workflow-templates/argo/${tmpl}" target="_blank" rel="noopener"
+            style="font-size:10px;color:var(--link);margin-left:6px;opacity:.8"
+            title="Submit a new workflow run for ${img.label}">▶ run</a>`
+      : '';
     return `<tr data-status="${rowStatus}"${neverRun?' style="opacity:0.65"':''}>
-      <td style="font-weight:600;white-space:nowrap">${imgLabel}${neverBadge}${overdueHtml}</td>
+      <td style="font-weight:600;white-space:nowrap">${imgLabel}${neverBadge}${overdueHtml}${runLink}</td>
       ${cols}
       <td style="white-space:nowrap">${greenHtml}</td>
       <td style="color:var(--muted);white-space:nowrap">${fmtAgo(lastRun)}</td>
