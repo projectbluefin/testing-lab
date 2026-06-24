@@ -34,8 +34,6 @@ spec:
             value: ""
       activeDeadlineSeconds: 1800
       podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
         securityContext:
           runAsUser: 0
       # NOTE: No output artifacts declared — artifact repository is not configured.

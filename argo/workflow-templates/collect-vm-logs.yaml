@@ -2,11 +2,7 @@
 #
 # Reusable log-collection step for KubeVirt test VMs on ghost.
 #
-# Lessons learned the hard way (2026-06-19):
-#   - pods MUST run on ghost (nodeSelector) — masquerade NAT iptables rules live
-#     in the virt-launcher pod netns, not the host netns
-#   - pods MUST use hostNetwork:true (podSpecPatch) — the VM IP is only reachable
-#     via the host network stack; pod-network pods on exo-1 get "No route to host"
+# Notes:
 #   - journalctl requires sudo — bluefin-test is not in systemd-journal group
 #
 # Usage: reference from a workflow DAG or steps block:
@@ -53,13 +49,8 @@ spec:
         value: bluefin-test-ssh-key
       - name: ssh-user
         value: bluefin-test
-    # REQUIRED: must run on ghost — VM masquerade NAT is not reachable cross-node.
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    # REQUIRED: host network — pod-network pods cannot reach virt-launcher pod IPs.
     podSpecPatch: |
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirst
     volumes:
     - name: ssh-key
       secret:

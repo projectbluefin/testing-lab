@@ -332,13 +332,6 @@ spec:
       - name: aggregate-path
         value: /tmp/migration-evidence.json
     name: inspect-image-compression
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash
@@ -417,13 +410,6 @@ spec:
       - name: aggregate-path
         value: /tmp/migration-evidence.json
     name: prepare-storage-backend
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash
@@ -513,13 +499,6 @@ spec:
       - name: aggregate-path
         value: /tmp/migration-evidence.json
     name: run-bootc-switch
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash
@@ -604,13 +583,6 @@ spec:
       - name: ssh-key-secret
         value: bluefin-test-ssh-key
     name: reboot-and-wait
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash
@@ -665,13 +637,6 @@ spec:
       - name: aggregate-path
         value: /tmp/migration-evidence.json
     name: collect-evidence
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash
@@ -802,13 +767,6 @@ spec:
       - name: output-root
         value: /tmp/migration-results
     name: verify-state
-    nodeSelector:
-      kubernetes.io/hostname: ghost
-    podSpecPatch: 'hostNetwork: true
-
-      dnsPolicy: ClusterFirstWithHostNet
-
-      '
     script:
       command:
       - bash

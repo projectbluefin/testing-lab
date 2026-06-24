@@ -187,11 +187,6 @@ spec:
           - name: vm-name
           - name: namespace
           - name: ssh-pubkey
-      nodeSelector:
-        kubernetes.io/hostname: ghost
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
       script:
         image: registry.k8s.io/kubectl:v1.32.0
         command: [bash]

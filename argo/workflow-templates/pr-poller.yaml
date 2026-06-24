@@ -15,8 +15,6 @@ spec:
         labels:
           app.kubernetes.io/part-of: bluefin-test-suite
           bluefin.io/step: pr-poller
-      nodeSelector:
-        kubernetes.io/hostname: ghost
       script:
         image: quay.io/fedora/fedora:latest
         command: [bash]

@@ -50,12 +50,7 @@ spec:
             value: ""
       # 60-minute ceiling: SSH wait (10min) + dnf install (10min) + test run (30min)
       activeDeadlineSeconds: 3600
-      # hostNetwork: KubeVirt masquerade only routes from the host network namespace
       podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-        nodeSelector:
-          kubernetes.io/hostname: ghost
         securityContext:
           runAsUser: 0
         tolerations: []

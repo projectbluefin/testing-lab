@@ -82,12 +82,6 @@ spec:
                 labels:
                   kubevirt.io/vm: "{{inputs.parameters.vm-name}}"
               spec:
-                # Pin VMs to bazzite (dedicated test worker).
-                # When VMs land on ghost (control-plane), KubeVirt masquerade NAT
-                # is unreachable from workflow pods that also run on ghost — SSH
-                # port becomes inaccessible. Bazzite → ghost flannel path works.
-                nodeSelector:
-                  kubernetes.io/hostname: bazzite
                 # Inject SSH public key at runtime via QEMU guest agent.
                 # This is reliable regardless of disk content — KubeVirt connects
                 # to the running guest agent and writes ~/.ssh/authorized_keys.
@@ -134,11 +128,6 @@ spec:
           - name: vm-name
           - name: namespace
       outputs: {}
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-        nodeSelector:
-          kubernetes.io/hostname: ghost
       script:
         image: cgr.dev/chainguard/kubectl:latest-dev
         command:

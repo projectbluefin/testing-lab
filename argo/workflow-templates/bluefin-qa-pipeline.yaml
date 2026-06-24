@@ -233,11 +233,6 @@ spec:
     # {{workflow.name}}-<suite> across all possible suites — idempotent because
     # kubectl delete --ignore-not-found is a no-op for already-deleted VMs.
     - name: cleanup-orphan-vms
-      podSpecPatch: |
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-        nodeSelector:
-          kubernetes.io/hostname: ghost
       script:
         image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
