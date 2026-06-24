@@ -82,6 +82,10 @@ spec:
                 labels:
                   kubevirt.io/vm: "{{inputs.parameters.vm-name}}"
               spec:
+                # Pin to ghost — only ghost has 192.168.1.102:30500 configured as
+                # an insecure (HTTP) registry in containerd; hamilton does not.
+                nodeSelector:
+                  kubernetes.io/hostname: ghost
                 # Inject SSH public key at runtime via QEMU guest agent.
                 # This is reliable regardless of disk content — KubeVirt connects
                 # to the running guest agent and writes ~/.ssh/authorized_keys.
