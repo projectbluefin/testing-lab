@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mask-sleep-targets
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: mask-sleep-targets
+    app.kubernetes.io/component: node-tuning
+    app.kubernetes.io/part-of: bluefin-test-suite
+  annotations:
+    bluefin.io/description: |
+      Masks systemd sleep/suspend targets on every node so worker machines
+      (hamilton, bazzite, exo-1) don't suspend mid-test and drop out of the
+      cluster. Survives reboots; re-runs after OS updates via pod recreation.
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mask-sleep-targets
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mask-sleep-targets
+        app.kubernetes.io/component: node-tuning
+        app.kubernetes.io/part-of: bluefin-test-suite
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      hostPID: true
+      initContainers:
+        - name: mask-sleep
+          image: quay.io/fedora/fedora:latest
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              nsenter -t 1 -m -- systemctl mask --now \
+                sleep.target suspend.target hibernate.target hybrid-sleep.target \
+                && echo "sleep targets masked on $(uname -n)"
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: 1m
+              memory: 4Mi
+            limits:
+              cpu: 10m
+              memory: 8Mi
