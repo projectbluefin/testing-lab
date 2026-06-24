@@ -39,6 +39,11 @@ spec:
       dag:
         tasks:
           # Skipped when force=true (digest-watch already confirmed a rebuild is needed).
+          # NOTE: use force=false for manual ad-hoc builds — the force=true path relies on
+          # check.Skipped in the depends expression which does not fire correctly after a
+          # workflow-controller restart (controller loses DAG reconciliation state for
+          # Skipped nodes). force=false lets check run, output "missing", and proceed
+          # normally via check.Succeeded.
           - name: check
             template: check
             when: "'{{inputs.parameters.force}}' != 'true'"
