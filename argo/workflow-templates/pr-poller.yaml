@@ -47,13 +47,24 @@ spec:
 
           dispatch_pr() {
            local PR="$1"
-           local REPO SHA PR_NUM BRANCH EXISTING TMPL
+           local REPO SHA PR_NUM BRANCH EXISTING TMPL TITLE TITLE_SLUG VM_MEM
 
            REPO=$(echo "$PR" | jq -r '.base.repo.full_name')
            SHA=$(echo "$PR"  | jq -r '.head.sha')
            PR_NUM=$(echo "$PR" | jq -r '.number')
            BRANCH=$(echo "$PR" | jq -r '.head.ref')
            REPO_SLUG=$(echo "$REPO" | sed 's|.*/||; s/bluefin-lts/lts/; s/bluefin/blu/; s/dakota/dak/; s/knuckle/knu/')
+           TITLE=$(echo "$PR" | jq -r '.title')
+           # Slugify title: lowercase, non-alnum to dash, truncate to 30 chars
+           TITLE_SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' \
+             | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' \
+             | cut -c1-30 | sed 's/-$//')
+           # Deps PRs (renovate/chore(deps)/fix(deps)) use 4Gi VMs — fit more concurrently
+           if echo "$TITLE" | grep -qiE '^(chore|fix)(\(deps\)|: deps)|^renovate'; then
+             VM_MEM="4Gi"
+           else
+             VM_MEM="8Gi"
+           fi
 
            # Idempotency: skip if ghost-lab status already posted for this SHA
            EXISTING=$(curl -sf \
@@ -86,7 +97,6 @@ spec:
              */knuckle)      TMPL="knuckle-qa-pipeline"
                              EXTRA_PARAMS="" ;;
              */bluefin-lts)  TMPL="bluefin-qa-pipeline"
-                             # LTS: correct image, 4Gi VM, smoke only
                              EXTRA_PARAMS="
                - name: image
                  value: ghcr.io/projectbluefin/bluefin-lts
@@ -99,7 +109,7 @@ spec:
                - name: suites
                  value: smoke
                - name: vm-memory
-                 value: 8Gi" ;;
+                 value: ${VM_MEM}" ;;
              *)              TMPL="bluefin-qa-pipeline"
                              # bluefin/common: smoke only to limit VM count
                              EXTRA_PARAMS="
@@ -108,14 +118,16 @@ spec:
                - name: containerdisk-tag
                  value: testing
                - name: suites
-                 value: smoke" ;;
+                 value: smoke
+               - name: vm-memory
+                 value: ${VM_MEM}" ;;
            esac
 
            kubectl create -f - <<EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
           metadata:
-           generateName: "${REPO_SLUG}-${PR_NUM}-"
+           generateName: "${REPO_SLUG}-${PR_NUM}-${TITLE_SLUG}-"
            namespace: argo
            labels:
              bluefin.io/trigger: pr-auto
