@@ -61,11 +61,10 @@ data:
         secondsAfterCompletion: 604800
         secondsAfterSuccess: 604800
         secondsAfterFailure: 2592000
-      # OnPodCompletion cleans each pod as it finishes rather than waiting for
-      # the whole workflow. Flattens scheduler load during long multi-lane
-      # pipelines.
+      # OnWorkflowCompletion keeps all pods until the workflow finishes,
+      # preserving logs for debugging failed steps.
       podGC:
-        strategy: OnPodCompletion
+        strategy: OnWorkflowCompletion
 
   # ── argoexec sidecar resource cap ─────────────────────────────────────────
   # argoexec runs in every workflow pod. Without limits it inherits node
