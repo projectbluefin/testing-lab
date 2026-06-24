@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aurora-test
+  labels:
+    kubernetes.io/metadata.name: aurora-test
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bluefin-test-ssh-pubkey
+  namespace: aurora-test
+type: Opaque
+data:
+  # SSH public key for root login via KubeVirt accessCredentials qemuGuestAgent.
+  # Injected at VM boot time — no disk modifications needed.
+  key: c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUtrQ3lBeDdaMUtrK25VeDdLOWdLTG1ZWUxuczNqWVFKN1JNRUp4LytQRWcgYmx1ZWZpbi10ZXN0LXN1aXRlQGdob3N0Cg==

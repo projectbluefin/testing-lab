@@ -58,6 +58,28 @@ spec:
                 - name: containerdisk-tag
                   value: "dakota-latest"
 
+          - name: watch-bazzite-testing
+            template: watch-variant
+            arguments:
+              parameters:
+                - name: image
+                  value: "ghcr.io/ublue-os/bazzite"
+                - name: image-tag
+                  value: "testing"
+                - name: containerdisk-tag
+                  value: "bazzite-testing"
+
+          - name: watch-aurora-testing
+            template: watch-variant
+            arguments:
+              parameters:
+                - name: image
+                  value: "ghcr.io/ublue-os/aurora"
+                - name: image-tag
+                  value: "testing"
+                - name: containerdisk-tag
+                  value: "aurora-testing"
+
     # ─── watch-variant ────────────────────────────────────────────────────────
     # Fetches the live GHCR digest (anonymous token, no image pull).
     # Compares against stored digest in ConfigMap containerdisk-source-digests.

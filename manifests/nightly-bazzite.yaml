@@ -1,0 +1,48 @@
+# CronWorkflow: runs bazzite system suite nightly at 04:00 UTC against bazzite:testing.
+# System suite only — bazzite uses KDE, not GNOME; smoke/developer suites are GNOME-specific.
+# All three images (bluefin, bazzite, aurora) share the same bootc system contract.
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: nightly-bazzite
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  schedules:
+    - "0 4 * * *"
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  workflowMetadata:
+    labels:
+      app.kubernetes.io/part-of: bluefin-test-suite
+      bluefin.io/trigger: nightly
+      bluefin.io/suite: system
+  workflowSpec:
+    serviceAccountName: argo
+    podGC:
+      strategy: OnWorkflowCompletion
+    ttlStrategy:
+      secondsAfterSuccess: 86400   # 24h
+      secondsAfterFailure: 604800  # 7d
+    workflowTemplateRef:
+      name: bluefin-qa-pipeline
+    arguments:
+      parameters:
+        - name: image
+          value: "ghcr.io/ublue-os/bazzite"
+        - name: image-tag
+          value: "testing"
+        - name: containerdisk-tag
+          value: "bazzite-testing"
+        - name: namespace
+          value: "bazzite-test"
+        - name: suites
+          value: "system"
+        - name: variant
+          value: "bazzite"
+        - name: ssh-key-secret
+          value: "bluefin-test-ssh-key"
+        - name: vm-memory
+          value: "8Gi"
