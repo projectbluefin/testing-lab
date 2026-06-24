@@ -53,6 +53,7 @@ spec:
            SHA=$(echo "$PR"  | jq -r '.head.sha')
            PR_NUM=$(echo "$PR" | jq -r '.number')
            BRANCH=$(echo "$PR" | jq -r '.head.ref')
+           REPO_SLUG=$(echo "$REPO" | sed 's|.*/||; s/bluefin-lts/lts/; s/bluefin/blu/; s/dakota/dak/; s/knuckle/knu/')
 
            # Idempotency: skip if ghost-lab status already posted for this SHA
            EXISTING=$(curl -sf \
@@ -114,7 +115,7 @@ spec:
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
           metadata:
-           generateName: "pr-test-${PR_NUM}-"
+           generateName: "${REPO_SLUG}-${PR_NUM}-"
            namespace: argo
            labels:
              bluefin.io/trigger: pr-auto
