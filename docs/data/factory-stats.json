@@ -1,7 +1,7 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-24T06:18:34Z",
+    "generated": "2026-06-24T06:51:23Z",
     "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
@@ -352,7 +352,25 @@
     "vm_type": "KubeVirt ephemeral ContainerDisk",
     "test_user": "bluefin-test (uid 1001)",
     "display_server": "Wayland (GNOME Shell 50)",
-    "scenarios_failed": 16
+    "scenarios_failed": 16,
+    "images_with_results": 1,
+    "coverage_by_suite": {
+      "smoke": {
+        "images": 1,
+        "scenarios": 29,
+        "failed": 0
+      },
+      "system": {
+        "images": 1,
+        "scenarios": 14,
+        "failed": 6
+      },
+      "developer": {
+        "images": 1,
+        "scenarios": 31,
+        "failed": 10
+      }
+    }
   },
   "supply_chain": {
     "slsa_level": 2,
@@ -447,8 +465,8 @@
     ],
     "agents_active": 1,
     "agents_total": 3,
-    "open_issues": 64,
-    "open_prs": 4,
+    "open_issues": 48,
+    "open_prs": 17,
     "merged_7d": 12,
     "tasks_completed_7d": 18,
     "advisory_count": 2,
@@ -475,7 +493,8 @@
       "forks": 1,
       "open_issues": 48,
       "open_prs": 17,
-      "watchers": 0
+      "watchers": 0,
+      "prs_merged_7d": 15
     },
     "common": {
       "stars": 27,
