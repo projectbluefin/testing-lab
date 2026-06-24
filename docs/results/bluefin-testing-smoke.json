@@ -1,18 +1,1 @@
-{
-  "variant": "bluefin-testing",
-  "suite": "smoke",
-  "last_run": "2026-06-24T03:56:23.176681Z",
-  "workflow_name": "bluefin-qa-fresh-8lnfn",
-  "status": "passed",
-  "scenarios": 29,
-  "failed": 0,
-  "screenshot_url": "https://projectbluefin.github.io/testing-lab/screenshots/bluefin-testing-smoke-latest.png",
-  "history": [
-    {
-      "run": "2026-06-24T03:56:23.176681Z",
-      "status": "passed",
-      "scenarios": 29,
-      "failed": 0
-    }
-  ]
-}
+{"variant":"bluefin-testing","suite":"smoke","last_run":"2026-06-24T17:04:41Z","workflow_name":"testsuite-550-fix-smoke-use-ssh-aware-steps-9tvfp","status":"failed","scenarios":137,"failed":39,"failed_scenarios":["AT-SPI registry daemon is running","AppIndicator support extension is enabled","Bazaar Integration extension is enabled","Blur My Shell extension is enabled","Caffeine extension is enabled","Calculator Flatpak has no host filesystem access","Clicking System menu opens Quick Settings","Clicking clock opens calendar popup","Custom Command List extension is enabled","Dash to Dock extension is enabled","Dash to Dock is visible in the shell","Do-Not-Disturb can be toggled via Quick Settings","Escape closes Quick Settings","Escape closes calendar popup","Extension Manager launches successfully","Firefox Flatpak has no host filesystem access","GSConnect extension is enabled","Gradia Integration extension is enabled","Impression launches successfully","Loupe Flatpak has no host filesystem access","Mission Center launches successfully","Night Light can be enabled and disabled","No accessibility-related journal errors after session start","No software rendering fallback (LLVMpipe)","Notification history is accessible from Quick Settings","Search Light extension is enabled","Session is running under Wayland","Switching workspace changes the active workspace index","System tray indicators are available","Warehouse launches successfully","Writable system storage has more than 15 percent free space","io.missioncenter.MissionCenter is installed system-wide","org.gnome.Calculator is installed system-wide","org.gnome.Calendar is installed system-wide","org.gnome.Loupe is installed system-wide","org.gnome.Papers is installed system-wide","org.gnome.TextEditor is installed system-wide","org.gnome.clocks is installed system-wide","org.mozilla.firefox is installed system-wide"],"screenshot_url":"https://projectbluefin.github.io/testing-lab/screenshots/bluefin-testing-smoke-latest.png","history":[{"run_date":"2026-06-24T17:04:41Z","workflow_name":"testsuite-550-fix-smoke-use-ssh-aware-steps-9tvfp","status":"failed","scenarios":137,"failed":39},{"run":"2026-06-24T03:56:23.176681Z","status":"passed","scenarios":29,"failed":0}]}
