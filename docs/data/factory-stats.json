@@ -1,7 +1,7 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-24T22:36:15Z",
+    "generated": "2026-06-24T23:10:19Z",
     "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
@@ -470,7 +470,7 @@
     ],
     "agents_active": 1,
     "agents_total": 3,
-    "open_issues": 48,
+    "open_issues": 49,
     "open_prs": 17,
     "merged_7d": 12,
     "tasks_completed_7d": 18,
@@ -496,7 +496,7 @@
     "testing_lab": {
       "stars": 0,
       "forks": 1,
-      "open_issues": 48,
+      "open_issues": 49,
       "open_prs": 17,
       "watchers": 0,
       "prs_merged_7d": 30
