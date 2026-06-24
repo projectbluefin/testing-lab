@@ -283,6 +283,10 @@ spec:
             echo "Copying tests/${SUITE}/ to VM..." >&2
             ${SSH} "mkdir -p /tmp/bluefin-tests /tmp/results"
             ${SCP} /workspace/bluefin-test-suite/tests/${SUITE} ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/
+            # Copy tests/shared/ so environment.py can resolve 'tests.shared.*' imports.
+            ${SSH} "mkdir -p /tmp/bluefin-tests/tests"
+            ${SCP} /workspace/bluefin-test-suite/tests/shared ${VM_USER}@${VM_IP}:/tmp/bluefin-tests/tests/
+            ${SSH} "touch /tmp/bluefin-tests/__init__.py /tmp/bluefin-tests/tests/__init__.py" || true
 
             if [[ "${SUITE}" != "system" ]]; then
               WAIT_FOR_SHELL=/workspace/bluefin-test-suite/tests/shared/wait_for_shell.py
