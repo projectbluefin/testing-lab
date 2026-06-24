@@ -15,8 +15,8 @@ The Hetzner CAS (`cache.projectbluefin.io:11002`) is untouched.
 push dakota:testing
     │
     ▼
-GHA cluster-build.yml (ghost-runners ARC)
-    │  argo submit dakota-build-pipeline
+dakota-commit-poller CronWorkflow (every 5 min)
+    │  polls GitHub API; SHA changed → submits dakota-build-pipeline
     ▼
 Argo WorkflowTemplate: dakota-build-pipeline
     ├── step: build-bluefin        (bst2 pod, any ready node)
@@ -27,8 +27,7 @@ Argo WorkflowTemplate: dakota-build-pipeline
               buildbox-casd  (Deployment, local-registry ns)
               PVC: 200Gi local-path on ghost NVMe
                            │
-              on success: skopeo copy → Zot :30500  (local)
-              on outage:  skopeo copy → GHCR        (failover)
+              on success: podman push → Zot :30500  (local)
 ```
 
 Both build pods share the same in-cluster casd Service. Cache hits from `build-bluefin`
@@ -52,6 +51,8 @@ exo-1 is NotReady — excluded.
 | `manifests/buildbox-casd.yaml` | casd Deployment + ClusterIP Service + PVC (200Gi) |
 | `manifests/bst-build-priorityclass.yaml` | PriorityClass `bst-build` value=500000, PreemptionPolicy=Never |
 | `argo/workflow-templates/dakota-build-pipeline.yaml` | WorkflowTemplate: parallel BST build steps |
+| `argo/workflow-templates/dakota-commit-poller.yaml` | WorkflowTemplate: poll GitHub API for new commits |
+| `manifests/dakota-commit-poller.yaml` | CronWorkflow: every 5 min trigger for commit-poller |
 
 ### Modified files in `testing-lab`
 
@@ -103,8 +104,7 @@ Nightlies and PR poller still get their VMs. BST build always has guaranteed roo
 4. Argo DAG starts two parallel steps: `build-bluefin` and `build-bluefin-nvidia`
 5. Each pod: `git clone dakota:testing` → `bst --config buildstream-cluster.conf build oci/<variant>.bst`
 6. BST pushes each built element to in-cluster casd over gRPC (cluster-local, sub-ms latency)
-7. On completion: `bst artifact checkout` → `skopeo copy` to Zot :30500
-8. Optional GHCR push when `cache.projectbluefin.io` is unreachable (checked via probe step)
+7. On completion: `bst artifact checkout` → `podman push` to Zot :30500
 
 ## Security
 
