@@ -99,6 +99,10 @@ spec:
                     cores: 4
                   memory:
                     guest: "{{inputs.parameters.vm-memory}}"
+                  features:
+                    acpi: {}
+                    smm:
+                      enabled: true
                   firmware:
                     bootloader:
                       efi:
