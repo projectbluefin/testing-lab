@@ -1,7 +1,7 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-25T01:04:42Z",
+    "generated": "2026-06-25T01:21:38Z",
     "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
@@ -352,13 +352,13 @@
     "vm_type": "KubeVirt ephemeral ContainerDisk",
     "test_user": "bluefin-test (uid 1001)",
     "display_server": "Wayland (GNOME Shell 50)",
-    "scenarios_failed": 92,
+    "scenarios_failed": 93,
     "images_with_results": 1,
     "coverage_by_suite": {
       "smoke": {
         "images": 1,
         "scenarios": 137,
-        "failed": 17
+        "failed": 18
       },
       "system": {
         "images": 1,
