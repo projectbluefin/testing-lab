@@ -12,15 +12,13 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app: argo-server
-                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: argo-server
       containers:
         - name: argo-server
           args:
