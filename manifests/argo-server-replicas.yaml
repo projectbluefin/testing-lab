@@ -1,0 +1,9 @@
+# Keep argo-server at 2 replicas so it survives a single-node hiccup.
+# ServerSideApply patches only replicas — Helm-owned fields stay intact.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-server
+  namespace: argo
+spec:
+  replicas: 2

@@ -15,6 +15,7 @@ metadata:
   name: workflow-controller
   namespace: argo
 spec:
+  replicas: 2
   template:
     spec:
       containers:
