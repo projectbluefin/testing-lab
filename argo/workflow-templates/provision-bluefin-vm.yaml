@@ -111,6 +111,9 @@ spec:
                     interfaces:
                       - name: default
                         masquerade: {}
+                  resources:
+                    requests:
+                      ephemeral-storage: "30Gi"
                 networks:
                   - name: default
                     pod: {}

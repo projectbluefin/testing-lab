@@ -156,6 +156,9 @@ spec:
                   interfaces:
                     - name: default
                       masquerade: {}
+                resources:
+                  requests:
+                    ephemeral-storage: "10Gi"
                 machine:
                   type: q35
               networks:
