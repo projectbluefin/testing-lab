@@ -233,7 +233,7 @@ spec:
         # Authenticate with GHCR to avoid rate limits and to support private images.
         echo "${GITHUB_TOKEN}" | podman login ghcr.io -u _ --password-stdin
         # Pull image — lands in /var/lib/containers/storage (ghost SSD).
-        podman pull --tls-verify=true "${IMAGE}"
+        podman --storage-driver=vfs pull --tls-verify=true "${IMAGE}"
 
         echo "[OUTER] SSH_AUTHORIZED_KEYS prefix: ${SSH_AUTHORIZED_KEYS:0:30}..."
 
@@ -245,7 +245,7 @@ spec:
         PODMAN_EXIT=0
         # --security-opt label=type:unconfined_t is the canonical bootc install flag.
         # Per bootc-dev/bootc docs/src/bootc-install.md via-loopback section.
-        podman run --rm --privileged --pid=host --ipc=host \
+        podman --storage-driver=vfs run --rm --privileged --pid=host --ipc=host \
           --security-opt label=type:unconfined_t \
           -v /dev:/dev \
           -v /run/udev:/run/udev \
