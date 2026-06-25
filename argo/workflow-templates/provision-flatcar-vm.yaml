@@ -93,6 +93,7 @@ spec:
         # ponytail: :latest tag is fine — no nightly CronWorkflow, runs are sequential
 
         echo "Installing qemu-img and bzip2..." >&2
+        dnf install -y -q qemu-img bzip2 2>&1 | tail -3
 
         echo "Downloading Flatcar ${CHANNEL} ${VERSION}..." >&2
         curl -L --fail --retry 3 -o /mnt/work/flatcar.img.bz2 "${URL}"
