@@ -105,6 +105,8 @@ a Helm-managed ConfigMap without owning the whole object.
 **Consequence:** `generateName:` is forbidden in `manifests/` — ArgoCD needs stable
 names to track resources. Always use a fixed `name:`.
 
+**Dynamic ConfigMap Key Avoidance:** When a ConfigMap tracks dynamic, runtime-managed state (such as image digests or the last-seen kernel version), do **not** declare placeholder keys (e.g., `kernel-stable: ""`) in the Git manifest's `data:` block. Under Server-Side Apply, defining a field in Git forces ArgoCD to continuously reconcile and overwrite that specific field, resetting it to the placeholder and triggering infinite polling or build loops. To prevent this, omit the dynamic keys entirely from the Git manifest. Server-Side Apply will bootstrap the empty ConfigMap object and leave dynamically added keys untouched at runtime.
+
 ### 6. Sync status and forced sync
 
 ```bash
