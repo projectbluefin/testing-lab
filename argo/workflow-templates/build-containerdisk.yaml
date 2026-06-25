@@ -259,7 +259,7 @@ spec:
         path: /var/mnt/ghost-data/bluefin-cd-build
         type: DirectoryOrCreate
     script:
-      image: quay.io/buildah/stable:latest
+      image: quay.io/fedora/fedora:latest
       command: [sh]
       securityContext:
         privileged: true
@@ -276,6 +276,8 @@ spec:
         mountPath: /mnt/staging
       source: |
         set -euo pipefail
+
+        dnf install -y qemu-img buildah
 
         # Flush all page-cache dirty pages to disk before reading the raw disk.
         # The install-to-disk pod's btrfs writes land in the kernel page cache for
