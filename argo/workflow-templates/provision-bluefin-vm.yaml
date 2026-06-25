@@ -99,6 +99,10 @@ spec:
                     cores: 4
                   memory:
                     guest: "{{inputs.parameters.vm-memory}}"
+                  firmware:
+                    bootloader:
+                      efi:
+                        secureBoot: false
                   devices:
                     blockMultiQueue: true
                     rng: {}
