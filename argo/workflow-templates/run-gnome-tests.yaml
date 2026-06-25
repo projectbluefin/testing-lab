@@ -145,14 +145,7 @@ spec:
         LOG=/tmp/results/runner.log
         exec > >(tee -a "$LOG") 2>&1
 
-        # Install SSH client and jq if not present (base fedora image omits them)
-        PKGS=()
-        command -v ssh &>/dev/null  || PKGS+=(openssh-clients rsync)
-        command -v jq  &>/dev/null  || PKGS+=(jq)
-        if [[ ${#PKGS[@]} -gt 0 ]]; then
-          echo "Installing: ${PKGS[*]}"
-          dnf install -y "${PKGS[@]}" >/dev/null
-        fi
+
 
         SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
         SSH="ssh ${SSH_OPTS} ${VM_USER}@${VM_IP}"
