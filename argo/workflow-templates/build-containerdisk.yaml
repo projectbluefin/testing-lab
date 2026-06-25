@@ -288,7 +288,7 @@ spec:
             # Some images (e.g. dakota) don't ship it; install from package manager.
             if [[ ! -f /usr/libexec/bootupd ]]; then
               echo '[INNER] bootupd missing, installing...'
-                echo '[INNER] WARNING: could not install bootupd'
+              yum install -y bootupd 2>&1 | tail -3 || dnf install -y bootupd 2>&1 | tail -3 || echo '[INNER] WARNING: could not install bootupd'
             fi
 
             # --via-loopback: upstream recommended pattern for VM disk creation.
