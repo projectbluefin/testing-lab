@@ -1,1 +1,214 @@
-{"recent_runs":[{"id":"dak-1088-chore-deps-update-common-v2026-p2tg9","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:11:10Z","finished_at":"2026-06-25T08:11:10Z","trigger":"pr-poller"},{"id":"dak-1101-chore-deps-update-distrobox-1-jljwf","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:11:08Z","finished_at":"2026-06-25T08:11:08Z","trigger":"pr-poller"},{"id":"dak-1058-chore-deps-update-sudo-rs-5p49w","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:06:01Z","finished_at":"2026-06-25T08:06:01Z","trigger":"pr-poller"},{"id":"dak-1088-chore-deps-update-common-v2026-5t59p","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:05:58Z","finished_at":"2026-06-25T08:05:58Z","trigger":"pr-poller"},{"id":"dak-1101-chore-deps-update-distrobox-1-tgxhq","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:05:54Z","finished_at":"2026-06-25T08:05:54Z","trigger":"pr-poller"},{"id":"dak-1058-chore-deps-update-sudo-rs-85c6s","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:01:02Z","finished_at":"2026-06-25T08:01:02Z","trigger":"pr-poller"},{"id":"dak-1088-chore-deps-update-common-v2026-dpxzp","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:00:53Z","finished_at":"2026-06-25T08:00:53Z","trigger":"pr-poller"},{"id":"dak-1101-chore-deps-update-distrobox-1-hr47j","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T08:00:50Z","finished_at":"2026-06-25T08:00:50Z","trigger":"pr-poller"},{"id":"dak-1058-chore-deps-update-sudo-rs-bk85p","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:55:58Z","finished_at":"2026-06-25T07:55:58Z","trigger":"pr-poller"},{"id":"dak-1088-chore-deps-update-common-v2026-m6zlp","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:55:54Z","finished_at":"2026-06-25T07:55:54Z","trigger":"pr-poller"},{"id":"dak-1101-chore-deps-update-distrobox-1-wxhdq","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:55:50Z","finished_at":"2026-06-25T07:55:50Z","trigger":"pr-poller"},{"id":"dak-1058-chore-deps-update-sudo-rs-dhmhj","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:50:58Z","finished_at":"2026-06-25T07:50:58Z","trigger":"pr-poller"},{"id":"dak-1088-chore-deps-update-common-v2026-7d9zv","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:50:55Z","finished_at":"2026-06-25T07:50:55Z","trigger":"pr-poller"},{"id":"dak-1101-chore-deps-update-distrobox-1-c4c8l","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:50:51Z","finished_at":"2026-06-25T07:50:51Z","trigger":"pr-poller"},{"id":"dak-1058-chore-deps-update-sudo-rs-swwng","overall":"fail","label":"dakota:latest","variant":"dakota","started_at":"2026-06-25T07:46:32Z","finished_at":"2026-06-25T07:46:32Z","trigger":"pr-poller"}],"_meta":{"generated":"2026-06-25T08:11:10Z"},"open_bugs":[{"number":237,"title":"Ptyxis new-tab key combo fails when uinput setup is silently broken","url":"https://github.com/projectbluefin/testing-lab/issues/237","created_at":"2026-06-23T22:21:07Z","affects":[],"area":"unknown"},{"number":236,"title":"fix: zot-writable loses manifest index on pod restart","url":"https://github.com/projectbluefin/testing-lab/issues/236","created_at":"2026-06-23T02:45:42Z","affects":[],"area":"unknown"},{"number":235,"title":"fix: configure-disk SSH injection writes to wrong btrfs inode (var subvolume)","url":"https://github.com/projectbluefin/testing-lab/issues/235","created_at":"2026-06-23T02:45:27Z","affects":[],"area":"unknown"},{"number":225,"title":"feat: add toggle-testing-rebase and migration-upgrade-test WorkflowTemplates to GitOps","url":"https://github.com/projectbluefin/testing-lab/issues/225","created_at":"2026-06-20T05:27:02Z","affects":[],"area":"unknown"}],"test_coverage":{"scenarios_total":286,"scenarios_failed":92,"images_with_results":1,"coverage_by_suite":{"smoke":{"images":1,"scenarios":137,"failed":17},"system":{"images":1,"scenarios":14,"failed":6},"developer":{"images":1,"scenarios":21,"failed":0},"common":{"images":1,"scenarios":114,"failed":69}}},"github":{"testing_lab":{"open_issues":49,"open_prs":17,"prs_merged_7d":30}},"hive":{"open_issues":49,"open_prs":17}}
+{
+  "recent_runs": [
+    {
+      "id": "dak-1088-chore-deps-update-common-v2026-p2tg9",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:11:10Z",
+      "finished_at": "2026-06-25T08:11:10Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1101-chore-deps-update-distrobox-1-jljwf",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:11:08Z",
+      "finished_at": "2026-06-25T08:11:08Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1058-chore-deps-update-sudo-rs-5p49w",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:06:01Z",
+      "finished_at": "2026-06-25T08:06:01Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1088-chore-deps-update-common-v2026-5t59p",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:05:58Z",
+      "finished_at": "2026-06-25T08:05:58Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1101-chore-deps-update-distrobox-1-tgxhq",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:05:54Z",
+      "finished_at": "2026-06-25T08:05:54Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1058-chore-deps-update-sudo-rs-85c6s",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:01:02Z",
+      "finished_at": "2026-06-25T08:01:02Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1088-chore-deps-update-common-v2026-dpxzp",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:00:53Z",
+      "finished_at": "2026-06-25T08:00:53Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1101-chore-deps-update-distrobox-1-hr47j",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T08:00:50Z",
+      "finished_at": "2026-06-25T08:00:50Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1058-chore-deps-update-sudo-rs-bk85p",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:55:58Z",
+      "finished_at": "2026-06-25T07:55:58Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1088-chore-deps-update-common-v2026-m6zlp",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:55:54Z",
+      "finished_at": "2026-06-25T07:55:54Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1101-chore-deps-update-distrobox-1-wxhdq",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:55:50Z",
+      "finished_at": "2026-06-25T07:55:50Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1058-chore-deps-update-sudo-rs-dhmhj",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:50:58Z",
+      "finished_at": "2026-06-25T07:50:58Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1088-chore-deps-update-common-v2026-7d9zv",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:50:55Z",
+      "finished_at": "2026-06-25T07:50:55Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1101-chore-deps-update-distrobox-1-c4c8l",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:50:51Z",
+      "finished_at": "2026-06-25T07:50:51Z",
+      "trigger": "pr-poller"
+    },
+    {
+      "id": "dak-1058-chore-deps-update-sudo-rs-swwng",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "variant": "dakota",
+      "started_at": "2026-06-25T07:46:32Z",
+      "finished_at": "2026-06-25T07:46:32Z",
+      "trigger": "pr-poller"
+    }
+  ],
+  "_meta": {
+    "generated": "2026-06-25T08:13:00Z"
+  },
+  "open_bugs": [
+    {
+      "number": 237,
+      "title": "Ptyxis new-tab key combo fails when uinput setup is silently broken",
+      "url": "https://github.com/projectbluefin/testing-lab/issues/237",
+      "created_at": "2026-06-23T22:21:07Z",
+      "affects": [],
+      "area": "unknown"
+    },
+    {
+      "number": 236,
+      "title": "fix: zot-writable loses manifest index on pod restart",
+      "url": "https://github.com/projectbluefin/testing-lab/issues/236",
+      "created_at": "2026-06-23T02:45:42Z",
+      "affects": [],
+      "area": "unknown"
+    },
+    {
+      "number": 235,
+      "title": "fix: configure-disk SSH injection writes to wrong btrfs inode (var subvolume)",
+      "url": "https://github.com/projectbluefin/testing-lab/issues/235",
+      "created_at": "2026-06-23T02:45:27Z",
+      "affects": [],
+      "area": "unknown"
+    },
+    {
+      "number": 225,
+      "title": "feat: add toggle-testing-rebase and migration-upgrade-test WorkflowTemplates to GitOps",
+      "url": "https://github.com/projectbluefin/testing-lab/issues/225",
+      "created_at": "2026-06-20T05:27:02Z",
+      "affects": [],
+      "area": "unknown"
+    }
+  ],
+  "test_coverage": {
+    "scenarios_total": 286,
+    "scenarios_failed": 92,
+    "images_with_results": 1,
+    "coverage_by_suite": {
+      "smoke": {
+        "images": 1,
+        "scenarios": 137,
+        "failed": 17
+      },
+      "system": {
+        "images": 1,
+        "scenarios": 14,
+        "failed": 6
+      },
+      "developer": {
+        "images": 1,
+        "scenarios": 21,
+        "failed": 0
+      },
+      "common": {
+        "images": 1,
+        "scenarios": 114,
+        "failed": 69
+      }
+    }
+  },
+  "github": {
+    "testing_lab": {
+      "open_issues": 49,
+      "open_prs": 17,
+      "prs_merged_7d": 30
+    }
+  },
+  "hive": {
+    "open_issues": 49,
+    "open_prs": 17
+  }
+}
