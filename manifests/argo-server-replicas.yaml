@@ -21,3 +21,8 @@ spec:
                   matchLabels:
                     app: argo-server
                 topologyKey: kubernetes.io/hostname
+      containers:
+        - name: argo-server
+          args:
+            - server
+            - --auth-mode=server
