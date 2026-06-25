@@ -260,8 +260,12 @@ spec:
           PART="${LOOP_DEV}p${PARTNUM}"
           [ -b "${PART}" ] || continue
           if mount "${PART}" "${SYSROOT}" 2>/dev/null; then
-            # Match ostree/deploy/<osname>/deploy/<hash>.0 (not backing/<hash>.0)
-            DEPLOY_DIR=$(find "${SYSROOT}/ostree/deploy" -maxdepth 5 -path "*/deploy/*.0" -type d 2>/dev/null | head -1)
+            echo "[POST-INSTALL] mounted ${PART}, listing ostree deploy dirs:"
+            find "${SYSROOT}/ostree/deploy" -maxdepth 5 -name "*.0" -type d 2>/dev/null | head -10
+            # Match ostree/deploy/<osname>/deploy/<hash>.0 (exclude backing/ which is the composefs object store)
+            DEPLOY_DIR=$(find "${SYSROOT}/ostree/deploy" -maxdepth 5 -name "*.0" -type d \
+              -not -path "*/backing/*" 2>/dev/null | head -1)
+            echo "[POST-INSTALL] deploy dir: ${DEPLOY_DIR:-NOT FOUND}"
             if [ -n "${DEPLOY_DIR}" ]; then
               WANTS="${DEPLOY_DIR}/etc/systemd/system/multi-user.target.wants/sshd.service"
               if [ ! -e "${WANTS}" ]; then
