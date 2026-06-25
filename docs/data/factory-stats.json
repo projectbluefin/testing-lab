@@ -1,8 +1,8 @@
 {
   "_meta": {
     "schema_version": "2",
-    "generated": "2026-06-25T02:04:55Z",
-    "source": "testing-lab \u2014 live data as of 2026-06-24T04:51 UTC",
+    "generated": "2026-06-25T02:12:19Z",
+    "source": "testing-lab — live data as of 2026-06-24T04:51 UTC",
     "note": "Wire to GitHub Actions job that writes this file on every pipeline run",
     "ttl_seconds": 300,
     "consumers": [
@@ -169,7 +169,7 @@
   },
   "pipelines": {
     "containerdisk": {
-      "description": "Build bootc ContainerDisk image \u2192 provision KubeVirt VM \u2192 run GNOME tests \u2192 teardown",
+      "description": "Build bootc ContainerDisk image → provision KubeVirt VM → run GNOME tests → teardown",
       "stages": [
         "poll",
         "build",
@@ -202,7 +202,7 @@
       "node_affinity": "any"
     },
     "hostdisk": {
-      "description": "Provision Flatcar/Knuckle HostDisk VM \u2192 run tests \u2192 teardown",
+      "description": "Provision Flatcar/Knuckle HostDisk VM → run tests → teardown",
       "stages": [
         "provision",
         "test",
@@ -554,6 +554,37 @@
     }
   ],
   "recent_runs": [
+    {
+      "id": "nightly-smoke-1782352800",
+      "overall": "fail",
+      "label": "bluefin:testing",
+      "variant": "bluefin",
+      "started_at": "2026-06-25T02:12:19Z",
+      "finished_at": "2026-06-25T02:12:19Z",
+      "trigger": "nightly",
+      "suite_scores": {
+        "smoke": {
+          "scenarios": 137,
+          "failed": 17,
+          "status": "failed"
+        },
+        "developer": {
+          "scenarios": 21,
+          "failed": 0,
+          "status": "passed"
+        },
+        "software": {
+          "scenarios": 0,
+          "failed": 0,
+          "status": "pending"
+        },
+        "system": {
+          "scenarios": 14,
+          "failed": 6,
+          "status": "failed"
+        }
+      }
+    },
     {
       "id": "bluefin-qa-fresh-8lnfn",
       "trigger": "nightly",
