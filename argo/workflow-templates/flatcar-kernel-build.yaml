@@ -336,14 +336,9 @@ spec:
           -- bash -c "
             set -euo pipefail
 
-            # Register overlay in portage repos.conf
-            sudo mkdir -p /etc/portage/repos.conf
-            sudo tee /etc/portage/repos.conf/flatcar-kernel.conf << EOF
-        [flatcar-kernel]
-        location = /overlay
-        masters = portage-stable coreos
-        auto-sync = no
-        EOF
+            # Register overlay in portage repos.conf (both host and board)
+            sudo mkdir -p /etc/portage/repos.conf /build/amd64-usr/etc/portage/repos.conf
+            echo -e "[flatcar-kernel]\nlocation = /overlay\nmasters = portage-stable coreos\nauto-sync = no" | sudo tee /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null
 
             # Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)
             /mnt/host/source/src/scripts/setup_board \
