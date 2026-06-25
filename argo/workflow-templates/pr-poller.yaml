@@ -16,7 +16,7 @@ spec:
           app.kubernetes.io/part-of: bluefin-test-suite
           bluefin.io/step: pr-poller
       script:
-        image: quay.io/fedora/fedora:latest
+        image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
         resources:
           requests:
@@ -33,10 +33,6 @@ spec:
                 key: token
         source: |
           set -euo pipefail
-          dnf install -y --quiet jq curl 2>/dev/null | tail -1 >&2
-          KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
-          curl -fsSL "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl" \
-            -o /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl
 
           CONTEXT="ghost-lab"
           API="https://api.github.com"
