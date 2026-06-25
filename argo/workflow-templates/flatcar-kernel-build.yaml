@@ -280,9 +280,9 @@ spec:
           set -euo pipefail
 
           echo "=== Formatting and mounting build PVC (/dev/vdb) ==="
-          sudo mkfs.ext4 -F /dev/vdb
+          sudo grep -q "/dev/vdb" /proc/mounts || sudo mkfs.ext4 -F /dev/vdb
           sudo mkdir -p /var/tmp/build
-          sudo mount /dev/vdb /var/tmp/build
+          sudo grep -q "/var/tmp/build" /proc/mounts || sudo mount /dev/vdb /var/tmp/build
           sudo chown core:core /var/tmp/build
 
           KERNEL_VERSION="${KERNEL_VERSION}"
