@@ -612,7 +612,33 @@ ADD --chown=107:107 disk.raw /disk/
 ```
 UID 107 = qemu. Required — omitting `--chown` causes VM boot failure (permission denied on disk).
 
+### 21. Log access — Argo is sufficient, no separate stack needed
 
+Argo Server retains all workflow pod logs for the workflow TTL period (7 days success,
+30 days failure via `workflow-controller-configmap`). No separate log aggregation stack
+(Loki, Promtail, etc.) is needed for a homelab CI cluster.
+
+**Retrieve logs:**
+```bash
+# most recent workflow
+just logs                              # alias: argo logs -n argo @latest
+
+# specific workflow
+argo logs -n argo <workflow-name>
+
+# specific pod/container
+kubectl logs -n argo <pod> -c main
+
+# via MCP
+argo-mcp-logs_workflow <workflow-name>
+```
+
+**Why a separate log stack is redundant:**
+- Pod logs are already captured and served by the Argo Server
+- Artifacts (`results.json`, `atspi_tree.txt`) echo to stderr — accessible via `argo logs`
+- Cross-workflow queries → `argo list -n argo` then `argo logs` per workflow
+- Adding Loki + Promtail duplicates storage, adds 2–3 pods, and a 10Gi PVC for no
+  additional capability that `argo logs` doesn't already provide
 
 | "The sub-template will see workflow.parameters directly." | It will not. Argo Workflows scopes parameters per-template. Always pass explicitly. |
 | "I applied the template with kubectl — it's fine." | ArgoCD selfHeal will overwrite it within minutes. Use git. |
@@ -622,6 +648,7 @@ UID 107 = qemu. Required — omitting `--chown` causes VM boot failure (permissi
 
 ## Red Flags
 
+- Adding a separate log aggregation stack (Loki, Promtail, Vector, etc.) alongside Argo — Argo Server already retains pod logs for the workflow TTL. A separate stack duplicates storage, adds pods/PVCs, and creates a Helm-outside-ArgoCD installation with GitOps debt. `argo logs` covers the same use case.
 - `synchronization.semaphore:` (singular) in any pipeline — deprecated, rejected by ArgoCD schema. Use `synchronization.semaphores:` (list with `- configMapKeyRef:` item)
 - `spec.schedule:` (singular) on a CronWorkflow — field does not exist in CRD schema; use `spec.schedules:` (array)
 - A pipeline with VMs and no `spec.activeDeadlineSeconds` — a stuck VM holds its semaphore slot forever
