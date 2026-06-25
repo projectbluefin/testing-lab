@@ -35,8 +35,8 @@ spec:
         nodeSelector:
           kubernetes.io/hostname: ghost
         script:
-          image: cgr.dev/chainguard/wolfi-base:latest
-          command: [sh]
+          image: quay.io/fedora/fedora:latest
+          command: [bash]
           env:
             - name: GITHUB_TOKEN
               valueFrom:
@@ -51,9 +51,8 @@ spec:
             - name: MAX_AGE_DAYS
               value: "7"
           source: |
-            apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-            exec bash <<'SCRIPT_EOF'
             set -euo pipefail
+            dnf install -y --quiet oras jq 2>&1 | tail -3
 
             echo "=== PR image GC: ${REGISTRY}/${REPO} ==="
 
@@ -116,5 +115,3 @@ spec:
             done <<< "$TAGS"
 
             echo "=== Done: deleted ${DELETED} tag(s), kept ${KEPT} tag(s) ==="
-
-            SCRIPT_EOF

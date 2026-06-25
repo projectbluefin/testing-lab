@@ -33,22 +33,19 @@ spec:
       hostPID: true
       initContainers:
         - name: configure-firewalld
-          image: cgr.dev/chainguard/wolfi-base:latest
+          image: quay.io/fedora/fedora:latest
           securityContext:
             privileged: true
           command:
             - /bin/sh
             - -c
             - |
-              apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-              exec bash <<'SCRIPT_EOF'
               # Run firewall-cmd in the host mount namespace via nsenter.
               # If firewalld is not active (e.g. ghost, exo-1 run no firewall)
               # firewall-cmd exits non-zero; we treat that as a no-op.
               nsenter -t 1 -m -- systemctl disable --now firewalld 2>/dev/null \
                 && echo "firewalld disabled" \
                 || echo "firewalld not present, skipping"
-              SCRIPT_EOF
           resources:
             requests:
               cpu: 10m

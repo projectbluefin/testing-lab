@@ -39,7 +39,7 @@ spec:
       # NOTE: No output artifacts declared — artifact repository is not configured.
       # Results are captured via stdout (pod logs / Loki). Same pattern as run-gnome-tests.
       container:
-        image: cgr.dev/chainguard/wolfi-base:latest
+        image: quay.io/fedora/fedora:latest
         imagePullPolicy: Always
         resources:
           requests:
@@ -69,15 +69,14 @@ spec:
           - name: ssh-key
             mountPath: /etc/ssh/test-key
             readOnly: true
-        command: [sh, -c]
+        command: [bash, -c]
         args:
           - |
-            apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-            exec bash <<'SCRIPT_EOF'
             set -euo pipefail
             mkdir -p /tmp/results
 
             # Install runtime deps (minimal Fedora image lacks python3, git, and ssh client)
+            dnf install -y -q python3 python3-pip openssh-clients git 2>&1 | tail -3
 
             # Install behave in runner pod (no qecore needed — no GNOME desktop)
             python3 -m pip install --quiet behave 2>&1 | tail -3
@@ -166,7 +165,6 @@ spec:
             fi
 
             exit ${BEHAVE_RC}
-            SCRIPT_EOF
       volumes:
         - name: ssh-key
           secret:

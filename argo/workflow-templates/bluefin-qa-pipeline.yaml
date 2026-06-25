@@ -121,7 +121,7 @@ spec:
           - name: containerdisk-tag
       script:
         image: quay.io/skopeo/stable:latest
-        command: [sh]
+        command: [bash]
         resources:
           requests:
             cpu: 100m
@@ -254,8 +254,8 @@ spec:
     # dashboard reflects live run data without waiting for the 30-min GHA cron.
     - name: update-factory-stats
       script:
-        image: cgr.dev/chainguard/wolfi-base:latest
-        command: [sh]
+        image: quay.io/fedora/fedora:latest
+        command: [bash]
         env:
           - name: GITHUB_TOKEN
             valueFrom:
@@ -263,9 +263,8 @@ spec:
                 name: github-token
                 key: token
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-          exec bash <<'SCRIPT_EOF'
           set -euo pipefail
+          dnf install -y --quiet jq 2>/dev/null | tail -1 >&2 || true
           if ! command -v jq &>/dev/null; then
             echo "WARNING: jq not available (dnf failed), skipping dashboard update" >&2
             exit 0
@@ -375,12 +374,11 @@ spec:
 
           echo "Dashboard update: ${OVERALL} for ${LABEL} (${WF_NAME}) — http=${HTTP}"
 
-          SCRIPT_EOF
     # ── post-github-status: posts commit status to GitHub API ──────────────────
     - name: post-github-status
       script:
-        image: cgr.dev/chainguard/wolfi-base:latest
-        command: [sh]
+        image: quay.io/fedora/fedora:latest
+        command: [bash]
         env:
           - name: GITHUB_TOKEN
             valueFrom:
@@ -388,8 +386,6 @@ spec:
                 name: github-token
                 key: token
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-          exec bash <<'SCRIPT_EOF'
           set -euo pipefail
           STATE=$([ "{{workflow.status}}" = "Succeeded" ] && echo success || echo failure)
           URL="http://192.168.1.102:32746/workflows/argo/{{workflow.name}}"
@@ -410,5 +406,3 @@ spec:
             echo "ERROR: GitHub API returned HTTP $HTTP_CODE — failing step for visibility" >&2
             exit 1
           fi
-
-          SCRIPT_EOF

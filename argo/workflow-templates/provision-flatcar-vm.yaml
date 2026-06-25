@@ -70,7 +70,7 @@ spec:
             sizeLimit: 20Gi
       script:
         image: quay.io/buildah/stable:latest
-        command: [sh]
+        command: [bash]
         securityContext:
           privileged: true
           runAsUser: 0
@@ -93,6 +93,7 @@ spec:
           # ponytail: :latest tag is fine — no nightly CronWorkflow, runs are sequential
 
           echo "Installing qemu-img and bzip2..." >&2
+          dnf install -y -q qemu-img bzip2 2>&1 | tail -3
 
           echo "Downloading Flatcar ${CHANNEL} ${VERSION}..." >&2
           curl -L --fail --retry 3 -o /mnt/work/flatcar.img.bz2 "${URL}"

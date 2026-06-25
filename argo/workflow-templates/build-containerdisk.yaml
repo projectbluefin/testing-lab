@@ -278,7 +278,7 @@ spec:
                   '  return r;}' \
                   > /tmp/fsetxattr_wrap.c
                 gcc -shared -fPIC -o /tmp/fsetxattr_wrapper.so /tmp/fsetxattr_wrap.c -ldl
-                LD_PRELOAD_VAR=/tmp/fsetxattr_wrapper.so
+                export LD_PRELOAD=/tmp/fsetxattr_wrapper.so
                 echo '[INNER] fsetxattr wrapper compiled and loaded'
               else
                 echo '[INNER] WARNING: gcc not found, no fsetxattr wrapper'
@@ -295,7 +295,7 @@ spec:
 
               # --via-loopback: upstream recommended pattern for VM disk creation.
               # --root-ssh-authorized-keys: bootc-native root SSH key injection.
-              LD_PRELOAD=${LD_PRELOAD_VAR:-} bootc install to-disk \
+              bootc install to-disk \
                 --generic-image \
                 --filesystem=btrfs \
                 --target-no-signature-verification \

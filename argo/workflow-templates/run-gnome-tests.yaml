@@ -48,6 +48,7 @@ spec:
             # image tag used to derive the screenshot slug pushed to GHCR
             # e.g. "testing", "lts-testing", "dakota-testing"
             value: ""
+      # 60-minute ceiling: SSH wait (10min) + dnf install (10min) + test run (30min)
       activeDeadlineSeconds: 3600
       podSpecPatch: |
         securityContext:
@@ -58,20 +59,19 @@ spec:
       # Results are captured via outputs.result (stdout) + kubectl logs.
       initContainers:
         - name: git-sync
-          image: cgr.dev/chainguard/wolfi-base:latest
+          image: quay.io/fedora/fedora:latest
           env:
             - name: BRANCH
               value: "{{inputs.parameters.branch}}"
-          command: [sh, -c]
+          command: [bash, -c]
           args:
             - |
-              apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-              exec bash <<'SCRIPT_EOF'
               for attempt in 1 2 3; do
                 # Clear any partial clone from a previous attempt — git clone
                 # refuses to write into a non-empty directory and would skip
                 # both the primary and the SHA-fallback path otherwise.
                 rm -rf /workspace/bluefin-test-suite
+                dnf install -y --quiet git 2>&1 | tail -2
                 # --branch accepts branch names and tags; for commit SHAs we
                 # fall back to a full clone + checkout.
                 if git clone --depth 1 --branch "${BRANCH}" \
@@ -91,13 +91,12 @@ spec:
                 sleep 15
               done
               exit 1
-              SCRIPT_EOF
           volumeMounts:
             - name: workspace
               mountPath: /workspace
       container:
         # Fedora: has dnf, python3, pip3 — matches Bluefin (Fedora-based) package names
-        image: cgr.dev/chainguard/wolfi-base:latest
+        image: quay.io/fedora/fedora:latest
         imagePullPolicy: Always
         resources:
           requests:
@@ -134,11 +133,9 @@ spec:
             readOnly: true
           - name: results-store
             mountPath: /var/mnt/ghost-data/test-results
-        command: [sh, -c]
+        command: [bash, -c]
         args:
           - |
-            apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-            exec bash <<'SCRIPT_EOF'
             set -euo pipefail
             mkdir -p /tmp/results
             LOG=/tmp/results/runner.log
@@ -149,6 +146,7 @@ spec:
             command -v ssh &>/dev/null  || PKGS+=(openssh-clients rsync)
             command -v jq  &>/dev/null  || PKGS+=(jq)
             if [[ ${#PKGS[@]} -gt 0 ]]; then
+              dnf install -y --quiet "${PKGS[@]}" 2>&1 | tail -3
             fi
 
             SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
@@ -264,6 +262,7 @@ spec:
                   echo 'Installing test dependencies...' >&2
                   sudo ostree admin unlock 2>/dev/null || true
                   sudo dnf clean packages -q 2>/dev/null || true
+                  sudo dnf install -y --quiet gnome-ponytail-daemon python3-gnome-ponytail-daemon python3-pip python3-virtualenv python3-behave 2>&1 | tail -3
                   pip3 --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2
                   python3 -m pip install --quiet --user qecore dogtail python-uinput 2>&1 | tail -3
                   for f in \$HOME/.local/bin/qecore_*; do sudo ln -sf \"\$f\" /usr/local/bin/\$(basename \"\$f\") 2>/dev/null; done
@@ -511,7 +510,6 @@ spec:
             " 2>/dev/null || echo "(python3 summary unavailable)"
             # Re-raise behave's exit code so Argo marks the step failed on test failures.
             exit ${BEHAVE_RC}
-            SCRIPT_EOF
       volumes:
         - name: ssh-key
           secret:

@@ -1,9 +1,0 @@
-@@ -194,7 +194,7 @@
-           echo "=== Move Docker data-root to PVC (SDK image is ~15GB) ==="
-           sudo systemctl stop docker || true
-           sudo mkdir -p \${BUILD_DIR}/docker /etc/docker
--          echo '{"data-root": "/var/tmp/build/docker"}' | sudo tee /etc/docker/daemon.json
-+          echo '{"data-root": "/var/tmp/build/docker", "insecure-registries": ["192.168.1.102:30501", "192.168.1.102:30500"]}' | sudo tee /etc/docker/daemon.json
-           sudo systemctl start docker
-           sudo systemctl is-active docker
- 

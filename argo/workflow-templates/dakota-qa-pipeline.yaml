@@ -194,7 +194,7 @@ spec:
     # ── update-factory-stats: append recent run to factory-stats.json ─────────
     - name: update-factory-stats
       script:
-        image: cgr.dev/chainguard/wolfi-base:latest
+        image: quay.io/fedora/fedora:latest
         command: [sh]
         env:
           - name: GITHUB_TOKEN
@@ -203,8 +203,6 @@ spec:
                 name: github-token
                 key: token
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-          exec bash <<'SCRIPT_EOF'
           set -euo pipefail
 
           API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/data/factory-stats.json"
@@ -249,11 +247,10 @@ spec:
             -d "$BODY" "${API_URL}" 2>&1) || HTTP="error"
           echo "Dashboard update: ${OVERALL} for ${LABEL} (${WF_NAME}) — http=${HTTP}"
 
-          SCRIPT_EOF
     # ── post-github-status ────────────────────────────────────────────────────
     - name: post-github-status
       script:
-        image: cgr.dev/chainguard/wolfi-base:latest
+        image: quay.io/fedora/fedora:latest
         command: [sh]
         env:
           - name: GITHUB_TOKEN
@@ -262,8 +259,6 @@ spec:
                 name: github-token
                 key: token
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-          exec bash <<'SCRIPT_EOF'
           STATE=$([ "{{workflow.status}}" = "Succeeded" ] && echo success || echo failure)
           PAYLOAD=$(jq -n \
             --arg state "$STATE" \
@@ -279,5 +274,3 @@ spec:
             -d "$PAYLOAD" \
           && echo "Posted $STATE to {{workflow.parameters.repo}}@{{workflow.parameters.sha}}" \
           || echo "WARNING: failed to post commit status (non-fatal)"
-
-          SCRIPT_EOF

@@ -12,6 +12,7 @@ spec:
     container:
       args:
       - "set -euo pipefail\nmkdir -p /tmp/results\nLOG=/tmp/results/runner.log\nexec\
+        \ > >(tee -a \"${LOG}\") 2>&1\n\ndnf install -y --quiet python3 python3-pytest\
         \ kubernetes-client jq curl openssl 2>&1 | tail -4\n\nSUITE=\"/workspace/testing-lab/tests/{{inputs.parameters.suite-path}}\"\
         \ntest -e \"${SUITE}\"\nexport PYTHONPATH=\"/workspace/testing-lab:${PYTHONPATH:-}\"\
         \n\nTEST_RC=0\npython3 -m pytest -q \"${SUITE}\" --junitxml /tmp/results/pytest-results.xml\
@@ -41,7 +42,7 @@ spec:
         value: '{{inputs.parameters.lane}}'
       - name: TEST_RESULTS_DIR
         value: /tmp/results
-      image: cgr.dev/chainguard/wolfi-base:latest
+      image: quay.io/fedora/fedora:latest
       imagePullPolicy: Always
       resources:
         limits:
@@ -56,6 +57,7 @@ spec:
         readOnly: true
     initContainers:
     - args:
+      - "set -euo pipefail\ndnf install -y --quiet git 2>&1 | tail -2\nfor attempt\
         \ in 1 2 3; do\n  rm -rf /workspace/testing-lab\n  if git clone --depth 1\
         \ --branch \"${BRANCH}\" \\\n      https://github.com/projectbluefin/testing-lab\
         \ \\\n      /workspace/testing-lab 2>&1; then\n    echo \"Synced testing-lab\
@@ -71,7 +73,7 @@ spec:
       env:
       - name: BRANCH
         value: '{{inputs.parameters.branch}}'
-      image: cgr.dev/chainguard/wolfi-base:latest
+      image: quay.io/fedora/fedora:latest
       name: git-sync
       volumeMounts:
       - mountPath: /workspace

@@ -62,6 +62,7 @@ spec:
       args:
       - |
         set -uo pipefail
+        dnf install -y --quiet openssh-clients 2>&1 | tail -2
 
         KEY=/etc/ssh/test-key/id_ed25519
         OPTS="-i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
