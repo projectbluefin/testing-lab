@@ -31,6 +31,8 @@ spec:
                   value: "ghcr.io/projectbluefin/bluefin"
                 - name: image-tag
                   value: "testing"
+                - name: disk-size
+                  value: "25G"
                 - name: containerdisk-tag
                   value: "testing"
 
@@ -45,6 +47,8 @@ spec:
                   value: "ghcr.io/projectbluefin/bluefin-lts"
                 - name: image-tag
                   value: "testing"
+                - name: disk-size
+                  value: "25G"
                 - name: containerdisk-tag
                   value: "lts-testing"
 

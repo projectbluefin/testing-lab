@@ -92,6 +92,8 @@ spec:
             value: "{{inputs.parameters.image-tag}}"
           - name: containerdisk-tag
             value: "{{inputs.parameters.containerdisk-tag}}"
+          - name: disk-size
+            value: "{{inputs.parameters.disk-size}}"
 
     # ─── check ────────────────────────────────────────────────────────────────
     # Checks whether the containerDisk image already exists in the local Zot registry.
@@ -251,6 +253,7 @@ spec:
       - name: image
       - name: image-tag
       - name: containerdisk-tag
+      - name: disk-size
     nodeSelector:
       kubernetes.io/hostname: ghost
     volumes:
