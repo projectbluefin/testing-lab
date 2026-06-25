@@ -27,11 +27,9 @@ spec:
           image: cgr.dev/chainguard/wolfi-base:latest
           command: [sh]
           source: |
-            apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
+            apk add --no-cache bash curl jq kubectl git python3 >/dev/null 2>&1
             exec bash <<'SCRIPT_EOF'
             set -euo pipefail
-            SCRIPT_EOF
-          microdnf install -y curl jq >/dev/null 2>&1
 
             # Fetch latest stable kernel version from kernel.org
             LATEST=$(curl -sf https://www.kernel.org/releases.json \
@@ -43,20 +41,20 @@ spec:
                     print(r['version'])
                     break
             ")
-            echo "Latest kernel.org stable: $LATEST"
+            echo "Latest kernel.org stable: \$LATEST"
 
             # Read last-seen version from ConfigMap
             SEEN=$(kubectl get configmap flatcar-kernel-polling-state \
               -n argo -o jsonpath='{.data.kernel-stable}' 2>/dev/null || echo "")
-            echo "Last built: $SEEN"
+            echo "Last built: \$SEEN"
 
-            if [ "$LATEST" = "$SEEN" ]; then
+            if [ "\$LATEST" = "\$SEEN" ]; then
               echo "No change — skipping build"
               exit 0
             fi
 
-            echo "New kernel detected: $LATEST — triggering build"
-            kubectl create -f - <<EOF
+            echo "New kernel detected: \$LATEST — triggering build"
+            kubectl create -f - <<MANIFEST_EOF
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
@@ -68,10 +66,11 @@ spec:
               arguments:
                 parameters:
                   - name: kernel-version
-                    value: "$LATEST"
-            EOF
+                    value: "\$LATEST"
+            MANIFEST_EOF
 
             # Update state so we don't re-trigger on next poll
             kubectl patch configmap flatcar-kernel-polling-state \
               -n argo --type=merge \
-              -p "{\"data\":{\"kernel-stable\":\"$LATEST\"}}"
+              -p "{\"data\":{\"kernel-stable\":\"\$LATEST\"}}"
+            SCRIPT_EOF

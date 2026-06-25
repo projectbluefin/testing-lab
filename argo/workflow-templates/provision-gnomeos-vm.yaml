@@ -340,7 +340,7 @@ spec:
             cpu: 500m
             memory: 256Mi
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
+          apk add --no-cache bash curl jq kubectl git python3 xz >/dev/null 2>&1
           exec bash <<'SCRIPT_EOF'
           set -euo pipefail
           exec 3>&1

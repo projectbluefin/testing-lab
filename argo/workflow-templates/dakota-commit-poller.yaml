@@ -74,7 +74,7 @@ spec:
                 name: github-token
                 key: token
         source: |
-          apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
+          apk add --no-cache bash curl jq kubectl git python3 >/dev/null 2>&1
           exec bash <<'SCRIPT_EOF'
           set -euo pipefail
           REPO="{{workflow.parameters.repo}}"
