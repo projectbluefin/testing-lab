@@ -423,69 +423,6 @@ spec:
           fi
         fi
 
-        # Push results JSON to GitHub for Pages dashboard at
-        # https://projectbluefin.github.io/testing-lab/
-        # Uses the GitHub Contents API (PUT /repos/.../contents/...).
-        # curl+jq only — no inline Python (colons break YAML block scalars).
-        PUSH_LOG="${RESULT_DIR}/pages-push.log"
-        if [[ -f /tmp/results/results.json && -n "${GITHUB_TOKEN:-}" && -n "${IMG_SLUG:-}" ]]; then
-          API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/results/${IMG_SLUG}-${SUITE}.json"
-          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          N_TOTAL=$(jq '[.[].elements | length] | add // 0' /tmp/results/results.json)
-          N_FAILED=$(jq '[.[].elements[] | select(.status=="failed")] | length' /tmp/results/results.json)
-          RUN_STATUS=$( [[ "$N_FAILED" -gt 0 ]] && echo failed || echo passed )
-
-          # GET current file for sha + history
-          CURRENT=$(curl -sf \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "${API_URL}" 2>/dev/null || echo "{}")
-          FILE_SHA=$(echo "$CURRENT" | jq -r '.sha // empty')
-          HISTORY=$(echo "$CURRENT" | jq -r 'if .content then (.content | gsub("\n";"") | @base64d | fromjson | .history // []) else [] end' 2>/dev/null || echo "[]")
-
-          # Capture failing scenario names for the dashboard
-          FAILED_NAMES=$(jq -c '[.[].elements[] | select(.status=="failed") | .name] | unique' \
-            /tmp/results/results.json 2>/dev/null || echo "[]")
-
-          ENTRY=$(jq -nc \
-            --arg rd "$NOW" --arg wf "{{workflow.name}}" \
-            --arg st "$RUN_STATUS" --argjson sc "$N_TOTAL" --argjson f "$N_FAILED" \
-            '{run_date:$rd,workflow_name:$wf,status:$st,scenarios:$sc,failed:$f}')
-
-          PAYLOAD_OBJ=$(jq -nc \
-            --arg v "$IMG_SLUG" --arg su "$SUITE" --arg lr "$NOW" \
-            --arg wf "{{workflow.name}}" --arg st "$RUN_STATUS" \
-            --argjson sc "$N_TOTAL" --argjson f "$N_FAILED" \
-            --argjson fn "$FAILED_NAMES" \
-            --arg ss "https://projectbluefin.github.io/testing-lab/screenshots/${IMG_SLUG}-${SUITE}-latest.png" \
-            --argjson h "$(echo "$HISTORY" | jq -c --argjson e "$ENTRY" '[$e] + . | .[:10]')" \
-            '{variant:$v,suite:$su,last_run:$lr,workflow_name:$wf,status:$st,scenarios:$sc,failed:$f,failed_scenarios:$fn,screenshot_url:$ss,history:$h}')
-
-          CONTENT=$(echo "$PAYLOAD_OBJ" | base64 -w0)
-          BODY=$(jq -nc \
-            --arg msg "test: update results for ${IMG_SLUG}-${SUITE}" \
-            --arg content "$CONTENT" \
-            --arg sha "$FILE_SHA" \
-            'if $sha != "" then {message:$msg,content:$content,sha:$sha} else {message:$msg,content:$content} end')
-
-          HTTP_CODE=$(curl -sf -w "%{http_code}" -o /tmp/push-result-response.json \
-            -X PUT \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "Content-Type: application/json" \
-            -d "$BODY" "${API_URL}" 2>&1) || HTTP_CODE="curl_error"
-
-          echo "${NOW} pushed ${IMG_SLUG}-${SUITE}: ${RUN_STATUS} (${N_TOTAL} scenarios, ${N_FAILED} failed) http=${HTTP_CODE}" \
-            | tee -a "${PUSH_LOG}" >&2
-          if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
-            echo "PUT response: $(cat /tmp/push-result-response.json 2>/dev/null)" \
-              | tee -a "${PUSH_LOG}" >&2
-          fi
-        else
-          echo "Skipping Pages push: GITHUB_TOKEN=$(test -n "${GITHUB_TOKEN:-}" && echo set || echo empty) IMG_SLUG=${IMG_SLUG:-empty}" \
-            | tee -a "${PUSH_LOG}" >&2
-        fi
 
         echo "Done. Results in /tmp/results/" >&2
         # Print full results JSON to stderr — captured by Loki and Argo MCP get_workflow_logs

@@ -185,64 +185,24 @@ spec:
   - name: cleanup-and-report
     dag:
       tasks:
-      - name: update-dashboard
-        template: update-factory-stats
+      - name: cleanup-vms
+        template: cleanup-orphan-vms
 
-    # ── update-factory-stats: append recent run to factory-stats.json ─────────
-  - name: update-factory-stats
+  - name: cleanup-orphan-vms
     script:
-      image: cgr.dev/chainguard/wolfi-base:latest
+      image: cgr.dev/chainguard/kubectl:latest-dev
       command: [sh]
-      env:
-      - name: GITHUB_TOKEN
-        valueFrom:
-          secretKeyRef:
-            name: github-token
-            key: token
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
       source: |
-        apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-        exec bash <<'SCRIPT_EOF'
-        set -euo pipefail
-
-        API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/data/factory-stats.json"
-        WF_NAME="{{workflow.name}}"
-        OVERALL=$([ "{{workflow.status}}" = "Succeeded" ] && echo "passed" || echo "fail")
-        NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        LABEL="dakota:{{workflow.parameters.image-tag}}"
-        VARIANT="{{workflow.parameters.variant}}"
-
-        CURRENT=$(curl -sf \
-          -H "Authorization: token ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
-          "${API_URL}" 2>/dev/null || echo "{}")
-        FILE_SHA=$(echo "$CURRENT" | jq -r '.sha // empty')
-        [[ -z "$FILE_SHA" ]] && echo "Could not fetch SHA — skipping" && exit 0
-
-        STATS=$(echo "$CURRENT" | jq -r '.content // ""' | tr -d '\n' | base64 -d \
-          | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)))" 2>/dev/null || echo "{}")
-
-        PR_NUM="{{workflow.parameters.pr-number}}"
-        TRIGGER=$([ -n "$PR_NUM" ] && echo "pr-poller" || echo "nightly")
-        NEW_RUN=$(jq -nc \
-          --arg id "$WF_NAME" --arg overall "$OVERALL" --arg label "$LABEL" \
-          --arg variant "$VARIANT" --arg started "$NOW" --arg finished "$NOW" \
-          --arg trigger "$TRIGGER" \
-          '{id:$id,overall:$overall,label:$label,variant:$variant,started_at:$started,finished_at:$finished,trigger:$trigger}')
-
-        UPDATED=$(echo "$STATS" | jq -c \
-          --argjson run "$NEW_RUN" --arg now "$NOW" \
-          '.recent_runs = ([$run] + (.recent_runs // []) | .[:15]) | ._meta.generated = $now')
-
-        BODY=$(jq -nc \
-          --arg msg "chore: update dashboard run data for ${WF_NAME}" \
-          --arg content "$(echo "$UPDATED" | base64 -w0)" \
-          --arg sha "$FILE_SHA" \
-          '{message:$msg,content:$content,sha:$sha}')
-
-        HTTP=$(curl -sf -w "%{http_code}" -o /dev/null -X PUT \
-          -H "Authorization: token ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "Content-Type: application/json" \
-          -d "$BODY" "${API_URL}" 2>&1) || HTTP="error"
-        echo "Dashboard update: ${OVERALL} for ${LABEL} (${WF_NAME}) — http=${HTTP}"
-        SCRIPT_EOF
+        NS="{{workflow.parameters.namespace}}"
+        WF="{{workflow.name}}"
+        for SUITE in smoke developer software system; do
+          kubectl delete vm -n "${NS}" "${WF}-${SUITE}" --ignore-not-found 2>/dev/null \
+            && echo "Cleaned ${WF}-${SUITE}" || true
+        done

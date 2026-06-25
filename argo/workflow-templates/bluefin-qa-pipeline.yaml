@@ -203,28 +203,15 @@ spec:
         continueOn:
           failed: true
 
-    # ── onExit handler: VM cleanup + optional GitHub status + dashboard ──────────
-    # cleanup-vms runs first, unconditionally — it deletes any VMs this workflow
-    # may have created but not torn down (e.g., when provision fails, lane teardown
-    # is skipped, leaving an orphaned VM).  Safe to run even when teardown already
-    # deleted the VM (--ignore-not-found).
   - name: cleanup-and-report
     dag:
       tasks:
       - name: cleanup-vms
         template: cleanup-orphan-vms
-      - name: update-dashboard
-        template: update-factory-stats
-        depends: cleanup-vms
 
-    # ── cleanup-orphan-vms: delete any VMs left behind when provision fails ──────
-    # The lane teardown step only runs after run-tests; if provision fails, teardown
-    # is skipped and the VM is orphaned.  This template deletes all VMs matching
-    # {{workflow.name}}-<suite> across all possible suites — idempotent because
-    # kubectl delete --ignore-not-found is a no-op for already-deleted VMs.
   - name: cleanup-orphan-vms
     script:
-      image: cgr.dev/chainguard/wolfi-base:latest
+      image: cgr.dev/chainguard/kubectl:latest-dev
       command: [sh]
       resources:
         requests:
@@ -234,140 +221,9 @@ spec:
           cpu: 500m
           memory: 256Mi
       source: |
-        apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
-        exec bash <<'SCRIPT_EOF'
         NS="{{workflow.parameters.namespace}}"
         WF="{{workflow.name}}"
         for SUITE in smoke developer software system; do
           kubectl delete vm -n "${NS}" "${WF}-${SUITE}" --ignore-not-found 2>/dev/null \
             && echo "Cleaned ${WF}-${SUITE}" || true
         done
-
-        SCRIPT_EOF
-    # ── update-factory-stats: append recent run to factory-stats.json ─────────
-    # Runs on every pipeline exit (success or failure). Patches the recent_runs
-    # array in docs/data/factory-stats.json via GitHub Contents API so the
-    # dashboard reflects live run data without waiting for the 30-min GHA cron.
-  - name: update-factory-stats
-    script:
-      image: cgr.dev/chainguard/wolfi-base:latest
-      command: [sh]
-      env:
-      - name: GITHUB_TOKEN
-        valueFrom:
-          secretKeyRef:
-            name: github-token
-            key: token
-      source: |
-        apk add --no-cache bash curl jq kubectl git openssh-client python3 >/dev/null 2>&1
-        exec bash <<'SCRIPT_EOF'
-        set -euo pipefail
-        if ! command -v jq &>/dev/null; then
-          echo "WARNING: jq not available (dnf failed), skipping dashboard update" >&2
-          exit 0
-        fi
-
-        API_URL="https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/data/factory-stats.json"
-        WF_NAME="{{workflow.name}}"
-        WF_STATUS="{{workflow.status}}"
-        NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-        # Map workflow status → dashboard overall
-        OVERALL=$([ "$WF_STATUS" = "Succeeded" ] && echo "passed" || echo "fail")
-
-        # Derive image label from pipeline parameters
-        TAG="{{workflow.parameters.image-tag}}"
-        VARIANT="{{workflow.parameters.variant}}"
-        case "$VARIANT" in
-          lts*)     LABEL="bluefin-lts:${TAG}" ;;
-          bazzite*) LABEL="bazzite:${TAG}" ;;
-          aurora*)  LABEL="aurora:${TAG}" ;;
-          dakota*)  LABEL="dakota:${TAG}" ;;
-          *)        LABEL="bluefin:${TAG}" ;;
-        esac
-
-        # Fetch current file
-        CURRENT=$(curl -sf \
-          -H "Authorization: token ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
-          "${API_URL}" 2>/dev/null || echo "{}")
-        FILE_SHA=$(echo "$CURRENT" | jq -r '.sha // empty')
-
-        if [[ -z "$FILE_SHA" ]]; then
-          echo "Could not fetch factory-stats.json SHA — skipping dashboard update"
-          exit 0
-        fi
-
-        # Decode current content
-        CONTENT_B64=$(echo "$CURRENT" | jq -r '.content // ""' | tr -d '\n')
-        STATS=$(echo "$CONTENT_B64" | base64 -d | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)))" 2>/dev/null || echo "{}")
-
-        # Build new recent_run entry — also fetch per-suite scores from result files
-        PR_NUM="{{workflow.parameters.pr-number}}"
-        TRIGGER=$([ -n "$PR_NUM" ] && echo "pr-poller" || echo "nightly")
-
-        # Determine image slug for result file lookup (mirrors slug derivation in run-gnome-tests)
-        case "$VARIANT" in
-          lts*)     IMG_SLUG="bluefin-lts-${TAG}" ;;
-          bazzite*) IMG_SLUG="bluefin-bazzite-${TAG}" ;;
-          aurora*)  IMG_SLUG="bluefin-aurora-${TAG}" ;;
-          *)        IMG_SLUG="bluefin-${TAG}" ;;
-        esac
-
-        # Fetch per-suite result files and write to temp dir
-        mkdir -p /tmp/suite-scores
-        for SUITE in smoke developer software system; do
-          curl -sf \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/projectbluefin/testing-lab/contents/docs/results/${IMG_SLUG}-${SUITE}.json" \
-            2>/dev/null \
-          | jq -r 'if .content then (.content | gsub("\n";"") | @base64d) else empty end' 2>/dev/null \
-          > "/tmp/suite-scores/${SUITE}.json" || true
-        done
-
-        # Build suite_scores object via jq (one-liner per suite, merge via jq -n)
-        SUITE_SCORES=$(jq -n \
-          --argjson sm "$(test -s /tmp/suite-scores/smoke.json    && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/smoke.json    2>/dev/null || echo 'null')" \
-          --argjson de "$(test -s /tmp/suite-scores/developer.json && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/developer.json 2>/dev/null || echo 'null')" \
-          --argjson sw "$(test -s /tmp/suite-scores/software.json  && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/software.json  2>/dev/null || echo 'null')" \
-          --argjson sy "$(test -s /tmp/suite-scores/system.json    && jq '{scenarios:.scenarios,failed:.failed,status:.status}' /tmp/suite-scores/system.json    2>/dev/null || echo 'null')" \
-          '{smoke:$sm,developer:$de,software:$sw,system:$sy} | with_entries(select(.value != null))' \
-        2>/dev/null || echo '{}')
-
-        NEW_RUN=$(jq -nc \
-          --arg id   "$WF_NAME" \
-          --arg overall "$OVERALL" \
-          --arg label "$LABEL" \
-          --arg variant "$VARIANT" \
-          --arg started "$NOW" \
-          --arg finished "$NOW" \
-          --arg trigger "$TRIGGER" \
-          --argjson scores "${SUITE_SCORES}" \
-          '{id:$id,overall:$overall,label:$label,variant:$variant,started_at:$started,finished_at:$finished,trigger:$trigger,suite_scores:$scores}')
-
-        # Prepend new entry, keep most recent 15, update _meta.generated
-        UPDATED=$(echo "$STATS" | jq -c \
-          --argjson run "$NEW_RUN" \
-          --arg now "$NOW" \
-          '.recent_runs = ([$run] + (.recent_runs // []) | .[:15])
-           | ._meta.generated = $now')
-
-        # Push back
-        BODY=$(jq -nc \
-          --arg msg  "chore: update dashboard run data for ${WF_NAME}" \
-          --arg content "$(echo "$UPDATED" | base64 -w0)" \
-          --arg sha  "$FILE_SHA" \
-          '{message:$msg,content:$content,sha:$sha}')
-
-        HTTP_CODE_FILE=$(mktemp)
-        curl -s -w "%{http_code}" -o /dev/null \
-          -X PUT \
-          -H "Authorization: token ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
-          -H "Content-Type: application/json" \
-          -d "$BODY" "${API_URL}" > "${HTTP_CODE_FILE}" 2>/dev/null || true
-        HTTP=$(cat "${HTTP_CODE_FILE}"); rm -f "${HTTP_CODE_FILE}"
-
-        echo "Dashboard update: ${OVERALL} for ${LABEL} (${WF_NAME}) — http=${HTTP}"
-        SCRIPT_EOF
