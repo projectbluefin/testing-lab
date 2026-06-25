@@ -116,6 +116,7 @@ spec:
                   memory:
                     guest: 32Gi
                   devices:
+                    blockMultiQueue: true
                     rng: {}
                     disks:
                       - name: rootdisk

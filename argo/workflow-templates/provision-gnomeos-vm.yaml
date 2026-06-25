@@ -248,6 +248,7 @@ spec:
                   memory:
                     guest: 8Gi
                   devices:
+                    blockMultiQueue: true
                     rng: {}
                     disks:
                       - name: rootdisk

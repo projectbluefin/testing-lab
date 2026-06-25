@@ -101,6 +101,7 @@ spec:
                   memory:
                     guest: "{{inputs.parameters.vm-memory}}"
                   devices:
+                    blockMultiQueue: true
                     rng: {}
                     disks:
                       - name: rootdisk
