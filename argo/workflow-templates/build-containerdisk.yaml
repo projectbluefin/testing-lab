@@ -296,8 +296,19 @@ spec:
         echo "qcow2 size: $(du -sh "${QCOW}" | cut -f1)"
 
         echo "Building containerDisk OCI image..."
+        cat << 'JSON' > "${STAGING}/containerDisk.json"
+        {
+          "volumes": [
+            {
+              "image": "disk.qcow2",
+              "capacity": "{{inputs.parameters.disk-size}}"
+            }
+          ]
+        }
+        JSON
         CTR=$(buildah from scratch)
         buildah copy --chown 107:107 "${CTR}" "${QCOW}" /disk/disk.qcow2
+        buildah copy "${CTR}" "${STAGING}/containerDisk.json" /containerDisk.json
         buildah commit "${CTR}" "${DEST}"
 
         echo "Pushing to ${DEST}..."
