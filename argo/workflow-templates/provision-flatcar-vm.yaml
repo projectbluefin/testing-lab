@@ -69,7 +69,7 @@ spec:
       emptyDir:
         sizeLimit: 20Gi
     script:
-      image: quay.io/fedora/fedora:latest
+      image: cgr.dev/chainguard/wolfi-base:latest
       command: [bash]
       securityContext:
         privileged: true
@@ -93,7 +93,7 @@ spec:
         # ponytail: :latest tag is fine — no nightly CronWorkflow, runs are sequential
 
         echo "Installing qemu-img and bzip2..." >&2
-        dnf install -y -q qemu-img bzip2 buildah 2>&1 | tail -3
+        apk add -q qemu-img bzip2 buildah curl
 
         echo "Downloading Flatcar ${CHANNEL} ${VERSION}..." >&2
         curl -L --fail --retry 3 -o /mnt/work/flatcar.img.bz2 "${URL}"

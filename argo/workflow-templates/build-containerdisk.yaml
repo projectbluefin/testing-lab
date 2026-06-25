@@ -233,7 +233,7 @@ spec:
         # Authenticate with GHCR to avoid rate limits and to support private images.
         echo "${GITHUB_TOKEN}" | podman login ghcr.io -u _ --password-stdin
         # Pull image — lands in /var/lib/containers/storage (ghost SSD).
-        podman --storage-driver=vfs pull --tls-verify=true "${IMAGE}"
+        podman pull --tls-verify=true "${IMAGE}"
 
         echo "[OUTER] SSH_AUTHORIZED_KEYS prefix: ${SSH_AUTHORIZED_KEYS:0:30}..."
 
@@ -245,7 +245,7 @@ spec:
         PODMAN_EXIT=0
         # --security-opt label=type:unconfined_t is the canonical bootc install flag.
         # Per bootc-dev/bootc docs/src/bootc-install.md via-loopback section.
-        podman --storage-driver=vfs run --rm --privileged --pid=host --ipc=host \
+        podman run --rm --privileged --pid=host --ipc=host \
           --security-opt label=type:unconfined_t \
           -v /dev:/dev \
           -v /run/udev:/run/udev \
@@ -295,7 +295,7 @@ spec:
             # --via-loopback: upstream recommended pattern for VM disk creation.
             # --root-ssh-authorized-keys: bootc-native root SSH key injection.
             LD_PRELOAD=${LD_PRELOAD_VAR:-} bootc install to-disk \
-                      --source-imgref 'docker://${IMAGE}' \
+                      --source-imgref 'docker://192.168.1.102:30501/'"${IMAGE#*/}" \
               --generic-image \
               --filesystem=btrfs \
               --target-no-signature-verification \
@@ -679,4 +679,8 @@ spec:
         rm -f "${RAW}" "${QCOW}"
 
         echo "Done: ${DEST}"
+
+
+
+
 
