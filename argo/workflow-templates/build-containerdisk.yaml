@@ -295,6 +295,7 @@ spec:
             # --via-loopback: upstream recommended pattern for VM disk creation.
             # --root-ssh-authorized-keys: bootc-native root SSH key injection.
             LD_PRELOAD=${LD_PRELOAD_VAR:-} bootc install to-disk \
+                      --source-imgref 'docker://${IMAGE}' \
               --generic-image \
               --filesystem=btrfs \
               --target-no-signature-verification \
