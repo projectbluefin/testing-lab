@@ -65,13 +65,9 @@ If no row matches:
 
 ```text
 1. just logs
-2. Query Loki for "=== BEHAVE RESULTS JSON ==="
-3. Query Loki for "STEP_ERROR"
-4. Query Loki for "AT-SPI tree written"
-5. argo get -n argo <workflow-name>
+2. argo logs -n argo <workflow-name> --follow
+3. argo get -n argo <workflow-name>
 ```
-
-Loki: <http://192.168.1.102:30100>. Pod label: `app.kubernetes.io/part-of=bluefin-test-suite`.
 
 ---
 

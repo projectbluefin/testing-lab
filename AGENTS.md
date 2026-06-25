@@ -23,7 +23,6 @@ Before changing anything, load the relevant skill file from `docs/skills/`:
 | ArgoCD sync, GitOps rules, bootstrap vs managed | [`docs/skills/gitops-argocd.md`](docs/skills/gitops-argocd.md) |
 | Flatcar node onboarding, k3s join, Nebraska, update_engine | [`docs/skills/flatcar-node-onboarding.md`](docs/skills/flatcar-node-onboarding.md) |
 | behave / qecore / dogtail / GNOME AT-SPI tests | [`docs/skills/test-authoring.md`](docs/skills/test-authoring.md) |
-| Loki, Promtail, pod log scraping, retention, disk fill | [`docs/skills/monitoring.md`](docs/skills/monitoring.md) |
 | End of session — write-back loop | [`docs/skills/skill-improvement.md`](docs/skills/skill-improvement.md) |
 
 **At end of every non-trivial session:** run the write-back loop in `docs/skills/skill-improvement.md`. Every session produces two outputs: the work and the learning.
@@ -122,7 +121,6 @@ Every pipeline (Bluefin, Bluefin-LTS, Dakota, Knuckle) provisions a fresh VM on 
 | bazzite | k3s worker (offline) | 192.168.1.223 | Gaming machine — removed from active service; rejoin with `just k8s-on` when available |
 | hamilton | k3s worker (opt-in) | 192.168.1.225 | Bluefin workstation — 16c/31.2Gi; `just k8s-on/off` to join/leave |
 | Argo UI | — | http://192.168.1.102:32746 | NodePort; also http://192.168.1.102:2746 on host |
-| Loki | log aggregation | http://192.168.1.102:30100 | Scrapes pods labeled `app.kubernetes.io/part-of=bluefin-test-suite` |
 | ArgoCD | GitOps controller | https://192.168.1.102 (argocd NS) | Two Applications: `testing-lab` + `testing-lab-infra` |
 | llm-d | LLM inference (hive node) | http://192.168.1.102:30800 | OpenAI-compatible API; model: Qwen/Qwen3.6-35B-A3B; namespace: `llm-d` |
 
@@ -218,8 +216,6 @@ manifests/                     ← ArgoCD (testing-lab-infra App) syncs these
   homelab-runner-rbac.yaml        RBAC for homelab ARC runners
   inotify-tuning.yaml             DaemonSet: tune inotify limits on all nodes
   registry-mirror-config.yaml     DaemonSet: write containerd hosts.toml mirror config
-  loki-config.yaml                Loki log aggregation config
-  promtail-config.yaml            Promtail log scraper config
   zot-cache.yaml                  Zot pull-through cache (port 30501, all upstreams)
   zot-writable.yaml               Zot writable local registry (port 30500)
 argocd/
@@ -345,7 +341,7 @@ For command recipes and deeper debugging flow, see [docs/dogtail-testing.md](doc
 ## Workflow History
 
 Workflows are retained for 7 days on success and 30 days on failure via `workflow-controller-configmap`.
-Loki captures workflow pod logs. Use the commands in [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) or the expanded procedures in [docs/lab-operations.md](docs/lab-operations.md) to retrieve results.
+Workflow pod logs are accessible via `argo logs`, the Argo UI, and `argo-mcp-logs_workflow`. Use the commands in [docs/agent-cheatsheet.md](docs/agent-cheatsheet.md) or the expanded procedures in [docs/lab-operations.md](docs/lab-operations.md) to retrieve results.
 
 ## Namespaces
 

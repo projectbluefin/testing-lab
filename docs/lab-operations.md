@@ -77,22 +77,10 @@ Repo-owner wrapper when needed:
 - `just logs`
 - `just list-workflows`
 
-### 4.2 Loki queries
-
-Loki is at <http://192.168.1.102:30100>. Pods carry `app.kubernetes.io/part-of=bluefin-test-suite`.
-
-| What you want | Loki query |
-|---|---|
-| Full behave JSON | `{app_kubernetes_io_part_of="bluefin-test-suite"} |= "=== BEHAVE RESULTS JSON ==="` |
-| Step traceback | `{app_kubernetes_io_part_of="bluefin-test-suite"} |= "STEP_ERROR"` |
-| AT-SPI tree dump | `{app_kubernetes_io_part_of="bluefin-test-suite"} |= "AT-SPI tree written"` |
-| Variant filter | `{bluefin_io_variant="lts"}` |
-| Suite filter | `{bluefin_io_suite="developer"}` |
-
-### 4.3 Runner artifacts
+### 4.2 Runner artifacts
 
 The runner echoes `results.json`, `pytest-results.xml`, and `atspi_tree.txt` into pod stderr before exit.
-Use Argo logs or Loki instead of shelling into pods.
+Use `argo logs` or the Argo UI instead of shelling into pods.
 
 ### 4.4 Updating files without workstation `scp`
 
@@ -195,10 +183,8 @@ SSH key injection now uses KubeVirt `accessCredentials` — not disk injection.
 ### 5.10 Unknown failure class
 
 1. `just logs`
-2. Query Loki for `=== BEHAVE RESULTS JSON ===`
-3. Query Loki for `STEP_ERROR`
-4. Query Loki for `AT-SPI tree written`
-5. `argo-mcp-get_workflow <workflow-name>`
+2. `argo logs -n argo <workflow-name>`
+3. `argo-mcp-get_workflow <workflow-name>`
 
 Expected outcome: after step 4 or 5 you should have a concrete failing template, step, or VM phase to route back into one of the branches above.
 

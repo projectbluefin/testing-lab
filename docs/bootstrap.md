@@ -157,20 +157,6 @@ just setup-ghost-ssh-banner
 
 ---
 
-## 8. Set Up Observability (optional)
-
-Deploy the OTel collector + Loki scraping config:
-
-```bash
-argo submit --from workflowtemplate/setup-otel -n argo --wait --log
-kubectl apply -f manifests/promtail-config.yaml
-```
-
-Loki listens at `http://192.168.1.102:30100` and scrapes pods labeled
-`app.kubernetes.io/part-of=bluefin-test-suite`.
-
----
-
 ## 9. Add Worker Nodes (optional)
 
 This cluster uses an opt-in model: worker nodes join the cluster manually and can

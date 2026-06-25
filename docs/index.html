@@ -604,10 +604,9 @@ function ghScenarioLink(suite, name) {
   return `https://github.com/search?q=${q}&type=code`;
 }
 
-// Loki log query URL for a workflow pod (raw API — filter by workflow label)
-function lokiLogUrl(wfName) {
-  const q = encodeURIComponent(`{app_kubernetes_io_part_of="bluefin-test-suite"} |= "${wfName}"`);
-  return `http://192.168.1.102:30100/loki/api/v1/query_range?query=${q}&limit=1000`;
+// Argo UI workflow URL
+function argoWorkflowUrl(wfName) {
+  return `http://192.168.1.102:32746/workflows/argo/${wfName}`;
 }
 
 // ── Nightly schedule strip ───────────────────────────────────────────────────
@@ -1345,7 +1344,7 @@ function buildFailures(allData, stats) {
         <span class="sep">·</span>
         ${since ? `Failing since: ${fmtAgo(since)}${consecutiveRuns > 1 ? ` <span style="color:var(--fail);font-size:10px">(${consecutiveRuns} runs)</span>` : ''}` : ''}
         ${argoUrl ? `<span class="sep">·</span><a href="${argoUrl}" target="_blank" rel="noopener">Argo logs</a>` : ''}
-        ${d.workflow_name ? `<span class="sep">·</span><a href="${lokiLogUrl(d.workflow_name)}" target="_blank" rel="noopener" style="color:var(--muted)" title="Query Loki for all pods in this workflow">Loki logs</a>` : ''}
+        ${d.workflow_name ? `<span class="sep">·</span><a href="${argoWorkflowUrl(d.workflow_name)}" target="_blank" rel="noopener" style="color:var(--muted)" title="View workflow in Argo UI">Argo workflow</a>` : ''}
         <span class="sep">·</span>
         <a href="${featureUrl}" target="_blank" rel="noopener">Feature files</a>
         <span class="sep">·</span>

@@ -72,7 +72,7 @@ etcd-snapshot-compress: true
 | Argument | Value | Rationale |
 |---|---|---|
 | `default-watch-cache-size` | 100 | Caps per-resource watch-cache entries; still fast for informers on a small cluster |
-| `event-ttl` | 30m | Default 1h; events are noisy and not durably needed — lab already uses Loki |
+| `event-ttl` | 30m | Default 1h; events are noisy and short-lived — Argo logs are the durable record |
 | `max-requests-inflight` | 100 | Default 400; adequate for five nodes + Argo burst |
 | `max-mutating-requests-inflight` | 50 | Default 200; adequate for VM create/delete cycles |
 | `profiling` | false | Saves a small amount of CPU; no pprof endpoint needed in production |

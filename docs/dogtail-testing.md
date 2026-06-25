@@ -165,9 +165,8 @@ Common tags in this repo: `@smoke_suite`, `@top_bar`, `@activities`, `@quick_set
 
 - Argo UI: <http://192.168.1.102:32746>
 - Logs: `just logs` or Argo MCP `logs_workflow`
-- Loki: <http://192.168.1.102:30100> (label `app.kubernetes.io/part-of=bluefin-test-suite`)
 - Artifacts (`results.json`, `pytest-results.xml`, `atspi_tree.txt`) are echoed into the
-  pod's stderr — search Loki for `=== BEHAVE RESULTS JSON ===`.
+  pod's stderr — use `argo logs <workflow-name> -n argo` to retrieve them.
 
 ---
 
@@ -427,7 +426,7 @@ def after_scenario(context, scenario):
 
 def after_step(context, step):
     # behave's JSON serialiser drops error_message for exceptions with empty str();
-    # print the full traceback ourselves so it lands in Loki.
+    # print the full traceback ourselves so it lands in Argo pod logs.
     if step.status.name in ("error", "failed") and step.exception is not None:
         traceback.print_exception(type(step.exception), step.exception,
                                   step.exception.__traceback__, file=sys.stderr)
@@ -500,7 +499,7 @@ than no test — it costs cluster time and trains agents to ignore red builds.
    refreshes.
 4. **Fail loudly, fail informatively.** Every assertion must produce enough context in its
    error message to triage from logs alone (full toggle inventory, raw Shell.Eval output,
-   AT-SPI children of the parent). Loki is the *only* post-mortem surface.
+   AT-SPI children of the parent). Argo pod logs are the *only* post-mortem surface.
 5. **No silent skips.** `behave` will mark a scenario "skipped" if its `before_scenario`
    fails silently — don't catch broad exceptions in hooks without `print`ing them and
    re-raising or `sys.exit(1)`.
@@ -592,7 +591,7 @@ Set after `context.sandbox = TestSandbox(...)` in `before_all`. Full list at
 | `opt_in_tree_on_fail`           | `False` | Flip when triaging "node not found" — embeds the AT-SPI tree.        |
 | `set_keyring`                   | `True`  | Leave on — prevents keyring popups breaking tests.                   |
 | `workspace_return`              | `False` | Flip if a scenario leaves apps on workspace ≠ 1.                     |
-| `production`                    | `True`  | Set to `False` in this repo (verbose logs needed in Loki).           |
+| `production`                    | `True`  | Set to `False` in this repo (verbose logs needed in Argo pod logs).  |
 | `attach_faf`                    | `True`  | Set to `False` (no FAF infrastructure).                              |
 | `package_list`                  | `{"gnome-shell","mutter",component}` | Extend to record extra RPM versions in the report. |
 
@@ -623,7 +622,7 @@ shape for new suites.
 
 ## 9. Debugging a Failure
 
-1. **Read the runner log first.** Search Loki/Argo logs for
+1. **Read the runner log first.** Search Argo logs for
    `=== BEHAVE RESULTS JSON ===` (full per-scenario report).
 2. **Look for `STEP_ERROR`** — `after_step` prints a full traceback for any errored step.
 3. **Inspect `/tmp/results/atspi_tree.txt`** — first smoke scenario writes it. Tells you
@@ -853,18 +852,6 @@ hitting a cached object or a pure Python comparison. Audit these immediately:
 After the 2026-05-26 fix (commit `70f51a8`), the smoke suite went from **31 zero-duration
 active steps → 1** (the one remaining is `Last command output stripped` which reads a Python
 string and is legitimately instantaneous).
-
-**Loki is not ingesting pod logs — capture behave JSON during the run.**
-As of 2026-05-26, the Loki instance at `http://192.168.1.102:30100` has no label data and
-returns zero streams for all queries. The per-scenario behave JSON (written to stderr inside
-the workflow pod) is lost when pods are cleaned up by `podGC`. To capture it:
-```bash
-# Wait until pod is in Running state, THEN attach
-kubectl logs -n argo <pod> -c main --follow > /tmp/smoke-output.log 2>&1 &
-argo wait <workflow> -n argo
-```
-Attach logs only after the pod transitions to `Running` — attaching during `PodInitializing`
-causes `kubectl logs` to time out during the init container phase.
 
 **The upstream Red Hat GNOME test suite used throughout this repo is:**
 `https://github.com/modehnal/GNOMETerminalAutomation` — by Michal Odehnal (Red Hat DesktopQE).
