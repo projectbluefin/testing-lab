@@ -146,17 +146,7 @@ spec:
                     cloudInitNoCloud:
                       userData: |
                         #cloud-config
-                        write_files:
-                          - path: /home/core/.ssh/authorized_keys
-                            permissions: '0600'
-                            owner: core:core
-                        runcmd:
-                          - mkdir -p /home/core/.ssh
-                          - chmod 700 /home/core/.ssh
-                          - mkfs.ext4 -F /dev/vdb
-                          - mkdir -p /var/tmp/build
-                          - mount /dev/vdb /var/tmp/build
-                          - chown core:core /var/tmp/build
+                        ssh_authorized_keys: []
 
     - name: wait-for-ssh
       script:
@@ -288,6 +278,13 @@ spec:
 
           $SSH bash -s << REMOTE
           set -euo pipefail
+
+          echo "=== Formatting and mounting build PVC (/dev/vdb) ==="
+          sudo mkfs.ext4 -F /dev/vdb
+          sudo mkdir -p /var/tmp/build
+          sudo mount /dev/vdb /var/tmp/build
+          sudo chown core:core /var/tmp/build
+
           KERNEL_VERSION="${KERNEL_VERSION}"
           SCRIPTS_REF="${SCRIPTS_REF}"
           SDK_VERSION="${SDK_VERSION}"
