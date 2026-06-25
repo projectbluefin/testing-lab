@@ -152,7 +152,7 @@ spec:
 
     - name: wait-for-ssh
       script:
-        image: registry.fedoraproject.org/fedora-hummingbird:latest
+        image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
         resources:
           requests:
@@ -248,7 +248,7 @@ spec:
               path: /tmp/filename.txt
       activeDeadlineSeconds: 10800
       script:
-        image: registry.fedoraproject.org/fedora-hummingbird:latest
+        image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
         securityContext:
           runAsUser: 0
@@ -409,7 +409,7 @@ spec:
           - name: size
           - name: filename
       script:
-        image: registry.fedoraproject.org/fedora-hummingbird:latest
+        image: cgr.dev/chainguard/kubectl:latest-dev
         command: [bash]
         resources:
           requests:
