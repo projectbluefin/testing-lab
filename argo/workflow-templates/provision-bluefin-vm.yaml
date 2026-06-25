@@ -128,6 +128,7 @@ spec:
                   - name: rootdisk
                     containerDisk:
                       image: "192.168.1.102:30500/bluefin-containerdisk:{{inputs.parameters.image-tag}}"
+                      imagePullPolicy: Always
 
     - name: wait-for-vm-ready
       metadata:
