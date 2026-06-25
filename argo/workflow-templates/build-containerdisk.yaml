@@ -247,6 +247,45 @@ spec:
           --via-loopback \
           "${DISK}"
 
+        # === Post-install: Rebuild grubx64.efi with btrfs support ===
+        # The grub2-efi-x64 binary shipped by CentOS/RHEL does not include btrfs.mod.
+        # KubeVirt presents disks as virtio-blk; on UEFI, GRUB must probe each EFI_BLOCK_IO
+        # handle for filesystems. Without btrfs.mod, GRUB cannot probe the btrfs root
+        # partition, so search --fs-uuid returns "no such device" and the VM hangs at GRUB.
+        # Fix: rebuild grubx64.efi from grub2-efi-x64-modules with btrfs compiled in.
+        LOOP=$(losetup --show -Pf "${DISK}" 2>/dev/null || true)
+        if [[ -n "${LOOP}" ]]; then
+          sleep 1
+          mkdir -p /tmp/efi-fix
+          if mount "${LOOP}p2" /tmp/efi-fix 2>/dev/null; then
+            if strings /tmp/efi-fix/EFI/centos/grubx64.efi 2>/dev/null | grep -qi btrfs; then
+              echo "[BUILD] grubx64.efi already has btrfs support, skipping rebuild"
+            else
+              echo "[BUILD] grubx64.efi missing btrfs — rebuilding with btrfs support..."
+              if ! ls /usr/lib/grub/x86_64-efi/btrfs.mod >/dev/null 2>&1; then
+                if which dnf >/dev/null 2>&1; then
+                  dnf install -y grub2-efi-x64-modules 2>&1 | tail -5
+                fi
+              fi
+              if ls /usr/lib/grub/x86_64-efi/btrfs.mod >/dev/null 2>&1; then
+                grub2-mkimage \
+                  --directory /usr/lib/grub/x86_64-efi \
+                  --output /tmp/efi-fix/EFI/centos/grubx64.efi \
+                  --format x86_64-efi \
+                  btrfs fat part_gpt part_msdos normal configfile echo sleep \
+                  linux linuxefi initrd initrdefi all_video \
+                  blscfg search search_fs_uuid search_fs_file \
+                  gfxterm gfxterm_background gfxmenu video_bochs video_cirrus
+                echo "[BUILD] grubx64.efi rebuilt with btrfs support"
+              else
+                echo "[BUILD] WARNING: grub2-efi-x64-modules unavailable, btrfs GRUB fix skipped"
+              fi
+            fi
+            umount /tmp/efi-fix
+          fi
+          losetup -d "${LOOP}" 2>/dev/null || true
+        fi
+
   - name: convert-and-push
     inputs:
       parameters:
