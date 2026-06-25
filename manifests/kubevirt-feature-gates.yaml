@@ -1,6 +1,6 @@
 # Persist required KubeVirt feature gates via GitOps.
 # This is intentionally a minimal SSA patch against the live KubeVirt CR so
-# ArgoCD manages only the featureGates we require for this repo's VM flows.
+# ArgoCD manages only the configuration we require for this repo's VM flows.
 apiVersion: kubevirt.io/v1
 kind: KubeVirt
 metadata:
@@ -8,6 +8,7 @@ metadata:
   namespace: kubevirt
 spec:
   configuration:
+    cpuModel: "host-passthrough"
     developerConfiguration:
       featureGates:
         - HostDisk
