@@ -31,7 +31,7 @@ spec:
       #
       # Measured compressed layer sizes via skopeo inspect (2026-06):
       #   bluefin:testing  4295 MB compressed → 25G  (native host SELinux; no relabeling pass needed; fits)
-      #   bluefin-lts      3153 MB compressed → 25G  (non-native; LTS declares xfs but btrfs override works; fits)
+      #   bluefin-lts      3153 MB compressed → 25G  (native xfs; CentOS/RHEL grubx64.efi has xfs.mod; fits)
       #   aurora           3405 MB compressed → 30G  (non-native; 25G failed with 282 kB remaining at end of relabeling)
       #   bazzite          4712 MB compressed → 40G  (non-native; not yet measured; scaled from aurora's empirical ratio)
       #   dakota           2927 MB compressed → blocked  (composefs image: declares bootloader=systemd + composefs=yes but ships no UKI; bootc install to-disk requires a signed UKI for composefs path; needs upstream fix or golden-disk approach like GnomeOS)
@@ -236,47 +236,14 @@ spec:
         fi
 
         LOCAL_IMAGE="192.168.1.102:30501/${IMAGE#*/}"
-        
-        # === Pre-install: Rebuild grubx64.efi with btrfs support ===
-        # The grub2-efi-x64 binary shipped by CentOS/RHEL does not include btrfs.mod.
-        # KubeVirt presents disks as virtio-blk; on UEFI, GRUB must probe each EFI_BLOCK_IO
-        # handle for filesystems. Without btrfs.mod, GRUB cannot probe the btrfs root
-        # partition, so search --fs-uuid returns "no such device" and the VM hangs at GRUB.
-        # Fix: rebuild grubx64.efi from grub2-efi-x64-modules with btrfs compiled in BEFORE
-        # bootupd deploys it. This is a no-op for Fedora-based images already having btrfs.
-        EFI_BINARY=/boot/efi/EFI/centos/grubx64.efi
-        if [[ -f "${EFI_BINARY}" ]]; then
-          if strings "${EFI_BINARY}" | grep -qi btrfs; then
-            echo "[BUILD] grubx64.efi already has btrfs support, skipping rebuild"
-          else
-            echo "[BUILD] grubx64.efi missing btrfs — rebuilding with btrfs support..."
-            if ! ls /usr/lib/grub/x86_64-efi/btrfs.mod >/dev/null 2>&1; then
-              if which dnf >/dev/null 2>&1; then
-                dnf install -y grub2-efi-x64-modules 2>&1 | tail -5
-              fi
-            fi
-            if ls /usr/lib/grub/x86_64-efi/btrfs.mod >/dev/null 2>&1; then
-              grub2-mkimage \
-                --directory /usr/lib/grub/x86_64-efi \
-                --output "${EFI_BINARY}" \
-                --format x86_64-efi \
-                btrfs fat part_gpt part_msdos normal configfile echo sleep \
-                linux linuxefi initrd initrdefi all_video \
-                blscfg search search_fs_uuid search_fs_file \
-                gfxterm gfxterm_background gfxmenu video_bochs video_cirrus
-              echo "[BUILD] grubx64.efi rebuilt with btrfs support ($(stat -c%s "${EFI_BINARY}") bytes)"
-            else
-              echo "[BUILD] WARNING: grub2-efi-x64-modules unavailable, btrfs GRUB fix skipped"
-            fi
-          fi
-        else
-          echo "[BUILD] No grubx64.efi at ${EFI_BINARY}, GRUB fix not applicable"
-        fi
 
+        # Use the image's native filesystem (no --filesystem override).
+        # bluefin:testing → Fedora → btrfs (native).
+        # bluefin-lts:testing → CentOS/RHEL → xfs (native).
+        # Forcing btrfs on LTS broke GRUB EFI: CentOS grubx64.efi lacks btrfs.mod.
         bootc install to-disk \
           --source-imgref "docker://${IMAGE}" \
           --generic-image \
-          --filesystem=btrfs \
           --target-no-signature-verification \
           --disable-selinux \
           --root-ssh-authorized-keys "${STAGING}/root-ssh-keys" \
