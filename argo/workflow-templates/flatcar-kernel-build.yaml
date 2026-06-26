@@ -336,39 +336,44 @@ spec:
             ebuild /overlay/sys-kernel/coreos-modules/coreos-modules-\${KERNEL_VERSION}.ebuild manifest 2>/dev/null || true
           "
 
+        echo "=== Write build script for execution inside SDK container ==="
+        printf '%s\n' \
+          '#!/bin/bash' \
+          'set -euo pipefail' \
+          '' \
+          '# Register overlay in portage repos.conf (both host and board)' \
+          'sudo mkdir -p /etc/portage/repos.conf /build/amd64-usr/etc/portage/repos.conf' \
+          'echo "[flatcar-kernel]" | sudo tee /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null' \
+          'echo "location = /overlay" | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null' \
+          'echo "masters = portage-stable coreos" | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null' \
+          'echo "auto-sync = no" | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null' \
+          '' \
+          '# Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)' \
+          '/mnt/host/source/src/scripts/setup_board \' \
+          '  --board=amd64-usr --default' \
+          '' \
+          '# Build kernel packages' \
+          'emerge-amd64-usr --quiet --jobs={{workflow.parameters.cores}} \' \
+          '  =sys-kernel/coreos-sources-{{inputs.parameters.kernel-version}} \' \
+          '  =sys-kernel/coreos-kernel-{{inputs.parameters.kernel-version}} \' \
+          '  =sys-kernel/coreos-modules-{{inputs.parameters.kernel-version}}' \
+          '' \
+          '# Build the full Flatcar OS image (generates update payload)' \
+          '/mnt/host/source/src/scripts/build_image \' \
+          '  --board=amd64-usr prod' \
+          '' \
+          'mkdir -p /mnt/host/source/src/build/output' \
+          'cp /mnt/host/source/src/build/images/amd64-usr/latest/flatcar_production_update.gz \' \
+          '   /mnt/host/source/src/build/output/flatcar_production_update.gz' \
+          > \${BUILD_DIR}/scripts/build-inside-sdk.sh
+        chmod +x \${BUILD_DIR}/scripts/build-inside-sdk.sh
+
         echo "=== Run SDK build via run_sdk_container ==="
         # run_sdk_container detects Docker and uses it natively
         ./run_sdk_container --rm \
           -m \${BUILD_DIR}/testing-lab/flatcar/kernel-overlay:/overlay \
           -V \${SDK_VERSION} \
-          -- bash -c "
-            set -euo pipefail
-
-            # Register overlay in portage repos.conf (both host and board)
-            sudo mkdir -p /etc/portage/repos.conf /build/amd64-usr/etc/portage/repos.conf
-            echo '[flatcar-kernel]' | sudo tee /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null
-            echo 'location = /overlay' | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null
-            echo 'masters = portage-stable coreos' | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null
-            echo 'auto-sync = no' | sudo tee -a /etc/portage/repos.conf/flatcar-kernel.conf /build/amd64-usr/etc/portage/repos.conf/flatcar-kernel.conf >/dev/null
-
-            # Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)
-            /mnt/host/source/src/scripts/setup_board \
-              --board=amd64-usr --default
-
-            # Build kernel packages
-            emerge-amd64-usr --quiet --jobs={{workflow.parameters.cores}} \
-              =sys-kernel/coreos-sources-\${KERNEL_VERSION} \
-              =sys-kernel/coreos-kernel-\${KERNEL_VERSION} \
-              =sys-kernel/coreos-modules-\${KERNEL_VERSION}
-
-            # Build the full Flatcar OS image (generates update payload)
-            /mnt/host/source/src/scripts/build_image \
-              --board=amd64-usr prod
-
-            mkdir -p /mnt/host/source/src/build/output
-            cp /mnt/host/source/src/build/images/amd64-usr/latest/flatcar_production_update.gz \
-               /mnt/host/source/src/build/output/flatcar_production_update.gz
-          "
+          -- /mnt/host/source/src/scripts/build-inside-sdk.sh
 
         # Collect output metadata
         PAYLOAD=\${BUILD_DIR}/scripts/src/build/output/flatcar_production_update.gz
