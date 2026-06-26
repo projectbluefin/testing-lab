@@ -322,10 +322,6 @@ spec:
         git clone --depth=1 --branch "\${SCRIPTS_REF}" \
           https://github.com/flatcar/scripts \${BUILD_DIR}/src/scripts
 
-        echo "=== Bypassing login shell profile scripts inside SDK container ==="
-        sed -i '/--entrypoint \/bin\/bash/{n;n;d}' \${BUILD_DIR}/src/scripts/run_sdk_container
-        sed -i '/version="\\\${FLATCAR_VERSION_ID}"/a version="\\\${DISTRIB_RELEASE}"' \${BUILD_DIR}/src/scripts/sdk_lib/sdk_entry.sh
-
         echo "=== Clone flatcar/coreos-overlay @ main ==="
         mkdir -p \${BUILD_DIR}/src/scripts/sdk_container/src/third_party
         rm -rf \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay
@@ -434,6 +430,7 @@ spec:
 
         # run_sdk_container detects Docker and uses it natively
         ./run_sdk_container --rm \
+          -v \${SDK_VERSION} \
           -m \${BUILD_DIR}/\${OVERLAY_DEST}:/overlay \
           -m \${BUILD_DIR}/portage-temp:/build/amd64-usr/var/tmp/portage \
           -V \${SDK_VERSION} \
