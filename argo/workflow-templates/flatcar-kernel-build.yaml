@@ -327,6 +327,7 @@ spec:
         rm -rf \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay
         git clone --depth=1 --branch main \
           https://github.com/flatcar/coreos-overlay \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay
+        echo "coreos-overlay" > \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay/profiles/repo_name
 
         echo "=== Clone flatcar/portage-stable @ main ==="
         rm -rf \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/portage-stable
