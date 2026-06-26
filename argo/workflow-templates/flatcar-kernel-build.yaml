@@ -172,11 +172,11 @@ spec:
       command: [bash]
       resources:
         requests:
-          cpu: 100m
-          memory: 128Mi
+          cpu: 10m
+          memory: 32Mi
         limits:
-          cpu: 500m
-          memory: 512Mi
+          cpu: 50m
+          memory: 64Mi
       env:
       - name: SSH_PUBKEY
         valueFrom:
@@ -273,11 +273,11 @@ spec:
       command: [bash]
       resources:
         requests:
-          cpu: 500m
-          memory: 512Mi
+          cpu: 50m
+          memory: 64Mi
         limits:
-          cpu: 1000m
-          memory: 1024Mi
+          cpu: 200m
+          memory: 128Mi
       env:
       - name: SSH_KEY
         valueFrom:
@@ -472,11 +472,11 @@ spec:
       command: [bash]
       resources:
         requests:
-          cpu: 100m
-          memory: 128Mi
+          cpu: 10m
+          memory: 32Mi
         limits:
-          cpu: 500m
-          memory: 512Mi
+          cpu: 50m
+          memory: 64Mi
       source: |
         set -euo pipefail
         apk add --no-cache bash curl jq kubectl git >/dev/null 2>&1
