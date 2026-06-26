@@ -336,6 +336,9 @@ spec:
         git clone --depth=1 --branch flatcar-master \
           https://github.com/flatcar/portage-stable \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/portage-stable
 
+        echo "=== Patching kernel-2.eclass to support EAPI 7 and 8 ==="
+        sed -i 's/2|3|4|5|6/2|3|4|5|6|7|8/g' \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/portage-stable/eclass/kernel-2.eclass
+
         echo "=== Clone testing-lab for kernel overlay ==="
         git clone --depth=1 \
           https://github.com/projectbluefin/testing-lab \
@@ -403,7 +406,7 @@ spec:
           '' \
           '# Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)' \
           '/mnt/host/source/src/scripts/setup_board \' \
-          '  --board=amd64-usr --default --force' \
+          '  --board=amd64-usr --default --force --skip_chroot_upgrade --skip_toolchain_update' \
           '' \
           '# Create Portage build directory on the ext4 PVC mount and symlink it to bypass overlayfs bugs' \
           'sudo mkdir -p /mnt/host/source/portage-temp' \
