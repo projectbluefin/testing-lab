@@ -388,7 +388,8 @@ spec:
           'if [ -f /usr/local/portage/crossdev/metadata/layout.conf ]; then' \
           '  sudo sed -i "s/coreos/coreos-overlay/g" /usr/local/portage/crossdev/metadata/layout.conf' \
           'fi' \
-          'sudo rm -f /build/amd64-usr/etc/portage/repos.conf/coreos*.conf' \
+          '# Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)' \
+          'sudo mkdir -p /build/amd64-usr/etc/portage/repos.conf' \
           'echo "[coreos]" | sudo tee /build/amd64-usr/etc/portage/repos.conf/coreos.conf >/dev/null' \
           'echo "location = /mnt/host/source/src/third_party/coreos-overlay" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos.conf >/dev/null' \
           'echo "masters = portage-stable" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos.conf >/dev/null' \
@@ -399,12 +400,10 @@ spec:
           'echo "masters = portage-stable" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
           'echo "auto-sync = no" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
           '' \
-          'sudo rm -f /build/amd64-usr/etc/portage/repos.conf/portage-stable*.conf' \
           'echo "[portage-stable]" | sudo tee /build/amd64-usr/etc/portage/repos.conf/portage-stable.conf >/dev/null' \
           'echo "location = /mnt/host/source/src/third_party/portage-stable" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/portage-stable.conf >/dev/null' \
           'echo "auto-sync = no" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/portage-stable.conf >/dev/null' \
           '' \
-          '# Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)' \
           '/mnt/host/source/src/scripts/setup_board \' \
           '  --board=amd64-usr --default --force --skip_chroot_upgrade --skip_toolchain_update' \
           '' \
