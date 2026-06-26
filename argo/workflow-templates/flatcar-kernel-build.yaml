@@ -324,6 +324,11 @@ spec:
         git clone --depth=1 --branch "\${SCRIPTS_REF}" \
           https://github.com/flatcar/scripts \${BUILD_DIR}/src/scripts
 
+        echo "=== Bypassing login shell profile scripts inside SDK container ==="
+        sed -i '/--entrypoint \/bin\/bash/{n;n;d}' \${BUILD_DIR}/src/scripts/run_sdk_container
+        sed -i '/setup_board/d' \${BUILD_DIR}/src/scripts/sdk_lib/sdk_entry.sh
+        sed -i '/update_chroot/d' \${BUILD_DIR}/src/scripts/setup_board
+
         echo "=== Clone flatcar/coreos-overlay @ main ==="
         mkdir -p \${BUILD_DIR}/src/scripts/sdk_container/src/third_party
         rm -rf \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay
