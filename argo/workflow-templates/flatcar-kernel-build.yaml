@@ -44,9 +44,9 @@ spec:
     - name: namespace
       value: "flatcar-test"
     - name: cores
-      value: "4"
+      value: "16"
     - name: memory
-      value: "8Gi"
+      value: "16Gi"
     - name: storage
       value: "120Gi"
     - name: ssh-timeout
