@@ -322,27 +322,6 @@ spec:
         git clone --depth=1 --branch "\${SCRIPTS_REF}" \
           https://github.com/flatcar/scripts \${BUILD_DIR}/src/scripts
 
-        echo "=== Creating pre-configured repos.conf directory on host ==="
-        mkdir -p \${BUILD_DIR}/repos.conf
-        echo '[coreos]' > \${BUILD_DIR}/repos.conf/coreos.conf
-        echo 'location = /mnt/host/source/src/third_party/coreos-overlay' >> \${BUILD_DIR}/repos.conf/coreos.conf
-        echo 'masters = portage-stable' >> \${BUILD_DIR}/repos.conf/coreos.conf
-        echo 'auto-sync = no' >> \${BUILD_DIR}/repos.conf/coreos.conf
-
-        echo '[coreos-overlay]' > \${BUILD_DIR}/repos.conf/coreos-overlay.conf
-        echo 'location = /mnt/host/source/src/third_party/coreos-overlay' >> \${BUILD_DIR}/repos.conf/coreos-overlay.conf
-        echo 'masters = portage-stable' >> \${BUILD_DIR}/repos.conf/coreos-overlay.conf
-        echo 'auto-sync = no' >> \${BUILD_DIR}/repos.conf/coreos-overlay.conf
-
-        echo '[flatcar-kernel]' > \${BUILD_DIR}/repos.conf/flatcar-kernel.conf
-        echo 'location = /overlay' >> \${BUILD_DIR}/repos.conf/flatcar-kernel.conf
-        echo 'masters = portage-stable coreos' >> \${BUILD_DIR}/repos.conf/flatcar-kernel.conf
-        echo 'auto-sync = no' >> \${BUILD_DIR}/repos.conf/flatcar-kernel.conf
-
-        echo '[portage-stable]' > \${BUILD_DIR}/repos.conf/portage-stable.conf
-        echo 'location = /mnt/host/source/src/third_party/portage-stable' >> \${BUILD_DIR}/repos.conf/portage-stable.conf
-        echo 'auto-sync = no' >> \${BUILD_DIR}/repos.conf/portage-stable.conf
-
         echo "=== Clone flatcar/coreos-overlay @ main ==="
         mkdir -p \${BUILD_DIR}/src/scripts/sdk_container/src/third_party
         rm -rf \${BUILD_DIR}/src/scripts/sdk_container/src/third_party/coreos-overlay
@@ -456,7 +435,6 @@ spec:
         ./run_sdk_container --rm \
           -v \${SDK_VERSION} \
           -m \${BUILD_DIR}/\${OVERLAY_DEST}:/overlay \
-          -m \${BUILD_DIR}/repos.conf:/etc/portage/repos.conf \
           -V \${SDK_VERSION} \
           -- /mnt/host/source/src/scripts/build-inside-sdk.sh
 
