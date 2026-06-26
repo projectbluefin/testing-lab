@@ -649,6 +649,8 @@ argo-mcp-logs_workflow <workflow-name>
 ## Red Flags
 
 - Adding a separate log aggregation stack (Loki, Promtail, Vector, etc.) alongside Argo — Argo Server already retains pod logs for the workflow TTL. A separate stack duplicates storage, adds pods/PVCs, and creates a Helm-outside-ArgoCD installation with GitOps debt. `argo logs` covers the same use case.
+- **Outage Risk**: Leaving nodes cordoned (`SchedulingDisabled`) after k3s upgrades or manual interventions. This completely blocks system pods (including CoreDNS!) from scheduling, causing cluster-wide DNS timeouts (`read udp i/o timeout`) and a silent, complete cluster outage. Always ensure nodes are uncordoned (`kubectl uncordon`) and `Ready`.
+- **Outage Risk**: Setting low memory limits (under 2Gi) for any runner/script step that performs large file transfers (e.g. copying 400MB+ Flatcar update payloads over SCP/kubectl cp). File caching and transfer buffers will instantly trigger the container OOM-killer (exit code 137). Always set memory limits to at least 2Gi–4Gi for transfer-heavy steps.
 - `synchronization.semaphore:` (singular) in any pipeline — deprecated, rejected by ArgoCD schema. Use `synchronization.semaphores:` (list with `- configMapKeyRef:` item)
 - `spec.schedule:` (singular) on a CronWorkflow — field does not exist in CRD schema; use `spec.schedules:` (array)
 - A pipeline with VMs and no `spec.activeDeadlineSeconds` — a stuck VM holds its semaphore slot forever
