@@ -21,11 +21,7 @@ DEPEND="${RDEPEND}
 
 KEYWORDS="amd64 arm64"
 IUSE="custom-cflags"
-
-pkg_setup() {
-	# Kernel build requires a cross-compile prefix for cross-arch scenarios
-	export CROSS_COMPILE="$(tc-getBUILD_PROG STRIP strip 2>/dev/null || true)"
-}
+RESTRICT="userpriv"
 
 src_configure() {
 	# Copy the default Flatcar kernel config from the installed sources
