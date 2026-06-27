@@ -6,16 +6,13 @@
 
 EAPI=7
 
-CROS_WORKON_PROJECT="flatcar/coreos-overlay"
-CROS_WORKON_LOCALNAME="."
-CROS_WORKON_SUBTREE="sys-kernel/coreos-kernel"
-
-inherit cros-workon toolchain-funcs savedconfig
+inherit toolchain-funcs
 
 DESCRIPTION="Builds the CoreOS (Flatcar) kernel binary"
 HOMEPAGE="https://www.kernel.org"
 LICENSE="GPL-2"
 SLOT="0"
+S="${WORKDIR}"
 
 # Uses sources installed by coreos-sources
 RDEPEND="=sys-kernel/coreos-sources-${PV}"
@@ -32,12 +29,13 @@ pkg_setup() {
 
 src_configure() {
 	# Copy the default Flatcar kernel config from the installed sources
-	KV_FULL=$(ls /usr/src/ | grep "${PV}" | head -1)
-	KSRC="/usr/src/linux-${KV_FULL}"
+	KV_FULL=$(ls "${SYSROOT}/usr/src/" | grep "${PV}" | head -1)
+	KSRC="${SYSROOT}/usr/src/${KV_FULL}"
 	if [[ -z "${KV_FULL}" || ! -d "${KSRC}" ]]; then
-		die "coreos-sources-${PV} not found in /usr/src"
+		die "coreos-sources-${PV} not found in ${SYSROOT}/usr/src"
 	fi
 	export KSRC
+	addwrite "${KSRC}"
 	cd "${KSRC}"
 	make ARCH=x86_64 flatcar_defconfig
 	# Merge any Flatcar config fragments
@@ -47,11 +45,13 @@ src_configure() {
 }
 
 src_compile() {
+	addwrite "${KSRC}"
 	cd "${KSRC}"
 	emake -j$(nproc) ARCH=x86_64 bzImage modules
 }
 
 src_install() {
+	addwrite "${KSRC}"
 	cd "${KSRC}"
 	local kv=$(make -s ARCH=x86_64 kernelrelease)
 	dodir /boot
