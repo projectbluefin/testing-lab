@@ -203,7 +203,7 @@
     }
   ],
   "_meta": {
-    "generated": "2026-06-27T03:48:11Z"
+    "generated": "2026-06-27T05:24:35Z"
   },
   "open_bugs": [
     {
@@ -270,7 +270,7 @@
     "testing_lab": {
       "open_issues": 50,
       "open_prs": 17,
-      "prs_merged_7d": 18
+      "prs_merged_7d": 17
     }
   },
   "hive": {
