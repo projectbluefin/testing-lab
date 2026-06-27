@@ -242,6 +242,14 @@ This keeps config simple while preserving staged rollout discipline.
 3. Promote by keeping the new package as the active stable target.
 4. On failure, roll back by re-pointing to the last-known-good package/version.
 
+### Operator checks
+
+```bash
+kubectl get configmap flatcar-kernel-lifecycle-state -n argo -o yaml
+argo cron list -n argo | grep flatcar-kernel-gate
+argo submit -n argo --from workflowtemplate/flatcar-kernel-gate
+```
+
 ### Exo-0 7.1 verification (ponytail path)
 
 ```bash

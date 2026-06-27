@@ -43,6 +43,8 @@ Rule: **if a `just` recipe exists, use it.** Otherwise use `argo`/`kubectl` dire
 
 ## Flatcar kernel lifecycle — quick checks
 
+Use these for lifecycle-state inspection and manual gate runs:
+
 ```bash
 kubectl get configmap flatcar-kernel-lifecycle-state -n argo -o yaml
 argo cron list -n argo | grep flatcar-kernel-gate

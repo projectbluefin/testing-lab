@@ -72,3 +72,20 @@ spec:
               -n argo --type=merge \
               -p "{\"data\":{\"kernel-stable\":\"${LATEST}\"}}"
             SCRIPT_EOF
+---
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: flatcar-kernel-gate
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+spec:
+  schedules:
+    - "*/30 * * * *"
+  timezone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  workflowSpec:
+    workflowTemplateRef:
+      name: flatcar-kernel-gate
