@@ -219,6 +219,12 @@ considered promoted for the rest of the cluster.
 
 This keeps config simple while preserving staged rollout discipline.
 
+| Key | Meaning |
+|---|---|
+| `candidate-version` | Kernel version currently under exo-0 canary gate |
+| `gate-status` | `pending`, `pass`, or `fail` for the current candidate |
+| `stable-version` | Last promoted known-good kernel version |
+
 ### Promotion policy
 
 1. Build and register a new candidate package via `flatcar-kernel-build`.

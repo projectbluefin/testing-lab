@@ -41,6 +41,16 @@ Rule: **if a `just` recipe exists, use it.** Otherwise use `argo`/`kubectl` dire
 
 ---
 
+## Flatcar kernel lifecycle — quick checks
+
+```bash
+kubectl get configmap flatcar-kernel-lifecycle-state -n argo -o yaml
+argo cron list -n argo | grep flatcar-kernel-gate
+argo submit -n argo --from workflowtemplate/flatcar-kernel-gate
+```
+
+---
+
 ## 2. Failure triage — symptom → exact next command
 
 Run `just logs` first. Then match a row:

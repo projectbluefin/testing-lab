@@ -1,0 +1,15 @@
+# Tracks the active Flatcar kernel lifecycle contract for candidate/stable state.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flatcar-kernel-lifecycle-state
+  namespace: argo
+  labels:
+    app.kubernetes.io/part-of: testing-lab
+data:
+  candidate-version: ""
+  candidate-package: ""
+  candidate-created-at: ""
+  gate-status: ""
+  stable-version: ""
+  stable-package: ""
