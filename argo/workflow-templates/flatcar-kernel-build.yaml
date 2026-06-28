@@ -402,11 +402,18 @@ spec:
           'sudo mkdir -p /build/amd64-usr/etc/portage/profile' \
           'echo "dev-util/pahole-1.24_p20221024" | sudo tee -a /build/amd64-usr/etc/portage/profile/package.provided >/dev/null' \
           '' \
+          '# Break util-linux <-> cryptsetup cycle in this SDK snapshot for kernel package build' \
+          'sudo mkdir -p /build/amd64-usr/etc/portage/package.use' \
+          'echo "sys-apps/util-linux -cryptsetup" | sudo tee /build/amd64-usr/etc/portage/package.use/zz-flatcar-kernel-build >/dev/null' \
+          '' \
           '# Build kernel packages' \
           'FEATURES="-sandbox -usersandbox -userpriv" emerge-amd64-usr --quiet --jobs={{workflow.parameters.cores}} \' \
           '  =sys-kernel/coreos-sources-{{inputs.parameters.kernel-version}} \' \
           '  =sys-kernel/coreos-kernel-{{inputs.parameters.kernel-version}} \' \
           '  =sys-kernel/coreos-modules-{{inputs.parameters.kernel-version}}' \
+          '' \
+          '# Restore default util-linux USE after staged kernel package merge' \
+          'sudo rm -f /build/amd64-usr/etc/portage/package.use/zz-flatcar-kernel-build' \
           '' \
           '# Build the full Flatcar OS image (generates update payload)' \
           '/mnt/host/source/src/scripts/build_image \' \
