@@ -432,7 +432,7 @@ spec:
           '' \
           '# Build the full Flatcar OS image (generates update payload)' \
           '/mnt/host/source/src/scripts/build_image \' \
-          '  --board=amd64-usr prod' \
+          '  --board=amd64-usr --skip_test_build_root prod' \
           '' \
           'mkdir -p /mnt/host/source/src/build/output' \
           'cp /mnt/host/source/src/build/images/amd64-usr/latest/flatcar_production_update.gz \' \
