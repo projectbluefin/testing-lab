@@ -65,15 +65,6 @@ data:
       # preserving logs for debugging failed steps.
       podGC:
         strategy: OnWorkflowSuccess
-      # Allow step pods (builds, test runners) to land on workstation nodes.
-      # KubeVirt virt-launcher pods do NOT inherit workflowDefaults tolerations,
-      # so VMs never schedule on nodes tainted workstation=true:NoSchedule.
-      tolerations:
-        - key: workstation
-          operator: Equal
-          value: "true"
-          effect: NoSchedule
-
   # ── argoexec sidecar resource cap ─────────────────────────────────────────
   # argoexec runs in every workflow pod. Without limits it inherits node
   # allocatable, inflating scheduler resource accounting. Generous limits —
