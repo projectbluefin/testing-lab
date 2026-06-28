@@ -399,10 +399,10 @@ spec:
           'echo "masters = portage-stable" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos.conf >/dev/null' \
           'echo "auto-sync = no" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos.conf >/dev/null' \
           '' \
-          'echo "[coreos-overlay]" | sudo tee /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
-          'echo "location = /mnt/host/source/src/third_party/coreos-overlay" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
-          'echo "masters = portage-stable" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
-          'echo "auto-sync = no" | sudo tee -a /build/amd64-usr/etc/portage/repos.conf/coreos-overlay.conf >/dev/null' \
+          '# SDK crossdev metadata sometimes references coreos-overlay; normalize to coreos.' \
+          'if [ -f /usr/local/portage/crossdev/metadata/layout.conf ]; then' \
+          '  sudo sed -i "s/coreos-overlay/coreos/g" /usr/local/portage/crossdev/metadata/layout.conf' \
+          'fi' \
           '' \
           'sudo rm -f /build/amd64-usr/etc/portage/repos.conf/portage-stable*.conf' \
           'echo "[portage-stable]" | sudo tee /build/amd64-usr/etc/portage/repos.conf/portage-stable.conf >/dev/null' \
