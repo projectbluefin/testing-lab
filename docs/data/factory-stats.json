@@ -1,209 +1,234 @@
 {
   "recent_runs": [
     {
-      "id": "blu-734-ci-promote-bluefin-testing-mai-w7kzz",
-      "overall": "fail",
-      "label": "bluefin:testing",
-      "variant": "bluefin",
-      "started_at": "2026-06-25T12:28:31Z",
-      "finished_at": "2026-06-25T12:28:31Z",
-      "trigger": "pr-poller",
-      "suite_scores": {
-        "smoke": {
-          "scenarios": 137,
-          "failed": 17,
-          "status": "failed"
-        },
-        "developer": {
-          "scenarios": 21,
-          "failed": 0,
-          "status": "passed"
-        },
-        "software": {
-          "scenarios": 0,
-          "failed": 0,
-          "status": "pending"
-        },
-        "system": {
-          "scenarios": 14,
-          "failed": 6,
-          "status": "failed"
-        }
-      }
+      "id": "build-cd-sync-stable-8cxdw",
+      "overall": "running",
+      "label": "bluefin:stable",
+      "started_at": "2026-06-28T15:00:17Z",
+      "finished_at": null,
+      "duration_min": 1,
+      "trigger": "manual"
     },
     {
-      "id": "bluefin-qa-pipeline-5qzzw",
+      "id": "build-cd-sync-dakota-latest-t5zj8",
+      "overall": "running",
+      "label": "dakota:latest",
+      "started_at": "2026-06-28T15:00:09Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-testing-8t6zv",
       "overall": "passed",
       "label": "bluefin:testing",
-      "variant": "bluefin",
-      "started_at": "2026-06-25T12:26:43Z",
-      "finished_at": "2026-06-25T12:26:43Z",
-      "trigger": "nightly",
-      "suite_scores": {
-        "smoke": {
-          "scenarios": 137,
-          "failed": 17,
-          "status": "failed"
-        },
-        "developer": {
-          "scenarios": 21,
-          "failed": 0,
-          "status": "passed"
-        },
-        "software": {
-          "scenarios": 0,
-          "failed": 0,
-          "status": "pending"
-        },
-        "system": {
-          "scenarios": 14,
-          "failed": 6,
-          "status": "failed"
-        }
-      }
+      "started_at": "2026-06-28T15:00:09Z",
+      "finished_at": "2026-06-28T15:00:19Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-66bbw",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:25:59Z",
-      "finished_at": "2026-06-25T12:25:59Z",
-      "trigger": "pr-poller"
+      "id": "build-cd-sync-aurora-testing-q76kk",
+      "overall": "passed",
+      "label": "aurora:testing",
+      "started_at": "2026-06-28T15:00:08Z",
+      "finished_at": "2026-06-28T15:00:18Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1102-fix-ci-generate-push-config-so-d7c74",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:25:56Z",
-      "finished_at": "2026-06-25T12:25:56Z",
-      "trigger": "pr-poller"
+      "id": "build-cd-sync-aurora-stable-wqkwd",
+      "overall": "passed",
+      "label": "aurora:stable",
+      "started_at": "2026-06-28T15:00:06Z",
+      "finished_at": "2026-06-28T15:00:16Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-jztcv",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:21:04Z",
-      "finished_at": "2026-06-25T12:21:04Z",
-      "trigger": "pr-poller"
+      "id": "build-cd-sync-lts-testing-bbbhv",
+      "overall": "passed",
+      "label": "bluefin-lts:testing",
+      "started_at": "2026-06-28T15:00:06Z",
+      "finished_at": "2026-06-28T15:00:16Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1102-fix-ci-generate-push-config-so-d4q75",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:21:02Z",
-      "finished_at": "2026-06-25T12:21:02Z",
-      "trigger": "pr-poller"
+      "id": "build-cd-sync-bazzite-testing-glp7f",
+      "overall": "passed",
+      "label": "bazzite:testing",
+      "started_at": "2026-06-28T15:00:06Z",
+      "finished_at": "2026-06-28T15:00:16Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-lfvsg",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:17:03Z",
-      "finished_at": "2026-06-25T12:17:03Z",
-      "trigger": "pr-poller"
+      "id": "build-cd-sync-lts-stable-2tpnz",
+      "overall": "passed",
+      "label": "bluefin-lts:stable",
+      "started_at": "2026-06-28T15:00:05Z",
+      "finished_at": "2026-06-28T15:00:15Z",
+      "duration_min": 0,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-t5j7p",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:15:53Z",
-      "finished_at": "2026-06-25T12:15:53Z",
-      "trigger": "pr-poller"
-    },
-    {
-      "id": "dak-1102-fix-ci-generate-push-config-so-ngsjd",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:15:50Z",
-      "finished_at": "2026-06-25T12:15:50Z",
-      "trigger": "pr-poller"
-    },
-    {
-      "id": "dak-1088-chore-deps-update-common-v2026-ptdk4",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:11:12Z",
-      "finished_at": "2026-06-25T12:11:12Z",
-      "trigger": "pr-poller"
-    },
-    {
-      "id": "dak-1102-fix-ci-generate-push-config-so-cjdrr",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:11:06Z",
-      "finished_at": "2026-06-25T12:11:06Z",
-      "trigger": "pr-poller"
-    },
-    {
-      "id": "dak-1088-chore-deps-update-common-v2026-fmwmj",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T12:05:57Z",
-      "finished_at": "2026-06-25T12:05:57Z",
-      "trigger": "pr-poller"
-    },
-    {
-      "id": "blu-734-ci-promote-bluefin-testing-mai-zx2xq",
-      "overall": "fail",
+      "id": "image-poll-bluefin-testing-1782658800",
+      "overall": "running",
       "label": "bluefin:testing",
-      "variant": "bluefin",
-      "started_at": "2026-06-25T11:57:14Z",
-      "finished_at": "2026-06-25T11:57:14Z",
-      "trigger": "pr-poller",
-      "suite_scores": {
-        "smoke": {
-          "scenarios": 137,
-          "failed": 17,
-          "status": "failed"
-        },
-        "developer": {
-          "scenarios": 21,
-          "failed": 0,
-          "status": "passed"
-        },
-        "software": {
-          "scenarios": 0,
-          "failed": 0,
-          "status": "pending"
-        },
-        "system": {
-          "scenarios": 14,
-          "failed": 6,
-          "status": "failed"
-        }
-      }
+      "started_at": "2026-06-28T15:00:02Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "poller"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-7mffx",
-      "overall": "fail",
+      "id": "dakota-commit-poller-1782658800",
+      "overall": "running",
       "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T11:55:52Z",
-      "finished_at": "2026-06-25T11:55:52Z",
-      "trigger": "pr-poller"
+      "started_at": "2026-06-28T15:00:01Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "manual"
     },
     {
-      "id": "dak-1088-chore-deps-update-common-v2026-zbc4w",
+      "id": "digest-watch-1782658800",
+      "overall": "running",
+      "label": null,
+      "started_at": "2026-06-28T15:00:01Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "poller"
+    },
+    {
+      "id": "flatcar-kernel-poller-1782658800",
+      "overall": "running",
+      "label": null,
+      "started_at": "2026-06-28T15:00:00Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "manual"
+    },
+    {
+      "id": "flatcar-kernel-gate-1782658800",
+      "overall": "running",
+      "label": null,
+      "started_at": "2026-06-28T15:00:00Z",
+      "finished_at": null,
+      "duration_min": 2,
+      "trigger": "manual"
+    },
+    {
+      "id": "orphan-pod-gc-1782658800",
+      "overall": "passed",
+      "label": null,
+      "started_at": "2026-06-28T15:00:00Z",
+      "finished_at": "2026-06-28T15:00:10Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-testing-6q2sw",
+      "overall": "passed",
+      "label": "bluefin:testing",
+      "started_at": "2026-06-28T14:55:13Z",
+      "finished_at": "2026-06-28T14:55:23Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-dakota-latest-tqbr8",
       "overall": "fail",
       "label": "dakota:latest",
-      "variant": "dakota",
-      "started_at": "2026-06-25T11:51:13Z",
-      "finished_at": "2026-06-25T11:51:13Z",
-      "trigger": "pr-poller"
+      "started_at": "2026-06-28T14:55:04Z",
+      "finished_at": "2026-06-28T14:59:15Z",
+      "duration_min": 4,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-lts-stable-ncppw",
+      "overall": "passed",
+      "label": "bluefin-lts:stable",
+      "started_at": "2026-06-28T14:55:04Z",
+      "finished_at": "2026-06-28T14:55:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-stable-7mwh2",
+      "overall": "passed",
+      "label": "bluefin:stable",
+      "started_at": "2026-06-28T14:55:04Z",
+      "finished_at": "2026-06-28T14:55:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-bazzite-testing-nz4fl",
+      "overall": "passed",
+      "label": "bazzite:testing",
+      "started_at": "2026-06-28T14:55:04Z",
+      "finished_at": "2026-06-28T14:55:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-aurora-testing-98qjk",
+      "overall": "passed",
+      "label": "aurora:testing",
+      "started_at": "2026-06-28T14:55:02Z",
+      "finished_at": "2026-06-28T14:55:12Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-aurora-stable-w9dv6",
+      "overall": "passed",
+      "label": "aurora:stable",
+      "started_at": "2026-06-28T14:55:02Z",
+      "finished_at": "2026-06-28T14:55:12Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-lts-testing-xrg9k",
+      "overall": "passed",
+      "label": "bluefin-lts:testing",
+      "started_at": "2026-06-28T14:55:02Z",
+      "finished_at": "2026-06-28T14:55:12Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-bazzite-stable-vhpp8",
+      "overall": "passed",
+      "label": "bazzite:stable",
+      "started_at": "2026-06-28T14:55:02Z",
+      "finished_at": "2026-06-28T14:55:12Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "dakota-commit-poller-1782658500",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "started_at": "2026-06-28T14:55:00Z",
+      "finished_at": "2026-06-28T14:59:17Z",
+      "duration_min": 4,
+      "trigger": "manual"
+    },
+    {
+      "id": "image-poll-akmods-43-1782658500",
+      "overall": "passed",
+      "label": null,
+      "started_at": "2026-06-28T14:55:00Z",
+      "finished_at": "2026-06-28T14:56:55Z",
+      "duration_min": 2,
+      "trigger": "poller"
     }
   ],
   "_meta": {
-    "generated": "2026-06-28T14:13:15Z"
+    "generated": "2026-06-28T15:00:19Z",
+    "refreshed_at": "2026-06-28T15:01:45Z"
   },
   "open_bugs": [
     {
@@ -276,5 +301,26 @@
   "hive": {
     "open_issues": 50,
     "open_prs": 17
+  },
+  "factory": {
+    "cluster": {
+      "nodes": [
+        {
+          "name": "exo-0",
+          "status": "ready",
+          "role": "worker",
+          "ram_gb": 62,
+          "cpu_threads": 32
+        },
+        {
+          "name": "ghost",
+          "status": "ready",
+          "role": "control-plane",
+          "ram_gb": 63,
+          "cpu_threads": 32
+        }
+      ],
+      "total_ram_gb": 125
+    }
   }
 }

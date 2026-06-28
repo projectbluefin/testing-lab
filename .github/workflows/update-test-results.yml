@@ -71,9 +71,9 @@ jobs:
           MERGED_7D=$(gh pr list --repo projectbluefin/testing-lab --state merged --limit 200 \
             --json mergedAt | jq "[.[] | select(.mergedAt > \"$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-7d +%Y-%m-%dT%H:%M:%SZ)\")] | length")
 
-          # Compute aggregate stats from result files
+          # Compute aggregate stats from result files + live cluster snapshots when reachable
           python3 - "$ISSUE_COUNT" "$PR_COUNT" "$MERGED_7D" <<'PYEOF'
-          import json, glob, datetime, sys
+          import json, glob, datetime, sys, subprocess, re
 
           issue_count = int(sys.argv[1]) if sys.argv[1:] and sys.argv[1].isdigit() else 0
           pr_count    = int(sys.argv[2]) if sys.argv[2:] and sys.argv[2].isdigit() else 0
@@ -82,6 +82,69 @@ jobs:
           stats_path = 'docs/data/factory-stats.json'
           with open(stats_path) as f:
               stats = json.load(f)
+
+          now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+          def run_json(cmd):
+              try:
+                  out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=15)
+                  return json.loads(out)
+              except Exception:
+                  return None
+
+          def phase_to_overall(phase):
+              if phase in ('Running', 'Pending'):
+                  return 'running'
+              if phase == 'Succeeded':
+                  return 'passed'
+              if phase in ('Failed', 'Error'):
+                  return 'fail'
+              return 'pending'
+
+          def infer_trigger(name):
+              if not name:
+                  return 'manual'
+              if name.startswith('nightly-'):
+                  return 'nightly'
+              if name.startswith('image-poll-') or name.startswith('digest-watch-'):
+                  return 'poller'
+              if re.match(r'^[a-z]+-\d+-', name):
+                  return 'pr-poller'
+              return 'manual'
+
+          def infer_label(params, wf_name):
+              p = {x.get('name'): x.get('value') for x in (params or [])}
+              variant = p.get('variant')
+              tag = p.get('image-tag')
+              image = p.get('image', '')
+              if variant and tag:
+                  return f'{variant}:{tag}'
+              if image and tag:
+                  img_name = image.rsplit('/', 1)[-1]
+                  return f'{img_name}:{tag}'
+              if image:
+                  return image.rsplit('/', 1)[-1]
+              if wf_name.startswith('dakota'):
+                  return 'dakota:latest'
+              return None
+
+          def safe_int(val, default=0):
+              try:
+                  return int(val)
+              except Exception:
+                  return default
+
+          def parse_mem_gib(mem):
+              # Kubernetes node capacity is usually Ki/Mi/Gi strings.
+              if not mem:
+                  return None
+              if mem.endswith('Ki'):
+                  return round(int(mem[:-2]) / (1024 * 1024))
+              if mem.endswith('Mi'):
+                  return round(int(mem[:-2]) / 1024)
+              if mem.endswith('Gi'):
+                  return int(mem[:-2])
+              return None
 
           # --- Open bugs ---
           with open('/tmp/bugs-raw.json') as f:
@@ -107,6 +170,7 @@ jobs:
           total_failed = 0
           coverage_by_suite = {}
           images_with_results = set()
+          newest_result_ts = None
           for path in glob.glob('docs/results/*.json'):
               try:
                   with open(path) as f:
@@ -122,6 +186,9 @@ jobs:
                       coverage_by_suite[s]['images']    += 1
                       coverage_by_suite[s]['scenarios'] += d.get('scenarios', 0)
                       coverage_by_suite[s]['failed']    += d.get('failed', 0)
+                      ts = d.get('last_run')
+                      if ts and (newest_result_ts is None or ts > newest_result_ts):
+                          newest_result_ts = ts
               except Exception:
                   pass
           cov = stats.setdefault('test_coverage', {})
@@ -143,8 +210,84 @@ jobs:
           stats['hive']['open_issues'] = issue_count
           stats['hive']['open_prs']    = pr_count
 
-          # --- Update generated timestamp ---
-          stats['_meta']['generated'] = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+          # --- Optional live Argo snapshot (available from homelab/ghost runners) ---
+          argo = run_json("curl -k -sS --max-time 12 https://192.168.1.102:32746/api/v1/workflows/argo")
+          recent_runs = []
+          newest_live_ts = None
+          if argo and isinstance(argo.get('items'), list):
+              for wf in argo['items']:
+                  md = wf.get('metadata', {})
+                  st = wf.get('status', {})
+                  spec = wf.get('spec', {})
+                  name = md.get('name')
+                  started = st.get('startedAt') or md.get('creationTimestamp')
+                  finished = st.get('finishedAt')
+                  if not started:
+                      continue
+                  params = ((spec.get('arguments') or {}).get('parameters') or [])
+                  phase = st.get('phase')
+                  overall = phase_to_overall(phase)
+                  duration_min = None
+                  try:
+                      sdt = datetime.datetime.fromisoformat(started.replace('Z', '+00:00'))
+                      edt = datetime.datetime.fromisoformat((finished or now).replace('Z', '+00:00'))
+                      duration_min = max(0, round((edt - sdt).total_seconds() / 60))
+                  except Exception:
+                      pass
+                  label = infer_label(params, name)
+                  run = {
+                      'id': name,
+                      'overall': overall,
+                      'label': label,
+                      'started_at': started,
+                      'finished_at': finished,
+                      'duration_min': duration_min,
+                      'trigger': infer_trigger(name),
+                  }
+                  recent_runs.append(run)
+                  for ts in (started, finished):
+                      if ts and (newest_live_ts is None or ts > newest_live_ts):
+                          newest_live_ts = ts
+
+              recent_runs.sort(key=lambda r: r.get('started_at') or '', reverse=True)
+              if recent_runs:
+                  stats['recent_runs'] = recent_runs[:25]
+
+          # --- Optional live cluster node snapshot ---
+          node_doc = run_json("kubectl get nodes -o json --request-timeout=8s")
+          if node_doc and isinstance(node_doc.get('items'), list):
+              nodes = []
+              total_ram = 0
+              for n in node_doc['items']:
+                  md = n.get('metadata', {})
+                  cap = (n.get('status') or {}).get('capacity') or {}
+                  conds = (n.get('status') or {}).get('conditions') or []
+                  ready = next((c.get('status') == 'True' for c in conds if c.get('type') == 'Ready'), False)
+                  labels = md.get('labels') or {}
+                  role = 'worker'
+                  if labels.get('node-role.kubernetes.io/control-plane') is not None or labels.get('node-role.kubernetes.io/master') is not None:
+                      role = 'control-plane'
+                  ram_gb = parse_mem_gib(cap.get('memory'))
+                  if ram_gb:
+                      total_ram += ram_gb
+                  nodes.append({
+                      'name': md.get('name'),
+                      'status': 'ready' if ready else 'not-ready',
+                      'role': role,
+                      'ram_gb': ram_gb,
+                      'cpu_threads': safe_int(cap.get('cpu')),
+                  })
+              factory = stats.setdefault('factory', {})
+              cluster = factory.setdefault('cluster', {})
+              cluster['nodes'] = nodes
+              cluster['total_ram_gb'] = total_ram
+
+          # --- Update metadata timestamps ---
+          meta = stats.setdefault('_meta', {})
+          # generated = freshest underlying data point, not script execution time
+          data_points = [x for x in [newest_live_ts, newest_result_ts, meta.get('generated')] if x]
+          meta['generated'] = max(data_points) if data_points else now
+          meta['refreshed_at'] = now
 
           with open(stats_path, 'w') as f:
               json.dump(stats, f, indent=2)

@@ -1498,24 +1498,39 @@ function buildCluster(stats) {
   const cd = sem.containerdisk || {};
   const hd = sem.hostdisk || {};
 
-  const cdPips = Array.from({length: cd.capacity||8}, (_,i) =>
-    `<span class="sem-pip${i < (cd.active||0) ? ' used' : ''}"></span>`).join('');
-  const hdPips = Array.from({length: hd.capacity||3}, (_,i) =>
-    `<span class="sem-pip${i < (hd.active||0) ? ' used' : ''}"></span>`).join('');
-
-  const nodeHtml = nodes.map(n => `
+  const parts = [];
+  if (nodes.length) {
+    const nodeHtml = nodes.map(n => `
     <span class="cluster-node">
       <span class="dot ${n.status==='ready'?'dot-pass':'dot-fail'}"></span>
       <strong>${n.name}</strong>
       <span style="color:var(--muted)">${n.role} · ${n.ram_gb}GB · ${n.cpu_threads}t</span>
     </span>`).join('<span class="cluster-sep">|</span>');
+    parts.push(nodeHtml);
+  } else {
+    parts.push('<span style="color:var(--muted)">Live node snapshot unavailable</span>');
+  }
 
-  document.getElementById('cluster-strip').innerHTML = `
-    ${nodeHtml}
-    <span class="cluster-sep">|</span>
-    <span>ContainerDisk <span class="sem-pips">${cdPips}</span> ${cd.active||0}/${cd.capacity||8}</span>
-    <span>HostDisk <span class="sem-pips">${hdPips}</span> ${hd.active||0}/${hd.capacity||3}</span>
-    <span style="color:var(--muted)">k3s · 3 nodes · ${stats.factory?.cluster?.total_ram_gb||128}GB RAM total</span>`;
+  if (Number.isFinite(cd.capacity) && Number.isFinite(cd.active)) {
+    const cdPips = Array.from({length: cd.capacity}, (_,i) =>
+      `<span class="sem-pip${i < cd.active ? ' used' : ''}"></span>`).join('');
+    parts.push(`<span>ContainerDisk <span class="sem-pips">${cdPips}</span> ${cd.active}/${cd.capacity}</span>`);
+  }
+
+  if (Number.isFinite(hd.capacity) && Number.isFinite(hd.active)) {
+    const hdPips = Array.from({length: hd.capacity}, (_,i) =>
+      `<span class="sem-pip${i < hd.active ? ' used' : ''}"></span>`).join('');
+    parts.push(`<span>HostDisk <span class="sem-pips">${hdPips}</span> ${hd.active}/${hd.capacity}</span>`);
+  }
+
+  if (nodes.length) {
+    const ready = nodes.filter(n => n.status === 'ready').length;
+    const total = nodes.length;
+    const totalRam = stats.factory?.cluster?.total_ram_gb;
+    parts.push(`<span style="color:var(--muted)">k3s · ${ready}/${total} ready${totalRam ? ` · ${totalRam}GB RAM total` : ''}</span>`);
+  }
+
+  document.getElementById('cluster-strip').innerHTML = parts.join('<span class="cluster-sep">|</span>');
 }
 
 // ── Recent runs table ───────────────────────────────────────────────────────
