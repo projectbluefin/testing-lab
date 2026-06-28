@@ -11,6 +11,7 @@ spec:
   schedules:
     - "*/10 * * * *"
   timezone: "UTC"
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
   workflowSpec:
@@ -84,6 +85,7 @@ spec:
   schedules:
     - "*/30 * * * *"
   timezone: "UTC"
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
   workflowSpec:

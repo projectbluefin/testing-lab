@@ -12,6 +12,7 @@ spec:
   schedules:
     - "*/5 * * * *"
   timezone: "UTC"
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 60
   workflowSpec:

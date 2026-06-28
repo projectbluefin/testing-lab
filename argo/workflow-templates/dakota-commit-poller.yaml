@@ -19,7 +19,8 @@ spec:
   ttlStrategy:
     secondsAfterSuccess: 3600
     secondsAfterFailure: 86400
-  activeDeadlineSeconds: 120
+  # Allow the referenced dakota-build-pipeline to complete.
+  activeDeadlineSeconds: 10800
   entrypoint: poll
 
   arguments:
