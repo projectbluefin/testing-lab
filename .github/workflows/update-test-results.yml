@@ -2,7 +2,7 @@ name: Update test results
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/5 * * * *'
   push:
     branches: [main]
     paths:
@@ -214,6 +214,7 @@ jobs:
           argo = run_json("curl -k -sS --max-time 12 https://192.168.1.102:32746/api/v1/workflows/argo")
           recent_runs = []
           newest_live_ts = None
+          live_runs_ok = False
           if argo and isinstance(argo.get('items'), list):
               for wf in argo['items']:
                   md = wf.get('metadata', {})
@@ -250,11 +251,15 @@ jobs:
                           newest_live_ts = ts
 
               recent_runs.sort(key=lambda r: r.get('started_at') or '', reverse=True)
-              if recent_runs:
-                  stats['recent_runs'] = recent_runs[:25]
+              stats['recent_runs'] = recent_runs[:25]
+              live_runs_ok = True
+          else:
+              # Avoid showing stale run state when a live snapshot is unavailable.
+              stats['recent_runs'] = []
 
           # --- Optional live cluster node snapshot ---
           node_doc = run_json("kubectl get nodes -o json --request-timeout=8s")
+          live_nodes_ok = False
           if node_doc and isinstance(node_doc.get('items'), list):
               nodes = []
               total_ram = 0
@@ -281,6 +286,13 @@ jobs:
               cluster = factory.setdefault('cluster', {})
               cluster['nodes'] = nodes
               cluster['total_ram_gb'] = total_ram
+              live_nodes_ok = True
+          else:
+              factory = stats.setdefault('factory', {})
+              cluster = factory.setdefault('cluster', {})
+              # Avoid showing stale node state when a live snapshot is unavailable.
+              cluster['nodes'] = []
+              cluster.pop('total_ram_gb', None)
 
           # --- Update metadata timestamps ---
           meta = stats.setdefault('_meta', {})
@@ -288,6 +300,7 @@ jobs:
           data_points = [x for x in [newest_live_ts, newest_result_ts, meta.get('generated')] if x]
           meta['generated'] = max(data_points) if data_points else now
           meta['refreshed_at'] = now
+          meta['live_snapshot_ok'] = bool(live_runs_ok and live_nodes_ok)
 
           with open(stats_path, 'w') as f:
               json.dump(stats, f, indent=2)
