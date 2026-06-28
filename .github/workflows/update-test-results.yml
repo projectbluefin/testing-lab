@@ -305,5 +305,6 @@ jobs:
             git commit \
               -m 'chore: refresh dashboard data (screenshots, bugs, stats)' \
               -m 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+            git pull --rebase origin main
             git push origin HEAD:main
           fi

@@ -1,234 +1,234 @@
 {
   "recent_runs": [
     {
-      "id": "build-cd-sync-stable-8cxdw",
-      "overall": "running",
+      "id": "build-cd-sync-dakota-latest-d6chb",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "started_at": "2026-06-28T15:10:05Z",
+      "finished_at": "2026-06-28T15:13:47Z",
+      "duration_min": 4,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-bazzite-stable-kg8l4",
+      "overall": "passed",
+      "label": "bazzite:stable",
+      "started_at": "2026-06-28T15:10:05Z",
+      "finished_at": "2026-06-28T15:10:15Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-stable-6p6sv",
+      "overall": "passed",
       "label": "bluefin:stable",
-      "started_at": "2026-06-28T15:00:17Z",
-      "finished_at": null,
+      "started_at": "2026-06-28T15:10:05Z",
+      "finished_at": "2026-06-28T15:10:15Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-testing-kp2mj",
+      "overall": "passed",
+      "label": "bluefin:testing",
+      "started_at": "2026-06-28T15:10:05Z",
+      "finished_at": "2026-06-28T15:10:15Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-aurora-stable-5v8k2",
+      "overall": "passed",
+      "label": "aurora:stable",
+      "started_at": "2026-06-28T15:10:04Z",
+      "finished_at": "2026-06-28T15:10:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-lts-testing-l2xpq",
+      "overall": "passed",
+      "label": "bluefin-lts:testing",
+      "started_at": "2026-06-28T15:10:03Z",
+      "finished_at": "2026-06-28T15:10:13Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-aurora-testing-d7frf",
+      "overall": "passed",
+      "label": "aurora:testing",
+      "started_at": "2026-06-28T15:10:03Z",
+      "finished_at": "2026-06-28T15:10:13Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-bazzite-testing-ppcft",
+      "overall": "passed",
+      "label": "bazzite:testing",
+      "started_at": "2026-06-28T15:10:03Z",
+      "finished_at": "2026-06-28T15:10:13Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-lts-stable-zr45t",
+      "overall": "passed",
+      "label": "bluefin-lts:stable",
+      "started_at": "2026-06-28T15:10:03Z",
+      "finished_at": "2026-06-28T15:10:13Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "dakota-commit-poller-1782659400",
+      "overall": "fail",
+      "label": "dakota:latest",
+      "started_at": "2026-06-28T15:10:00Z",
+      "finished_at": "2026-06-28T15:12:09Z",
+      "duration_min": 2,
+      "trigger": "manual"
+    },
+    {
+      "id": "flatcar-kernel-poller-1782659400",
+      "overall": "passed",
+      "label": null,
+      "started_at": "2026-06-28T15:10:00Z",
+      "finished_at": "2026-06-28T15:10:35Z",
       "duration_min": 1,
       "trigger": "manual"
     },
     {
-      "id": "build-cd-sync-dakota-latest-t5zj8",
-      "overall": "running",
-      "label": "dakota:latest",
-      "started_at": "2026-06-28T15:00:09Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-testing-8t6zv",
+      "id": "digest-watch-1782659400",
       "overall": "passed",
-      "label": "bluefin:testing",
-      "started_at": "2026-06-28T15:00:09Z",
-      "finished_at": "2026-06-28T15:00:19Z",
+      "label": null,
+      "started_at": "2026-06-28T15:10:00Z",
+      "finished_at": "2026-06-28T15:10:10Z",
       "duration_min": 0,
-      "trigger": "manual"
+      "trigger": "poller"
     },
     {
-      "id": "build-cd-sync-aurora-testing-q76kk",
-      "overall": "passed",
-      "label": "aurora:testing",
-      "started_at": "2026-06-28T15:00:08Z",
-      "finished_at": "2026-06-28T15:00:18Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-aurora-stable-wqkwd",
-      "overall": "passed",
-      "label": "aurora:stable",
-      "started_at": "2026-06-28T15:00:06Z",
-      "finished_at": "2026-06-28T15:00:16Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-lts-testing-bbbhv",
-      "overall": "passed",
-      "label": "bluefin-lts:testing",
-      "started_at": "2026-06-28T15:00:06Z",
-      "finished_at": "2026-06-28T15:00:16Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-bazzite-testing-glp7f",
+      "id": "build-cd-sync-bazzite-testing-pw8zz",
       "overall": "passed",
       "label": "bazzite:testing",
-      "started_at": "2026-06-28T15:00:06Z",
-      "finished_at": "2026-06-28T15:00:16Z",
+      "started_at": "2026-06-28T15:05:16Z",
+      "finished_at": "2026-06-28T15:05:26Z",
       "duration_min": 0,
       "trigger": "manual"
     },
     {
-      "id": "build-cd-sync-lts-stable-2tpnz",
+      "id": "build-cd-sync-lts-testing-rw2n2",
       "overall": "passed",
-      "label": "bluefin-lts:stable",
-      "started_at": "2026-06-28T15:00:05Z",
-      "finished_at": "2026-06-28T15:00:15Z",
+      "label": "bluefin-lts:testing",
+      "started_at": "2026-06-28T15:05:05Z",
+      "finished_at": "2026-06-28T15:05:15Z",
       "duration_min": 0,
       "trigger": "manual"
     },
     {
-      "id": "image-poll-bluefin-testing-1782658800",
-      "overall": "running",
-      "label": "bluefin:testing",
-      "started_at": "2026-06-28T15:00:02Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "poller"
-    },
-    {
-      "id": "dakota-commit-poller-1782658800",
-      "overall": "running",
-      "label": "dakota:latest",
-      "started_at": "2026-06-28T15:00:01Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "manual"
-    },
-    {
-      "id": "digest-watch-1782658800",
-      "overall": "running",
-      "label": null,
-      "started_at": "2026-06-28T15:00:01Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "poller"
-    },
-    {
-      "id": "flatcar-kernel-poller-1782658800",
-      "overall": "running",
-      "label": null,
-      "started_at": "2026-06-28T15:00:00Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "manual"
-    },
-    {
-      "id": "flatcar-kernel-gate-1782658800",
-      "overall": "running",
-      "label": null,
-      "started_at": "2026-06-28T15:00:00Z",
-      "finished_at": null,
-      "duration_min": 2,
-      "trigger": "manual"
-    },
-    {
-      "id": "orphan-pod-gc-1782658800",
-      "overall": "passed",
-      "label": null,
-      "started_at": "2026-06-28T15:00:00Z",
-      "finished_at": "2026-06-28T15:00:10Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-testing-6q2sw",
-      "overall": "passed",
-      "label": "bluefin:testing",
-      "started_at": "2026-06-28T14:55:13Z",
-      "finished_at": "2026-06-28T14:55:23Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-dakota-latest-tqbr8",
-      "overall": "fail",
-      "label": "dakota:latest",
-      "started_at": "2026-06-28T14:55:04Z",
-      "finished_at": "2026-06-28T14:59:15Z",
-      "duration_min": 4,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-lts-stable-ncppw",
-      "overall": "passed",
-      "label": "bluefin-lts:stable",
-      "started_at": "2026-06-28T14:55:04Z",
-      "finished_at": "2026-06-28T14:55:14Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-stable-7mwh2",
+      "id": "build-cd-sync-stable-zdqw7",
       "overall": "passed",
       "label": "bluefin:stable",
-      "started_at": "2026-06-28T14:55:04Z",
-      "finished_at": "2026-06-28T14:55:14Z",
+      "started_at": "2026-06-28T15:05:05Z",
+      "finished_at": "2026-06-28T15:05:15Z",
       "duration_min": 0,
       "trigger": "manual"
     },
     {
-      "id": "build-cd-sync-bazzite-testing-nz4fl",
+      "id": "build-cd-sync-testing-lmkn6",
       "overall": "passed",
-      "label": "bazzite:testing",
-      "started_at": "2026-06-28T14:55:04Z",
-      "finished_at": "2026-06-28T14:55:14Z",
+      "label": "bluefin:testing",
+      "started_at": "2026-06-28T15:05:05Z",
+      "finished_at": "2026-06-28T15:05:15Z",
       "duration_min": 0,
       "trigger": "manual"
     },
     {
-      "id": "build-cd-sync-aurora-testing-98qjk",
-      "overall": "passed",
-      "label": "aurora:testing",
-      "started_at": "2026-06-28T14:55:02Z",
-      "finished_at": "2026-06-28T14:55:12Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-aurora-stable-w9dv6",
-      "overall": "passed",
-      "label": "aurora:stable",
-      "started_at": "2026-06-28T14:55:02Z",
-      "finished_at": "2026-06-28T14:55:12Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-lts-testing-xrg9k",
-      "overall": "passed",
-      "label": "bluefin-lts:testing",
-      "started_at": "2026-06-28T14:55:02Z",
-      "finished_at": "2026-06-28T14:55:12Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "build-cd-sync-bazzite-stable-vhpp8",
-      "overall": "passed",
-      "label": "bazzite:stable",
-      "started_at": "2026-06-28T14:55:02Z",
-      "finished_at": "2026-06-28T14:55:12Z",
-      "duration_min": 0,
-      "trigger": "manual"
-    },
-    {
-      "id": "dakota-commit-poller-1782658500",
+      "id": "build-cd-sync-dakota-latest-z4j4d",
       "overall": "fail",
       "label": "dakota:latest",
-      "started_at": "2026-06-28T14:55:00Z",
-      "finished_at": "2026-06-28T14:59:17Z",
+      "started_at": "2026-06-28T15:05:04Z",
+      "finished_at": "2026-06-28T15:09:19Z",
       "duration_min": 4,
       "trigger": "manual"
     },
     {
-      "id": "image-poll-akmods-43-1782658500",
+      "id": "build-cd-sync-aurora-stable-425nl",
+      "overall": "passed",
+      "label": "aurora:stable",
+      "started_at": "2026-06-28T15:05:04Z",
+      "finished_at": "2026-06-28T15:05:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-lts-stable-rcqdb",
+      "overall": "passed",
+      "label": "bluefin-lts:stable",
+      "started_at": "2026-06-28T15:05:04Z",
+      "finished_at": "2026-06-28T15:05:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-aurora-testing-vx8zj",
+      "overall": "passed",
+      "label": "aurora:testing",
+      "started_at": "2026-06-28T15:05:04Z",
+      "finished_at": "2026-06-28T15:05:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-bazzite-stable-hfpfr",
+      "overall": "passed",
+      "label": "bazzite:stable",
+      "started_at": "2026-06-28T15:05:04Z",
+      "finished_at": "2026-06-28T15:05:14Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "image-poll-bazzite-testing-1782659100",
+      "overall": "passed",
+      "label": "bazzite:testing",
+      "started_at": "2026-06-28T15:05:01Z",
+      "finished_at": "2026-06-28T15:05:21Z",
+      "duration_min": 0,
+      "trigger": "poller"
+    },
+    {
+      "id": "digest-watch-1782659100",
       "overall": "passed",
       "label": null,
-      "started_at": "2026-06-28T14:55:00Z",
-      "finished_at": "2026-06-28T14:56:55Z",
-      "duration_min": 2,
+      "started_at": "2026-06-28T15:05:00Z",
+      "finished_at": "2026-06-28T15:05:25Z",
+      "duration_min": 0,
       "trigger": "poller"
+    },
+    {
+      "id": "build-cd-sync-bazzite-stable-6dvgd",
+      "overall": "passed",
+      "label": "bazzite:stable",
+      "started_at": "2026-06-28T15:00:22Z",
+      "finished_at": "2026-06-28T15:00:32Z",
+      "duration_min": 0,
+      "trigger": "manual"
+    },
+    {
+      "id": "build-cd-sync-stable-8cxdw",
+      "overall": "passed",
+      "label": "bluefin:stable",
+      "started_at": "2026-06-28T15:00:17Z",
+      "finished_at": "2026-06-28T15:00:27Z",
+      "duration_min": 0,
+      "trigger": "manual"
     }
   ],
   "_meta": {
-    "generated": "2026-06-28T15:00:19Z",
-    "refreshed_at": "2026-06-28T15:03:44Z"
+    "generated": "2026-06-28T15:13:47Z",
+    "refreshed_at": "2026-06-28T15:14:30Z"
   },
   "open_bugs": [
     {
