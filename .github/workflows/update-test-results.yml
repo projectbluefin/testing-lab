@@ -254,8 +254,8 @@ jobs:
               stats['recent_runs'] = recent_runs[:25]
               live_runs_ok = True
           else:
-              # Avoid showing stale run state when a live snapshot is unavailable.
-              stats['recent_runs'] = []
+              # Keep last known live snapshot when unavailable from this runner.
+              stats.setdefault('recent_runs', [])
 
           # --- Optional live cluster node snapshot ---
           node_doc = run_json("kubectl get nodes -o json --request-timeout=8s")
@@ -290,9 +290,8 @@ jobs:
           else:
               factory = stats.setdefault('factory', {})
               cluster = factory.setdefault('cluster', {})
-              # Avoid showing stale node state when a live snapshot is unavailable.
-              cluster['nodes'] = []
-              cluster.pop('total_ram_gb', None)
+              # Keep last known live snapshot when unavailable from this runner.
+              cluster.setdefault('nodes', [])
 
           # --- Update metadata timestamps ---
           meta = stats.setdefault('_meta', {})
