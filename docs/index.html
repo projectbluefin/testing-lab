@@ -831,10 +831,18 @@ function nightlyOverdue(img, row) {
 }
 
 // Suite cell for status table
+function isStaleResult(d) {
+  if (!d?.last_run || d.status === 'running') return false;
+  const ageH = (Date.now() - new Date(d.last_run).getTime()) / 3600000;
+  return ageH > 48;
+}
+
 function suiteCell(d, suite) {
   if (!d) return `<div class="suite-cell cell-pend">—</div>`;
   const score = d.scenarios - d.failed;
   const isCritical = suite === 'system';
+  const stale = isStaleResult(d);
+  const status = stale ? 'pending' : d.status;
 
   // Trend: compare current failed count to previous run
   let trend = '';
@@ -847,22 +855,22 @@ function suiteCell(d, suite) {
 
   // Staleness: if result is older than 48h, warn maintainers data may be outdated
   const ageH = d.last_run ? (Date.now() - new Date(d.last_run).getTime()) / 3600000 : Infinity;
-  const staleBadge = (ageH > 48 && d.status !== 'pending')
+  const staleBadge = stale
     ? `<span style="font-size:10px;color:var(--muted);display:block" title="${Math.round(ageH/24)}d since this result was recorded — may be stale">stale ${Math.round(ageH/24)}d</span>`
     : '';
 
-  if (d.status === 'running') {
+  if (status === 'running') {
     return `<div class="suite-cell cell-run">
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">running</a>
     </div>`;
   }
-  if (d.status === 'passed') {
+  if (status === 'passed') {
     return `<div class="suite-cell cell-pass">
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener">✓ ${score}/${d.scenarios}</a>
       ${trend}${staleBadge}
     </div>`;
   }
-  if (d.status === 'failed') {
+  if (status === 'failed') {
     const style = isCritical ? ' style="color:#ff6b6b;font-weight:700"' : '';
     return `<div class="suite-cell cell-fail"${style}>
       <a href="${argoHref(d.workflow_name)}" target="_blank" rel="noopener"${style}>✗ ${score}/${d.scenarios}</a>
@@ -1396,7 +1404,8 @@ function buildStatusTable(images, allData) {
 
     // Never run: all tracked suites are pending/null
     const neverRun = imgSuites.every(s => !row[s] || row[s].status === 'pending' || !row[s].last_run);
-    const hasFailure = imgSuites.some(s => row[s]?.status === 'failed');
+    const allStale = !neverRun && imgSuites.every(s => !row[s] || isStaleResult(row[s]));
+    const hasFailure = imgSuites.some(s => row[s]?.status === 'failed' && !isStaleResult(row[s]));
 
     // Nightly overdue detection
     const overdueH = nightlyOverdue(img, row);
@@ -1417,11 +1426,11 @@ function buildStatusTable(images, allData) {
     const imgLabel = ghcrUrl
       ? `<a href="${ghcrUrl}" target="_blank" rel="noopener" style="color:var(--text)" title="${tooltip}">${img.label}</a>`
       : `<span title="${tooltip}">${img.label}</span>`;
-    const neverBadge = neverRun
-      ? `<span style="font-size:10px;color:var(--pending);margin-left:6px" title="No test runs recorded for this image">no data</span>`
+    const neverBadge = (neverRun || allStale)
+      ? `<span style="font-size:10px;color:var(--pending);margin-left:6px" title="${neverRun ? 'No test runs recorded for this image' : 'All available test results are stale'}">${neverRun ? 'no data' : 'stale data'}</span>`
       : '';
 
-    const rowStatus = hasFailure ? 'fail' : neverRun ? 'untested' : 'ok';
+    const rowStatus = hasFailure ? 'fail' : (neverRun || allStale) ? 'untested' : 'ok';
     // "Run pipeline" link for images with failures or no data
     const tmpl = WORKFLOW_TEMPLATES[img.slug];
     const runLink = (hasFailure || neverRun) && tmpl
