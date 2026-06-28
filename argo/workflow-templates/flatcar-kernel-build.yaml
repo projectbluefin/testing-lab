@@ -405,7 +405,7 @@ spec:
           '# Build the kernel packages with full dependency resolution so the board root' \
           '# stays valid for build_image checks and locale generation.' \
           '/mnt/host/source/src/scripts/build_packages \' \
-          '  --board=amd64-usr --skip_chroot_upgrade --skip_toolchain_update --jobs={{workflow.parameters.cores}} \' \
+          '  --board=amd64-usr --skip_chroot_upgrade --skip_toolchain_update \' \
           '  =sys-kernel/coreos-sources-{{inputs.parameters.kernel-version}} \' \
           '  =sys-kernel/coreos-kernel-{{inputs.parameters.kernel-version}} \' \
           '  =sys-kernel/coreos-modules-{{inputs.parameters.kernel-version}}' \
