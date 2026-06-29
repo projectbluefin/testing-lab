@@ -414,7 +414,7 @@ spec:
           'sudo mkdir -p /build/amd64-usr/etc/portage/package.use' \
           'echo "sys-apps/shadow -pam" | sudo tee /build/amd64-usr/etc/portage/package.use/flatcar-kernel-cycle-break >/dev/null' \
           'BINHOST_VER="{{inputs.parameters.flatcar-scripts-ref}}"' \
-          'BINHOST_VER="${BINHOST_VER#stable-}"' \
+          'BINHOST_VER="\${BINHOST_VER#stable-}"' \
           'export PORTAGE_BINHOST="http://mirror.release.flatcar-linux.net/boards/amd64-usr/\${BINHOST_VER}/pkgs"' \
           '/mnt/host/source/src/scripts/build_packages \' \
           '  --board=amd64-usr --skip_chroot_upgrade --skip_toolchain_update --noworkon \' \
