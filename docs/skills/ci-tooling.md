@@ -30,8 +30,12 @@ metadata:
 2. For dashboard stats jobs, treat private-cluster snapshots as optional: when live fetch fails, preserve last known live values and set explicit freshness/state flags.
 3. Never wipe `recent_runs` or `factory.cluster.nodes` just because a hosted runner cannot reach `192.168.x.x`; preserve and annotate.
 4. Add explicit metadata in JSON (`_meta.live_snapshot_ok`, `_meta.refreshed_at`) so UI can show freshness honestly.
-5. For browser-side `fetch`, avoid custom request headers that force CORS preflight against GitHub APIs (for example `Cache-Control` request headers).
-6. After push, validate production Pages with a real browser render (not raw HTML fetch only): confirm no loading placeholders and key sections render.
+5. For GitHub Pages sites, verify the Pages source and build state before assuming a push is live:
+   - `gh api repos/<owner>/<repo>/pages --jq '.source'`
+   - `gh api repos/<owner>/<repo>/pages/builds/latest --jq '.status'`
+   - Pages can legitimately stay in `building` for a while even after the commit is on `main`.
+6. For browser-side `fetch`, avoid custom request headers that force CORS preflight against GitHub APIs (for example `Cache-Control` request headers).
+7. After push, validate production Pages with a real browser render (not raw HTML fetch only): confirm no loading placeholders and key sections render.
 
 ## Common Rationalizations
 
@@ -52,7 +56,7 @@ metadata:
 
 - [ ] Workflow logic preserves last known live snapshot when private endpoint fetch fails
 - [ ] `_meta.live_snapshot_ok` and `_meta.refreshed_at` are present and updated
+- [ ] GitHub Pages source/build state was checked before declaring a site live
 - [ ] Browser fetch code avoids unnecessary custom headers that trigger preflight
 - [ ] Production `https://projectbluefin.github.io/testing-lab/` renders with real table/cluster content (no loading placeholders)
 - [ ] Render validation includes a real browser run (headless is fine) and captures evidence
-
