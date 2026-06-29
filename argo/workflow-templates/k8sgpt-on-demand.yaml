@@ -6,8 +6,8 @@ metadata:
   annotations:
     description: |
       Runs an on-demand K8sGPT analysis against the cluster and writes the full
-      JSON output to an artifact. By default it uses the K8sGPT CR's configured
-      active filters; optional template parameters can narrow the namespace or
+      JSON output to an artifact. Default filters mirror the repo-managed
+      K8sGPT manifest; optional template parameters can narrow the namespace or
       override filters for focused triage.
   labels:
     app.kubernetes.io/part-of: testing-lab
@@ -31,15 +31,38 @@ spec:
     - name: analyze
       activeDeadlineSeconds: 600
       container:
-        image: ghcr.io/k8sgpt-ai/k8sgpt:v0.4.24
-        command: ["/bin/sh", "-c"]
+        image: cgr.dev/chainguard/wolfi-base:latest
+        command: [sh, -c]
         args:
           - |
+            apk add --no-cache bash curl jq tar >/dev/null 2>&1
+            exec bash <<'SCRIPT_EOF'
             set -euo pipefail
+
+            k8sgpt_version="v0.4.24"
             mkdir -p /tmp/results
+            mkdir -p /tmp/bin
             ns_arg=""
             explain_arg=""
             filters_arg=""
+
+            arch="$(uname -m)"
+            case "${arch}" in
+              x86_64|amd64)
+                archive="k8sgpt_Linux_x86_64.tar.gz"
+                ;;
+              aarch64|arm64)
+                archive="k8sgpt_Linux_arm64.tar.gz"
+                ;;
+              *)
+                echo "unsupported architecture: ${arch}" >&2
+                exit 1
+                ;;
+            esac
+
+            curl -fsSL "https://github.com/k8sgpt-ai/k8sgpt/releases/download/${k8sgpt_version}/${archive}" \
+              | tar -xz -C /tmp/bin k8sgpt
+
             if [ -n "{{workflow.parameters.namespace}}" ]; then
               ns_arg="--namespace={{workflow.parameters.namespace}}"
             fi
@@ -49,9 +72,11 @@ spec:
             if [ -n "{{workflow.parameters.filters}}" ]; then
               filters_arg="--filter={{workflow.parameters.filters}}"
             fi
-            k8sgpt analyze ${explain_arg} --output=json ${filters_arg} ${ns_arg} > /tmp/results/k8sgpt-results.json
-            findings_count=$(awk 'index($0, "\"kind\"") { c++ } END { print c+0 }' /tmp/results/k8sgpt-results.json)
+
+            /tmp/bin/k8sgpt analyze ${explain_arg} --output=json ${filters_arg} ${ns_arg} > /tmp/results/k8sgpt-results.json
+            findings_count=$(jq '[.. | objects | select(has("kind"))] | length' /tmp/results/k8sgpt-results.json)
             echo "k8sgpt findings: ${findings_count}"
+            SCRIPT_EOF
         resources:
           requests:
             cpu: 100m

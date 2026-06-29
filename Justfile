@@ -207,7 +207,7 @@ run-k8sgpt namespace="" filters="Pod,Deployment,Service,Ingress,Node" explain="t
       -p namespace="{{ namespace }}" \
       -p filters="{{ filters }}" \
       -p explain="{{ explain }}" \
-      -n {{ argo_ns }} --watch
+      -n {{ argo_ns }} --wait --log
 
 # Run first PVC/local-path restore drill (#60 #74 #84)
 run-homelab-restore:

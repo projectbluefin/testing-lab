@@ -122,6 +122,13 @@ Then consume via `{{steps.wait-for-vm.outputs.result}}`.
 
 **`cgr.dev/chainguard/kubectl:latest-dev`** is the correct image for any step that needs both `kubectl` and `bash`. `registry.k8s.io/kubectl` is distroless (no shell — `nc`, `bash /dev/tcp` all fail). Add `cgr.dev` to the registry lint allowlist when using it.
 
+If a step needs shell features (`mkdir`, redirection, `jq`/`awk` parsing, heredocs), do **not** assume a vendor CLI image has `/bin/sh`. Third-party tool images are often distroless. Either:
+
+- run the binary directly with `container.command`/`args` and avoid shell syntax entirely, or
+- switch to a shell-capable base image (`cgr.dev/chainguard/wolfi-base:latest`, `cgr.dev/chainguard/kubectl:latest-dev`) and install/fetch the CLI inside the step.
+
+A runtime `/bin/sh: not found` or missing-coreutils failure from a CLI image usually means the image is distroless, not that the WorkflowTemplate syntax is wrong.
+
 ### 5. Always use `onExit` for teardown
 
 Every pipeline that provisions a VM must have a guaranteed teardown:

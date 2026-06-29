@@ -68,6 +68,19 @@ argo submit --from workflowtemplate/knuckle-qa-pipeline \
 These are exposed because they are referenced by the entry points;
 submit them directly only for diagnosis.
 
+### `k8sgpt-on-demand`
+
+Runs an on-demand K8sGPT cluster scan and stores the full analyzer output as a
+workflow artifact while printing a concise findings summary to logs/stdout.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `namespace` | `""` | Empty means cluster-wide scan |
+| `filters` | `Pod,Deployment,Service,Ingress,Node` | Repo-managed core filters; override for focused triage |
+| `explain` | `true` | Enables `--explain` for the scan |
+
+Artifact: analyze node emits `k8sgpt-results` from `/tmp/results/k8sgpt-results.json`.
+
 ### `build-containerdisk` (template: `build-containerdisk`)
 
 Builds a KubeVirt containerDisk from a bootc image and pushes it to the local
