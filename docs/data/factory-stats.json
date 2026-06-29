@@ -228,11 +228,11 @@
   ],
   "_meta": {
     "generated": "2026-06-28T16:12:58Z",
-    "refreshed_at": "2026-06-29T16:25:34Z",
+    "refreshed_at": "2026-06-29T17:23:11Z",
     "live_snapshot_ok": false,
-    "freshness_minutes": 6621,
+    "freshness_minutes": 6679,
     "freshness": {
-      "age_minutes": 6621,
+      "age_minutes": 6679,
       "threshold_minutes": 180,
       "state": "stale"
     },
@@ -302,13 +302,13 @@
   "github": {
     "testing_lab": {
       "open_issues": 50,
-      "open_prs": 17,
+      "open_prs": 18,
       "prs_merged_7d": 17
     }
   },
   "hive": {
     "open_issues": 50,
-    "open_prs": 17
+    "open_prs": 18
   },
   "factory": {
     "cluster": {
