@@ -111,7 +111,7 @@
     {
       "source": "live_cluster_snapshot",
       "reason": "private endpoint unavailable or incomplete from GitHub-hosted runner",
-      "effect": "public telemetry downgraded to partial/degraded"
+      "effect": "public telemetry downgraded to unknown/degraded"
     }
   ]
 }

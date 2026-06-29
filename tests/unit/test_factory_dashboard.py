@@ -58,3 +58,9 @@ def test_factory_public_telemetry_contract_shape():
         assert 'numerator' in metric and 'denominator' in metric
         assert metric['evidence']
         assert all(ref.get('url', '').startswith('https://') for ref in metric['evidence'])
+
+    if telemetry.get('errors'):
+        for err in telemetry['errors']:
+            assert err['source']
+            assert err['reason']
+            assert err['effect'] == 'public telemetry downgraded to unknown/degraded'
