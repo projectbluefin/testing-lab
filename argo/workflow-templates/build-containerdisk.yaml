@@ -248,7 +248,7 @@ spec:
         # and this pod does not carry a containers/image registry config for it.
         # Use the upstream image ref here; the pod image itself still comes from the
         # cluster's normal mirror path when the workflow is launched.
-        SOURCE_IMGREF="docker://${IMAGE}:${IMAGE_TAG}"
+        SOURCE_IMGREF="docker://${IMAGE}"
 
         # Use the image's native filesystem unless --filesystem override is specified.
         # bluefin:testing → Fedora → btrfs (native).
