@@ -7,6 +7,7 @@ description: >
 metadata:
   context7-sources:
     - /websites/github_en_actions
+    - /websites/github_en_rest
 ---
 
 # CI Tooling — GitHub Actions in testing-lab
@@ -38,6 +39,8 @@ metadata:
 7. For dashboard data jobs, confirm the producer workflow published every generated JSON artifact the UI depends on before declaring a section broken; missing data should render an explicit unavailable state rather than disappearing.
 8. For browser-side `fetch`, avoid custom request headers that force CORS preflight against GitHub APIs (for example `Cache-Control` request headers).
 9. After push, validate production Pages with a real browser render (not raw HTML fetch only): confirm no loading placeholders and key sections render.
+10. Any image freshness/status numbers shown in the dashboard must come from GitHub Releases API (`/repos/{owner}/{repo}/releases`) metadata only (`published_at`, `tag_name`, `html_url`). Do not infer release age from Argo run labels or workflow names.
+11. For every dashboard number that is not self-evident from local files, publish explicit source lineage (source URL + derivation input) or hide the number as unavailable.
 
 ## Common Rationalizations
 
@@ -55,6 +58,8 @@ metadata:
 - Generated dashboard sections disappear because their JSON artifact was not published
 - Browser console logs CORS preflight failures to GitHub API endpoints
 - CI changes are declared fixed without checking production Pages render
+- Image-status ages are derived from workflow/run activity instead of release metadata.
+- A dashboard card shows a numeric value without a traceable source URL/evidence path.
 
 ## Verification
 
@@ -65,3 +70,5 @@ metadata:
 - [ ] Browser fetch code avoids unnecessary custom headers that trigger preflight
 - [ ] Production `https://projectbluefin.github.io/testing-lab/` renders with real table/cluster content (no loading placeholders)
 - [ ] Render validation includes a real browser run (headless is fine) and captures evidence
+- [ ] Image-status cards derive age from GitHub Releases `published_at` and link to the exact release page (`html_url`).
+- [ ] Unsupported metrics (no source-of-truth feed) are hidden or explicitly unavailable, never synthesized.
