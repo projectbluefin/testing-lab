@@ -228,8 +228,15 @@
   ],
   "_meta": {
     "generated": "2026-06-28T16:12:58Z",
-    "refreshed_at": "2026-06-29T15:01:46Z",
-    "live_snapshot_ok": false
+    "refreshed_at": "2026-06-29T16:25:34Z",
+    "live_snapshot_ok": false,
+    "freshness_minutes": 6621,
+    "freshness": {
+      "age_minutes": 6621,
+      "threshold_minutes": 180,
+      "state": "stale"
+    },
+    "source": "github-actions/update-test-results"
   },
   "open_bugs": [
     {

@@ -1,29 +1,113 @@
 {
   "schema_version": "v2",
   "snapshot": {
-    "generated_at": "2026-06-29T05:27:02Z",
+    "generated_at": "2026-06-28T16:12:58Z",
     "window": {
       "type": "rolling",
       "hours": 24
     },
-    "state": "unknown",
-    "age_minutes": null,
+    "state": "degraded",
+    "age_minutes": 6621,
     "threshold_minutes": 180
   },
   "lineage": {
     "collector": {
       "workflow": ".github/workflows/update-test-results.yml",
-      "run_id": null,
-      "run_url": "https://github.com/projectbluefin/testing-lab/actions",
+      "run_id": "28386975716",
+      "run_url": "https://github.com/projectbluefin/testing-lab/actions/runs/28386975716",
       "job": "update",
-      "commit_sha": "",
-      "commit_url": "https://github.com/projectbluefin/testing-lab/commits/main"
+      "commit_sha": "a537ab200d328f78a42388d34be3abdf0ff639e2",
+      "commit_url": "https://github.com/projectbluefin/testing-lab/commit/a537ab200d328f78a42388d34be3abdf0ff639e2"
     },
-    "inputs_digest_sha256": "sha256:bootstrap",
+    "inputs_digest_sha256": "sha256:e3bfc5a9a91752abb015889965f6e16724352b4ddf2fb218f82e6c9928ae181b",
     "inputs": [
       {
+        "path": "docs/results/bluefin-aurora-testing-developer.json",
+        "sha256": "sha256:99cd6b4ea4b2a4b4fe1f44c3abca43a9e29a60929de3d4708b81925afde8c29b"
+      },
+      {
+        "path": "docs/results/bluefin-aurora-testing-smoke.json",
+        "sha256": "sha256:a115bcf8796d807dcc616c7ba0f72aea9b3be2ba952425069c1422756947b32f"
+      },
+      {
+        "path": "docs/results/bluefin-aurora-testing-software.json",
+        "sha256": "sha256:119b5cfa7ac18f203aee925a5a06f1f9e8cbe67e67878c7a71454e5555f10dfd"
+      },
+      {
+        "path": "docs/results/bluefin-aurora-testing-system.json",
+        "sha256": "sha256:e2901358c8d5f86298ac7a77a3c3b98c6223a5dbc9714e1e76c9c4df953d7807"
+      },
+      {
+        "path": "docs/results/bluefin-bazzite-testing-developer.json",
+        "sha256": "sha256:8551a5e61968cd66dfb9d3d9475f9d8a8c531039a7ac6870779e0ed96a3eaba6"
+      },
+      {
+        "path": "docs/results/bluefin-bazzite-testing-smoke.json",
+        "sha256": "sha256:bfaf412bfe03793d33e61c42018682eae5724a78237d07dd09665353c8d2ea3b"
+      },
+      {
+        "path": "docs/results/bluefin-bazzite-testing-software.json",
+        "sha256": "sha256:87ea85d6b96c72027eccb63d0296f7966684ad8a9508b22d4bee99ec70c314ad"
+      },
+      {
+        "path": "docs/results/bluefin-bazzite-testing-system.json",
+        "sha256": "sha256:35dcc44159f5122887d77dbe73b1f1be64e5fe5de9b14964f0925519a5ccab30"
+      },
+      {
+        "path": "docs/results/bluefin-lts-testing-developer.json",
+        "sha256": "sha256:a5d44fdaff7446edec7daefac4bb865dd8a5689f529ad45a1111052be2511f56"
+      },
+      {
+        "path": "docs/results/bluefin-lts-testing-smoke.json",
+        "sha256": "sha256:abccf5c03258fc8a841405b4a7a5d9722d0fec213c3e782c5d6fa219c4ab1cc8"
+      },
+      {
+        "path": "docs/results/bluefin-lts-testing-software.json",
+        "sha256": "sha256:8f7bef0b29ea71fdd1471daa2e6d62f3c84840861ba1948803438ea8ddafef4f"
+      },
+      {
+        "path": "docs/results/bluefin-lts-testing-system.json",
+        "sha256": "sha256:183f3ee5739b02040eacc5f6151b2639822289e6c40f23d7fb8883c05ac71307"
+      },
+      {
+        "path": "docs/results/bluefin-testing-common.json",
+        "sha256": "sha256:aeedca639f0238a555b5a6d6069c27fe7a96b89dc6332060d644e6742680ae70"
+      },
+      {
+        "path": "docs/results/bluefin-testing-developer.json",
+        "sha256": "sha256:3fae89aaa2eed29345ca97ab02b04f1f458d319bc652b9829f7a7f476e7d226f"
+      },
+      {
         "path": "docs/results/bluefin-testing-smoke.json",
-        "sha256": "sha256:bootstrap"
+        "sha256": "sha256:871a7f7b664e4b6c1ddfe8d377d47265ea5b0a407d0e6c08c53d0c35632a3e98"
+      },
+      {
+        "path": "docs/results/bluefin-testing-software.json",
+        "sha256": "sha256:9d2fe4dab08bdcb136b2b260405c28601947bfed7da354476685e304bb13e6e1"
+      },
+      {
+        "path": "docs/results/bluefin-testing-system.json",
+        "sha256": "sha256:78fefd5edfec98072c7f630e01f910a8683697028de9226efcece8f068d54571"
+      },
+      {
+        "path": "docs/results/dakota-testing-developer.json",
+        "sha256": "sha256:390f95d6ec8b993f8349b6944ba5732ea67427fdcda8e19bac68a9999f0c3ed5"
+      },
+      {
+        "path": "docs/results/dakota-testing-smoke.json",
+        "sha256": "sha256:86a3309414681475b1a99320830709bb11b5c74682b929deebd66d667646174f"
+      },
+      {
+        "path": "docs/results/dakota-testing-software.json",
+        "sha256": "sha256:a42d1819f9e375edd603bbe4425e22074a91250fea47d8c02c196db5558d84f6"
+      },
+      {
+        "path": "docs/results/dakota-testing-system.json",
+        "sha256": "sha256:5da3c630e4be7f8ab89d9a5086d16b797816b2f01417548e749d2c8f5baba1b5"
+      },
+      {
+        "path": "docs/results/flatcar-testing-flatcar.json",
+        "sha256": "sha256:1d3d24ad9d6b79bdd25df68f32d6195bbf745e2339ffe9175c27bc8523d79617"
       }
     ]
   },
@@ -37,18 +121,22 @@
     {
       "id": "suite_pass_rate_24h",
       "label": "Suite pass rate (24h)",
-      "value": 25.0,
+      "value": 91.67,
       "unit": "percent",
-      "numerator": 1,
-      "denominator": 4,
+      "numerator": 22,
+      "denominator": 24,
       "formula": "passed_suite_runs / completed_suite_runs * 100",
       "window_hours": 24,
       "confidence": "high",
-      "state": "unknown",
+      "state": "degraded",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28386975716"
+        },
+        {
+          "kind": "commit",
+          "url": "https://github.com/projectbluefin/testing-lab/commit/a537ab200d328f78a42388d34be3abdf0ff639e2"
         }
       ]
     },
@@ -62,47 +150,59 @@
       "formula": "(scenarios_total - scenarios_failed) / scenarios_total * 100",
       "window_hours": 24,
       "confidence": "medium",
-      "state": "unknown",
+      "state": "degraded",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28386975716"
+        },
+        {
+          "kind": "commit",
+          "url": "https://github.com/projectbluefin/testing-lab/commit/a537ab200d328f78a42388d34be3abdf0ff639e2"
         }
       ]
     },
     {
       "id": "queue_pressure_now",
       "label": "Queue pressure (now)",
-      "value": 19,
+      "value": 1,
       "unit": "count",
-      "numerator": 19,
+      "numerator": 1,
       "denominator": 25,
       "formula": "count(runs where overall=running)",
       "window_hours": 1,
       "confidence": "high",
-      "state": "unknown",
+      "state": "degraded",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28386975716"
+        },
+        {
+          "kind": "commit",
+          "url": "https://github.com/projectbluefin/testing-lab/commit/a537ab200d328f78a42388d34be3abdf0ff639e2"
         }
       ]
     },
     {
       "id": "unknown_station_ratio",
       "label": "Unknown station ratio",
-      "value": 75.0,
+      "value": 0.0,
       "unit": "percent",
-      "numerator": 3,
-      "denominator": 4,
+      "numerator": 0,
+      "denominator": 1,
       "formula": "unknown_station_count / total_stations * 100",
       "window_hours": 24,
       "confidence": "high",
-      "state": "unknown",
+      "state": "degraded",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28386975716"
+        },
+        {
+          "kind": "commit",
+          "url": "https://github.com/projectbluefin/testing-lab/commit/a537ab200d328f78a42388d34be3abdf0ff639e2"
         }
       ]
     }
