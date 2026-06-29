@@ -45,8 +45,8 @@ spec:
               echo "curl is required but not available in runner image" >&2
               exit 1
             fi
-            if ! command -v tar >/dev/null 2>&1; then
-              echo "tar is required but not available in runner image" >&2
+            if ! command -v python3 >/dev/null 2>&1; then
+              echo "python3 is required but not available in runner image" >&2
               exit 1
             fi
 
@@ -65,7 +65,14 @@ spec:
             esac
 
             curl -fsSL "https://github.com/k8sgpt-ai/k8sgpt/releases/download/${k8sgpt_version}/${archive}" \
-              | tar -xz -C /tmp/bin k8sgpt
+              -o /tmp/k8sgpt.tgz
+            python3 - <<'PY'
+            import tarfile
+            with tarfile.open('/tmp/k8sgpt.tgz', 'r:gz') as tf:
+                member = tf.getmember('k8sgpt')
+                tf.extract(member, '/tmp/bin')
+            PY
+            chmod +x /tmp/bin/k8sgpt
 
             if [ -n "${namespace}" ]; then
               if ! printf '%s' "${namespace}" | grep -Eq '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'; then
