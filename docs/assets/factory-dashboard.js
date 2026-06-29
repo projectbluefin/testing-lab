@@ -337,6 +337,98 @@ function buildTelemetryEvidence(telemetry) {
   `;
 }
 
+function latestRunsByLabel(runs) {
+  const map = new Map();
+  for (const run of runs || []) {
+    if (!run?.label || map.has(run.label)) continue;
+    map.set(run.label, run);
+  }
+  return map;
+}
+
+function fallbackRunQueryUrl(run) {
+  if (run?.run_url) return run.run_url;
+  if (!run?.id) return 'https://github.com/projectbluefin/testing-lab/actions';
+  return `https://github.com/projectbluefin/testing-lab/actions?query=${encodeURIComponent(run.id)}`;
+}
+
+function buildPromotionTimeline(runs) {
+  const byLabel = latestRunsByLabel(runs);
+  const channels = [
+    'bluefin:testing',
+    'bluefin:stable',
+    'bluefin-lts:testing',
+    'bluefin-lts:stable',
+    'dakota:latest',
+  ];
+
+  return `
+    <section class="section">
+      <h2>Promotion timeline</h2>
+      <div class="panel">
+        <table class="coverage-table">
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Latest run</th>
+              <th>Status</th>
+              <th>Observed</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${channels.map((lane) => {
+              const run = byLabel.get(lane);
+              const tone = runStatusClass(run?.overall);
+              return `
+                <tr>
+                  <td class="mono">${escapeHtml(lane)}</td>
+                  <td>${escapeHtml(run?.id || 'no recent run')}</td>
+                  <td>${run ? `<span class="badge ${tone}">${escapeHtml(run.overall)}</span>` : '<span class="badge pending">unknown</span>'}</td>
+                  <td>${escapeHtml(run ? formatTime(run.started_at) : 'unknown')}</td>
+                  <td>${run ? `<a href="${escapeHtml(fallbackRunQueryUrl(run))}" target="_blank" rel="noreferrer">source</a>` : 'no source'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function buildLineagePanel(telemetry) {
+  const collector = telemetry?.lineage?.collector || {};
+  const inputs = telemetry?.lineage?.inputs || [];
+  const coverage = telemetry?.coverage || {};
+  return `
+    <section class="section">
+      <h2>Lineage & data quality</h2>
+      <div class="panel">
+        <div class="meta">
+          <span>collector run: ${collector.run_url ? `<a href="${escapeHtml(collector.run_url)}" target="_blank" rel="noreferrer">source</a>` : 'unknown'}</span>
+          <span>collector commit: ${collector.commit_url ? `<a href="${escapeHtml(collector.commit_url)}" target="_blank" rel="noreferrer">source</a>` : 'unknown'}</span>
+          <span>input digest: <span class="mono">${escapeHtml(telemetry?.lineage?.inputs_digest_sha256 || 'unknown')}</span></span>
+          <span>coverage: ${escapeHtml(`${coverage.observed_result_docs ?? 0}/${coverage.expected_result_docs ?? 0}`)} (${escapeHtml(metricValue({ value: (coverage.coverage_ratio || 0) * 100, unit: 'percent' }))})</span>
+        </div>
+        <table class="coverage-table" style="margin-top: 12px">
+          <thead>
+            <tr><th>Input path</th><th>Digest</th></tr>
+          </thead>
+          <tbody>
+            ${inputs.length ? inputs.slice(0, 8).map((input) => `
+              <tr>
+                <td class="mono">${escapeHtml(input.path || 'unknown')}</td>
+                <td class="mono">${escapeHtml(input.sha256 || 'unknown')}</td>
+              </tr>
+            `).join('') : '<tr><td colspan="2">No lineage inputs published.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
 function render(copy, stats, history, telemetry) {
   const root = document.getElementById('factory-dashboard');
   const runs = Array.isArray(stats?.recent_runs) ? stats.recent_runs : [];
@@ -501,6 +593,8 @@ function render(copy, stats, history, telemetry) {
     </section>
 
     ${buildTelemetryEvidence(telemetry)}
+    ${buildPromotionTimeline(runs)}
+    ${buildLineagePanel(telemetry)}
 
     <section class="split section">
       <article class="panel">

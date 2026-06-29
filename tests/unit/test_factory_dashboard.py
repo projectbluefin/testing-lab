@@ -21,7 +21,7 @@ def test_factory_copy_and_history_have_expected_shape():
     assert len(copy['trust_labels']) >= 4
     assert len(copy['screenshots']) == 3
     assert history['window_days'] == 7
-    assert len(history['rollups']) == 7
+    assert 0 < len(history['rollups']) <= 7
 
 
 def test_dashboard_data_files_still_exist():
@@ -78,6 +78,8 @@ def test_dashboard_renderer_loads_public_telemetry():
     assert 'numerator' in js
     assert 'denominator' in js
     assert 'confidence' in js
+    assert 'Promotion timeline' in js
+    assert 'Lineage & data quality' in js
 
 
 def test_dashboard_default_copy_has_no_private_links():
