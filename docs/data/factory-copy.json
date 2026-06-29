@@ -11,8 +11,8 @@
   "trust_labels": ["Signing", "SBOM", "Attestation", "CVE posture", "Promotion timing"],
   "links": [
     {
-      "label": "Argo UI",
-      "href": "https://192.168.1.102:32746",
+      "label": "Actions",
+      "href": "https://github.com/projectbluefin/testing-lab/actions",
       "tone": "good"
     },
     {

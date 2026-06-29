@@ -64,3 +64,17 @@ def test_factory_public_telemetry_contract_shape():
             assert err['source']
             assert err['reason']
             assert err['effect'] == 'public telemetry downgraded to unknown/degraded'
+
+
+def test_factory_copy_links_are_public():
+    copy = json.loads((ROOT / 'docs/data/factory-copy.json').read_text())
+    for link in copy['links']:
+        assert '192.168.' not in link['href']
+
+
+def test_dashboard_renderer_loads_public_telemetry():
+    js = (ROOT / 'docs/assets/factory-dashboard.js').read_text()
+    assert "loadJson('./data/factory-telemetry.json'" in js
+    assert 'numerator' in js
+    assert 'denominator' in js
+    assert 'confidence' in js

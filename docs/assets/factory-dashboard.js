@@ -25,6 +25,7 @@ const DATA = {
   copy: DEFAULT_COPY,
   stats: null,
   history: null,
+  telemetry: null,
 };
 
 const fmt = new Intl.DateTimeFormat(undefined, {
@@ -270,7 +271,73 @@ function buildCoverageTable(coverage) {
   `;
 }
 
-function render(copy, stats, history) {
+function metricById(telemetry, id) {
+  return (telemetry?.metrics || []).find((metric) => metric.id === id) || null;
+}
+
+function metricValue(metric, fallback = 'unknown') {
+  if (!metric || metric.value == null) return fallback;
+  if (metric.unit === 'percent') return `${Math.round(metric.value)}%`;
+  return String(metric.value);
+}
+
+function metricEvidence(metric) {
+  const evidence = (metric?.evidence || [])
+    .map((ref) => ref?.url)
+    .filter(Boolean);
+  if (!evidence.length) return 'no source';
+  return evidence.map((url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">source</a>`).join(' · ');
+}
+
+function buildTelemetryEvidence(telemetry) {
+  const metrics = telemetry?.metrics || [];
+  if (!metrics.length) {
+    return `
+      <section class="section">
+        <h2>Telemetry evidence</h2>
+        <div class="panel">
+          <div class="loading">Telemetry evidence unavailable for this snapshot. Metrics are intentionally marked unknown.</div>
+          <div class="meta"><a href="./data/factory-telemetry.json" target="_blank" rel="noreferrer">raw telemetry JSON</a></div>
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="section">
+      <h2>Telemetry evidence</h2>
+      <div class="panel">
+        <table class="coverage-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+              <th>Numerator / denominator</th>
+              <th>Window</th>
+              <th>Confidence</th>
+              <th>Formula</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${metrics.map((metric) => `
+              <tr>
+                <td>${escapeHtml(metric.label || metric.id)}</td>
+                <td>${escapeHtml(metricValue(metric, 'unknown'))}</td>
+                <td>${escapeHtml(`${metric.numerator}/${metric.denominator}`)}</td>
+                <td>${escapeHtml(`${metric.window_hours}h`)}</td>
+                <td>${escapeHtml(metric.confidence || 'unknown')}</td>
+                <td class="mono">${escapeHtml(metric.formula || 'unknown')}</td>
+                <td>${metricEvidence(metric)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function render(copy, stats, history, telemetry) {
   const root = document.getElementById('factory-dashboard');
   const runs = Array.isArray(stats?.recent_runs) ? stats.recent_runs : [];
   const openBugs = Array.isArray(stats?.open_bugs) ? stats.open_bugs : [];
@@ -285,6 +352,16 @@ function render(copy, stats, history) {
   const pressureSeries = historySeries.map((entry) => entry.pressure || 0);
   const freshness = stats?._meta?.refreshed_at || stats?._meta?.generated;
   const liveOk = stats?._meta?.live_snapshot_ok;
+  const telemetrySnapshot = telemetry?.snapshot || {};
+  const suiteMetric = metricById(telemetry, 'suite_pass_rate_24h');
+  const queueMetric = metricById(telemetry, 'queue_pressure_now');
+  const scenarioMetric = metricById(telemetry, 'scenario_pass_rate_24h');
+  const unknownMetric = metricById(telemetry, 'unknown_station_ratio');
+  const stationStates = stats?.station_states || {};
+  const stationSource = stationStates.source_and_intent || {};
+  const stationAssemble = stationStates.assemble || {};
+  const stationVerify = stationStates.verify || {};
+  const stationTrust = stationStates.trust_and_ship || {};
 
   root.innerHTML = `
     <header class="topbar">
@@ -303,7 +380,7 @@ function render(copy, stats, history) {
         <h2>${escapeHtml(copy.mission.headline)}</h2>
         <p>${escapeHtml(copy.mission.body)}</p>
         <div class="pill-row">
-          <span class="pill ${liveOk ? 'good' : 'warn'}"><strong>${liveOk ? 'live' : 'partial'}</strong> snapshot</span>
+          <span class="pill ${telemetrySnapshot.state === 'fresh' ? 'good' : 'warn'}"><strong>${telemetrySnapshot.state || (liveOk ? 'live' : 'unknown')}</strong> snapshot</span>
           <span class="pill muted">refreshed ${escapeHtml(hoursAgo(freshness))}</span>
           <span class="pill muted">${escapeHtml(summary.total)} recent runs</span>
           <span class="pill muted">${escapeHtml(openBugs.length)} open bugs</span>
@@ -312,8 +389,8 @@ function render(copy, stats, history) {
       <aside class="hero-aside">
         <span class="label">Current readout</span>
         <div class="pill-row">
-          <span class="chip ${summary.failed ? 'bad' : 'good'}">pass rate <strong>${escapeHtml(percent(summary.passRate))}</strong></span>
-          <span class="chip ${summary.running ? 'warn' : 'good'}">running <strong>${escapeHtml(summary.running)}</strong></span>
+          <span class="chip ${suiteMetric?.state === 'unknown' ? 'warn' : (summary.failed ? 'bad' : 'good')}">reliability <strong>${escapeHtml(metricValue(suiteMetric, 'unknown'))}</strong> <span class="mono">${suiteMetric ? `${suiteMetric.numerator}/${suiteMetric.denominator}` : 'unknown'}</span></span>
+          <span class="chip ${queueMetric?.state === 'unknown' ? 'warn' : (queueMetric?.value ? 'warn' : 'good')}">running <strong>${escapeHtml(queueMetric ? queueMetric.numerator : 'unknown')}</strong></span>
           <span class="chip muted">median speed <strong>${escapeHtml(minutesLabel(summary.speed))}</strong></span>
           <span class="chip muted">cluster RAM <strong>${escapeHtml(compactNumber(stats?.factory?.cluster?.total_ram_gb || 0))} GB</strong></span>
         </div>
@@ -353,16 +430,20 @@ function render(copy, stats, history) {
         })}
         ${buildMetricCard({
           title: 'Reliability',
-          value: percent(summary.passRate),
-          subtext: `${summary.failed} failures among ${summary.complete} completed runs.`,
-          spark: sparkBars(reliabilitySeries),
+          value: metricValue(suiteMetric, 'unknown'),
+          subtext: suiteMetric
+            ? `${suiteMetric.numerator}/${suiteMetric.denominator} · confidence ${suiteMetric.confidence} · ${suiteMetric.window_hours}h`
+            : 'unknown · no telemetry evidence available',
+          spark: suiteMetric ? sparkBars(reliabilitySeries) : '<span class="loading">no evidence</span>',
           tone: summary.failed ? 'warn' : 'good',
         })}
         ${buildMetricCard({
           title: 'Queue pressure',
-          value: compactNumber(summary.running),
-          subtext: 'Active workflows still moving through the factory.',
-          spark: sparkBars(pressureSeries),
+          value: metricValue(queueMetric, 'unknown'),
+          subtext: queueMetric
+            ? `${queueMetric.numerator}/${queueMetric.denominator} · confidence ${queueMetric.confidence} · ${queueMetric.window_hours}h`
+            : 'unknown · no telemetry evidence available',
+          spark: queueMetric ? sparkBars(pressureSeries) : '<span class="loading">no evidence</span>',
           tone: summary.running ? 'warn' : 'good',
         })}
       </div>
@@ -373,27 +454,27 @@ function render(copy, stats, history) {
       <div class="station-grid">
         ${buildStation({
           title: copy.station_labels[0],
-          status: `${summary.total} runs`,
-          body: 'Fresh work enters through pollers and manual dispatch before the dashboard snapshot lands.',
-          chip: { label: latest?.trigger || 'manual', tone: 'run' },
+          status: `${summary.total} runs in window`,
+          body: `Input source is ${stationSource.trigger || latest?.trigger || 'unknown'}; latest label ${latest?.label || 'unknown'}.`,
+          chip: { label: stationSource.status || 'unknown', tone: stationSource.status === 'unknown' ? 'warn' : 'run' },
         })}
         ${buildStation({
           title: copy.station_labels[1],
-          status: `${compactNumber(stats?.test_coverage?.scenarios_total || 0)} scenarios`,
-          body: 'The current coverage snapshot shows whether the image matrix is broad enough to trust.',
-          chip: { label: `${compactNumber(stats?.test_coverage?.images_with_results || 0)} images`, tone: 'good' },
+          status: `${compactNumber(stats?.test_coverage?.scenarios_total || 0)} scenarios tracked`,
+          body: `Scenario pass rate ${metricValue(scenarioMetric, 'unknown')}; image coverage ${compactNumber(stats?.test_coverage?.images_with_results || 0)}.`,
+          chip: { label: stationAssemble.status || 'unknown', tone: stationAssemble.status === 'unknown' ? 'warn' : 'good' },
         })}
         ${buildStation({
           title: copy.station_labels[2],
           status: `${summary.failed} failing`,
-          body: 'Failing runs and open bugs stay adjacent so triage can move directly from symptom to owner.',
-          chip: { label: `${summary.complete} complete`, tone: summary.failed ? 'bad' : 'good' },
+          body: `Verification has ${summary.complete} complete runs and ${openBugs.length} linked bugs for triage.`,
+          chip: { label: stationVerify.status || (summary.failed ? 'failed' : 'published'), tone: summary.failed ? 'bad' : 'good' },
         })}
         ${buildStation({
           title: copy.station_labels[3],
-          status: `${openBugs.length} open bugs`,
-          body: 'Trust keeps the image contract honest: the open-issue count, snapshot health, and promotion cadence.',
-          chip: { label: liveOk ? 'live' : 'stale', tone: liveOk ? 'good' : 'warn' },
+          status: `${metricValue(unknownMetric, 'unknown')} unknown-state ratio`,
+          body: `Telemetry snapshot is ${telemetrySnapshot.state || 'unknown'} with confidence labels and evidence links attached.`,
+          chip: { label: stationTrust.status || telemetrySnapshot.state || 'unknown', tone: telemetrySnapshot.state === 'fresh' ? 'good' : 'warn' },
         })}
       </div>
     </section>
@@ -405,19 +486,21 @@ function render(copy, stats, history) {
           <article class="trust-item">
             <div class="title">
               <h3>${escapeHtml(label)}</h3>
-              <span class="badge ${index < 2 ? 'pass' : index === 2 ? 'run' : 'pending'}">${index < 2 ? 'checked' : index === 2 ? 'queued' : 'watch'}</span>
+              <span class="badge ${telemetrySnapshot.state === 'fresh' ? 'pass' : telemetrySnapshot.state === 'degraded' ? 'fail' : 'pending'}">${escapeHtml(telemetrySnapshot.state || 'unknown')}</span>
             </div>
             <div class="subtext">
-              ${index === 0 ? 'Image signatures and runtime provenance close the loop on what was actually shipped.' :
-                index === 1 ? 'SBOM generation and artifact traceability keep the release surface reviewable.' :
-                index === 2 ? 'Attestation links the image to the run that produced it.' :
-                index === 3 ? `${openBugs.length} issues remain open in the current snapshot.` :
+              ${index === 0 ? `Collector run: ${(telemetry?.lineage?.collector?.run_url ? `<a href="${escapeHtml(telemetry.lineage.collector.run_url)}" target="_blank" rel="noreferrer">source</a>` : 'unknown')}` :
+                index === 1 ? `Snapshot age: ${telemetrySnapshot.age_minutes == null ? 'unknown' : `${telemetrySnapshot.age_minutes}m`} (threshold ${telemetrySnapshot.threshold_minutes ?? 'unknown'}m).` :
+                index === 2 ? `${telemetry?.metrics?.length || 0} metrics expose numerator/denominator and formula.` :
+                index === 3 ? `${telemetry?.errors?.length || 0} telemetry errors reported in this snapshot.` :
                 `Last refresh was ${escapeHtml(hoursAgo(freshness))}.`}
             </div>
           </article>
         `).join('')}
       </div>
     </section>
+
+    ${buildTelemetryEvidence(telemetry)}
 
     <section class="split section">
       <article class="panel">
@@ -455,15 +538,17 @@ function render(copy, stats, history) {
 }
 
 async function main() {
-  const [copy, stats, history] = await Promise.all([
+  const [copy, stats, history, telemetry] = await Promise.all([
     loadJson('./data/factory-copy.json', DEFAULT_COPY),
     loadJson('./data/factory-stats.json', { recent_runs: [], open_bugs: [], _meta: {}, test_coverage: {}, factory: { cluster: { nodes: [], total_ram_gb: 0 } } }),
     loadJson('./data/factory-history.json', { rollups: [] }),
+    loadJson('./data/factory-telemetry.json', { snapshot: {}, metrics: [], coverage: {}, lineage: {}, errors: [] }),
   ]);
   DATA.copy = copy;
   DATA.stats = stats;
   DATA.history = history;
-  render(copy, stats, history);
+  DATA.telemetry = telemetry;
+  render(copy, stats, history, telemetry);
 }
 
 main().catch((error) => {
