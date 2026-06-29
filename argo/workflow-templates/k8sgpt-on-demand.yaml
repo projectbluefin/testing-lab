@@ -24,7 +24,7 @@ spec:
       - name: namespace
         value: ""
       - name: filters
-        value: ""
+        value: "Pod,Deployment,Service,Ingress,Node"
       - name: explain
         value: "true"
   templates:
