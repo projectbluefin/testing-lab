@@ -387,6 +387,12 @@ spec:
           'echo -e "nameserver 1.1.1.1\\nnameserver 8.8.8.8" | sudo tee /etc/resolv.conf >/dev/null' \
           'getent hosts github.com >/dev/null' \
           '' \
+          '# ponytail: skip sysext package builds in this workflow; we only need kernel payload.' \
+          'cat > /mnt/host/source/src/scripts/build_library/extra_sysexts.sh <<'\''EOF'\''' \
+          'EXTRA_SYSEXTS=()' \
+          'get_unversioned_sysext_packages() { :; }' \
+          'EOF' \
+          '' \
           '# Set up board (no --skip-chroot-upgrade: not a valid flag in this SDK version)' \
           '/mnt/host/source/src/scripts/setup_board \' \
           '  --board=amd64-usr --default --force --skip_chroot_upgrade --skip_toolchain_update' \
