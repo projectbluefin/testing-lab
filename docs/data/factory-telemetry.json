@@ -7,17 +7,17 @@
       "hours": 24
     },
     "state": "degraded",
-    "age_minutes": 6864,
+    "age_minutes": 6904,
     "threshold_minutes": 180
   },
   "lineage": {
     "collector": {
       "workflow": ".github/workflows/update-test-results.yml",
-      "run_id": "28400549836",
-      "run_url": "https://github.com/projectbluefin/testing-lab/actions/runs/28400549836",
+      "run_id": "28402763704",
+      "run_url": "https://github.com/projectbluefin/testing-lab/actions/runs/28402763704",
       "job": "update",
-      "commit_sha": "5b9c2906ae75d1ce4e1a82161162d730ca59be43",
-      "commit_url": "https://github.com/projectbluefin/testing-lab/commit/5b9c2906ae75d1ce4e1a82161162d730ca59be43"
+      "commit_sha": "f5d0c27b6216fdb1625b7abdb48553e57ff81570",
+      "commit_url": "https://github.com/projectbluefin/testing-lab/commit/f5d0c27b6216fdb1625b7abdb48553e57ff81570"
     },
     "inputs_digest_sha256": "sha256:e3bfc5a9a91752abb015889965f6e16724352b4ddf2fb218f82e6c9928ae181b",
     "inputs": [
@@ -132,11 +132,11 @@
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28400549836"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28402763704"
         },
         {
           "kind": "commit",
-          "url": "https://github.com/projectbluefin/testing-lab/commit/5b9c2906ae75d1ce4e1a82161162d730ca59be43"
+          "url": "https://github.com/projectbluefin/testing-lab/commit/f5d0c27b6216fdb1625b7abdb48553e57ff81570"
         }
       ]
     },
@@ -154,11 +154,11 @@
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28400549836"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28402763704"
         },
         {
           "kind": "commit",
-          "url": "https://github.com/projectbluefin/testing-lab/commit/5b9c2906ae75d1ce4e1a82161162d730ca59be43"
+          "url": "https://github.com/projectbluefin/testing-lab/commit/f5d0c27b6216fdb1625b7abdb48553e57ff81570"
         }
       ]
     },
@@ -176,11 +176,11 @@
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28400549836"
+          "url": "https://github.com/projectbluefin/testing-lab/actions/runs/28402763704"
         },
         {
           "kind": "commit",
-          "url": "https://github.com/projectbluefin/testing-lab/commit/5b9c2906ae75d1ce4e1a82161162d730ca59be43"
+          "url": "https://github.com/projectbluefin/testing-lab/commit/f5d0c27b6216fdb1625b7abdb48553e57ff81570"
         }
       ]
     }

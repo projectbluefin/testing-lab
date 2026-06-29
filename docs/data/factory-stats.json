@@ -228,11 +228,11 @@
   ],
   "_meta": {
     "generated": "2026-06-28T16:12:58Z",
-    "refreshed_at": "2026-06-29T20:28:16Z",
+    "refreshed_at": "2026-06-29T21:07:56Z",
     "live_snapshot_ok": false,
-    "freshness_minutes": 6864,
+    "freshness_minutes": 6904,
     "freshness": {
-      "age_minutes": 6864,
+      "age_minutes": 6904,
       "threshold_minutes": 180,
       "state": "stale"
     },
