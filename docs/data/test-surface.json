@@ -1,0 +1,163 @@
+{
+  "_meta": {
+    "description": "Every (variant, branch, suite) the lab is expected to publish results for. Generated from docs/results/*.json and docs/screenshots/*-latest.png.",
+    "count": 22,
+    "with_screenshot": 3
+  },
+  "surface": [
+    {
+      "variant": "aurora",
+      "branch": "testing",
+      "suite": "developer",
+      "results_path": "results/bluefin-aurora-testing-developer.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "aurora",
+      "branch": "testing",
+      "suite": "smoke",
+      "results_path": "results/bluefin-aurora-testing-smoke.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "aurora",
+      "branch": "testing",
+      "suite": "software",
+      "results_path": "results/bluefin-aurora-testing-software.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "aurora",
+      "branch": "testing",
+      "suite": "system",
+      "results_path": "results/bluefin-aurora-testing-system.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bazzite",
+      "branch": "testing",
+      "suite": "developer",
+      "results_path": "results/bluefin-bazzite-testing-developer.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bazzite",
+      "branch": "testing",
+      "suite": "smoke",
+      "results_path": "results/bluefin-bazzite-testing-smoke.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bazzite",
+      "branch": "testing",
+      "suite": "software",
+      "results_path": "results/bluefin-bazzite-testing-software.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bazzite",
+      "branch": "testing",
+      "suite": "system",
+      "results_path": "results/bluefin-bazzite-testing-system.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin-lts",
+      "branch": "testing",
+      "suite": "developer",
+      "results_path": "results/bluefin-lts-testing-developer.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin-lts",
+      "branch": "testing",
+      "suite": "smoke",
+      "results_path": "results/bluefin-lts-testing-smoke.json",
+      "screenshot_path": "screenshots/bluefin-lts-testing-smoke-latest.png"
+    },
+    {
+      "variant": "bluefin-lts",
+      "branch": "testing",
+      "suite": "software",
+      "results_path": "results/bluefin-lts-testing-software.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin-lts",
+      "branch": "testing",
+      "suite": "system",
+      "results_path": "results/bluefin-lts-testing-system.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin",
+      "branch": "testing",
+      "suite": "common",
+      "results_path": "results/bluefin-testing-common.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin",
+      "branch": "testing",
+      "suite": "developer",
+      "results_path": "results/bluefin-testing-developer.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin",
+      "branch": "testing",
+      "suite": "smoke",
+      "results_path": "results/bluefin-testing-smoke.json",
+      "screenshot_path": "screenshots/bluefin-testing-smoke-latest.png"
+    },
+    {
+      "variant": "bluefin",
+      "branch": "testing",
+      "suite": "software",
+      "results_path": "results/bluefin-testing-software.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "bluefin",
+      "branch": "testing",
+      "suite": "system",
+      "results_path": "results/bluefin-testing-system.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "dakota",
+      "branch": "testing",
+      "suite": "developer",
+      "results_path": "results/dakota-testing-developer.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "dakota",
+      "branch": "testing",
+      "suite": "smoke",
+      "results_path": "results/dakota-testing-smoke.json",
+      "screenshot_path": "screenshots/dakota-testing-smoke-latest.png"
+    },
+    {
+      "variant": "dakota",
+      "branch": "testing",
+      "suite": "software",
+      "results_path": "results/dakota-testing-software.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "dakota",
+      "branch": "testing",
+      "suite": "system",
+      "results_path": "results/dakota-testing-system.json",
+      "screenshot_path": null
+    },
+    {
+      "variant": "flatcar",
+      "branch": "testing",
+      "suite": "flatcar",
+      "results_path": "results/flatcar-testing-flatcar.json",
+      "screenshot_path": null
+    }
+  ]
+}

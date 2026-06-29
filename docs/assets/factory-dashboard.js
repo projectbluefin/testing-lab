@@ -642,6 +642,24 @@ function buildFabricStrip(fabric, nodes) {
   `;
 }
 
+function buildFabricEmpty(copy) {
+  const fallback = copy?.fabric || {};
+  return `
+    <div class="fabric-strip" aria-label="Thunderbolt/USB4 fabric">
+      <div class="fabric-head">
+        <span class="fabric-label">${escapeHtml(fallback.label || 'Thunderbolt / USB4 mesh')}</span>
+        ${fallback.tagline ? `<span class="fabric-tagline">${escapeHtml(fallback.tagline)}</span>` : ''}
+        <span class="fabric-source chip warn">unavailable</span>
+      </div>
+      <ul class="fabric-links">
+        <li class="fabric-link muted">
+          <span class="mono">No observed or declared USB4 links in this snapshot.</span>
+        </li>
+      </ul>
+    </div>
+  `;
+}
+
 function buildFactoryPulse(stats) {
   const gh = stats?.github?.testing_lab || {};
   const hive = stats?.hive || {};
@@ -754,7 +772,10 @@ function buildClusterNodesPanel(nodes, summary, freshness, telemetrySnapshot, op
         </div>
       </div>
       <p class="section-sub">Who\u2019s donating cycles to test Bluefin right now \u2014 each card is a real machine running real tests.</p>
-      ${buildFabricStrip(resolveFabric(DATA.stats, DATA.copy), nodes)}
+      ${(() => {
+    const fabric = resolveFabric(DATA.stats, DATA.copy);
+    return fabric ? buildFabricStrip(fabric, nodes) : buildFabricEmpty(DATA.copy);
+  })()}
       <div class="nodes-grid">
         ${nodes.length ? nodes.map((node) => `
           <article class="node-card">
