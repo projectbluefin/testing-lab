@@ -703,6 +703,8 @@ argo-mcp-logs_workflow <workflow-name>
 - A downstream `when` condition that references `{{tasks.X.outputs.result}}` where task X has its own `when` guard — if X is Skipped its output is undefined and the downstream task silently skips too. Fix: let X always run; handle the bypass inside the script (see §18).
 - A `force=true` rebuild workflow where only 1–2 nodes appear (DAG + a Skipped check) and no build step ever runs — this is the §18 `when`/Skipped output bug, not a semaphore or mutex issue
 - Dakota builds (`build-cd-sync-dakota-latest-*`) running at all — dakota pipeline is permanently blocked; these builds always fail and hold the `ghost-heavy-compute` mutex, starving LTS/aurora/bazzite rebuilds. `image-poll-dakota` must remain suspended in git.
+- An image poller that writes the new digest to `image-polling-digests` before the downstream QA pipeline succeeds — failures under cluster pressure then drop work permanently (digest is marked seen, no retry on next poll). Persist digest only after `run-pipeline.Succeeded`.
+- Aurora/Bazzite digest pollers running full GNOME suite sets (`smoke,common,developer,software,system`) even though these variants are KDE-focused — this creates 5x VM pressure per trigger and overloads scheduling. Keep Aurora/Bazzite pollers on `suites: system`.
 - Commit message not in Conventional Commits format — the pre-commit hook rejects any commit not matching `<type>(<scope>): <description>`. Valid types: `feat fix ci chore docs refactor test build perf revert`
 
 ## Verification
@@ -725,3 +727,4 @@ Before marking any WorkflowTemplate change done:
 - [ ] No CronWorkflow with a `dry-run` parameter whose default is `"true"` — verify GC jobs actually delete
 - [ ] All local OCI registry references use `:30500` (NodePort), not `:5000` (container-internal)
 - [ ] `grep -rn 'image:' argo/ manifests/` shows only allowlisted registries: `ghcr.io`, `quay.io`, `registry.fedoraproject.org`, `registry.access.redhat.com`, `registry.k8s.io`, `192.168.1.102`, `localhost`
+- [ ] Image pollers update digest state only after QA pipeline success (failed runs must retry on next poll)

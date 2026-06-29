@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: bluefin-test-suite
 spec:
   serviceAccountName: argo
+  activeDeadlineSeconds: 1800
   entrypoint: check-and-trigger
   arguments:
     parameters:
@@ -65,11 +66,23 @@ spec:
                 - name: variant
                   value: "{{workflow.parameters.variant}}"
                 - name: vm-memory
-                  value: "8Gi"
+                  value: "{{workflow.parameters.vm-memory}}"
                 - name: branch
                   value: "{{workflow.parameters.branch}}"
                 - name: ssh-key-secret
                   value: "{{workflow.parameters.ssh-key-secret}}"
+          - name: update-digest
+            depends: "check-digest.Succeeded && run-pipeline.Succeeded"
+            when: "{{tasks.check-digest.outputs.parameters.changed}} == true"
+            template: update-local
+            arguments:
+              parameters:
+                - name: state-key
+                  value: "{{workflow.parameters.state-key}}"
+                - name: remote-digest
+                  value: "{{tasks.check-digest.outputs.parameters.remote-digest}}"
+                - name: expected-digest
+                  value: "{{tasks.check-digest.outputs.parameters.stored-digest}}"
 
     - name: poll-digest
       inputs:
@@ -81,7 +94,13 @@ spec:
         parameters:
           - name: changed
             valueFrom:
-              parameter: "{{tasks.update.outputs.parameters.changed}}"
+              parameter: "{{tasks.compare.outputs.parameters.changed}}"
+          - name: remote-digest
+            valueFrom:
+              parameter: "{{tasks.fetch.outputs.parameters.digest}}"
+          - name: stored-digest
+            valueFrom:
+              parameter: "{{tasks.compare.outputs.parameters.stored-digest}}"
       dag:
         tasks:
           - name: fetch
@@ -92,9 +111,9 @@ spec:
                   value: "{{inputs.parameters.image}}"
                 - name: image-tag
                   value: "{{inputs.parameters.image-tag}}"
-          - name: update
+          - name: compare
             depends: "fetch.Succeeded"
-            template: update-local
+            template: compare-local
             arguments:
               parameters:
                 - name: state-key
@@ -142,16 +161,15 @@ spec:
             echo "skopeo attempt ${i}/3 failed for ${IMAGE_REF}; retrying in $(( i * 15 ))s" >&2
             sleep $(( i * 15 ))
           done
-          
+
           if [ -z "${REMOTE}" ]; then
             echo "Failed to resolve digest" >&2
-            # Write empty string or dummy so it doesn't fail the workflow but stops it
             echo "none" > /tmp/digest
           else
             echo "${REMOTE}" > /tmp/digest
           fi
 
-    - name: update-local
+    - name: compare-local
       inputs:
         parameters:
           - name: state-key
@@ -161,6 +179,55 @@ spec:
           - name: changed
             valueFrom:
               path: /tmp/changed
+          - name: stored-digest
+            valueFrom:
+              path: /tmp/stored-digest
+      metadata:
+        labels:
+          app.kubernetes.io/part-of: bluefin-test-suite
+          bluefin.io/step: compare-digest
+      script:
+        image: cgr.dev/chainguard/kubectl:latest-dev
+        command: [bash]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        source: |
+          set -euo pipefail
+          KEY="{{inputs.parameters.state-key}}"
+          REMOTE="{{inputs.parameters.remote-digest}}"
+          STORED=$(kubectl get configmap image-polling-digests -n argo \
+            -o jsonpath="{.data.${KEY}}" 2>/dev/null || true)
+
+          printf '%s' "${STORED}" > /tmp/stored-digest
+
+          if [[ "${REMOTE}" == "none" ]]; then
+            echo "No remote digest fetched. Skipping." >&2
+            echo "false" > /tmp/changed
+            exit 0
+          fi
+
+          echo "Remote: ${REMOTE}" >&2
+          echo "Stored: ${STORED:-<none>}" >&2
+
+          if [[ "${REMOTE}" == "${STORED}" ]]; then
+            echo "No change." >&2
+            echo "false" > /tmp/changed
+          else
+            echo "Digest changed." >&2
+            echo "true" > /tmp/changed
+          fi
+
+    - name: update-local
+      inputs:
+        parameters:
+          - name: state-key
+          - name: remote-digest
+          - name: expected-digest
       metadata:
         labels:
           app.kubernetes.io/part-of: bluefin-test-suite
@@ -179,28 +246,18 @@ spec:
           set -euo pipefail
           KEY="{{inputs.parameters.state-key}}"
           REMOTE="{{inputs.parameters.remote-digest}}"
-
-          if [[ "${REMOTE}" == "none" ]]; then
-            echo "No remote digest fetched. Skipping." >&2
-            echo "false" > /tmp/changed
-            exit 0
-          fi
-
+          EXPECTED="{{inputs.parameters.expected-digest}}"
           STORED=$(kubectl get configmap image-polling-digests -n argo \
             -o jsonpath="{.data.${KEY}}" 2>/dev/null || true)
 
-          echo "Remote:  ${REMOTE}" >&2
-          echo "Stored:  ${STORED:-<none>}" >&2
-
-          if [[ "${REMOTE}" == "${STORED}" ]]; then
-            echo "No change." >&2
-            echo "false" > /tmp/changed
-          else
-            echo "Digest changed — updating ConfigMap key ${KEY}" >&2
-            kubectl patch configmap image-polling-digests \
-              -n argo --type merge \
-              -p "{\"data\":{\"${KEY}\":\"${REMOTE}\"}}" 2>/dev/null \
-              || kubectl create configmap image-polling-digests \
-                   -n argo --from-literal="${KEY}=${REMOTE}"
-            echo "true" > /tmp/changed
+          if [[ "${STORED}" != "${EXPECTED}" ]]; then
+            echo "State changed since check (expected '${EXPECTED}', found '${STORED}'); skipping stale write." >&2
+            exit 0
           fi
+
+          echo "Persisting new digest for ${KEY}: ${REMOTE}" >&2
+          kubectl patch configmap image-polling-digests \
+            -n argo --type merge \
+            -p "{\"data\":{\"${KEY}\":\"${REMOTE}\"}}" 2>/dev/null \
+            || kubectl create configmap image-polling-digests \
+                 -n argo --from-literal="${KEY}=${REMOTE}"

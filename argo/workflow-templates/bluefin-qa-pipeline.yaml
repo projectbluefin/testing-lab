@@ -223,7 +223,7 @@ spec:
       source: |
         NS="{{workflow.parameters.namespace}}"
         WF="{{workflow.name}}"
-        for SUITE in smoke developer software system; do
+        for SUITE in smoke common developer software system; do
           kubectl delete vm -n "${NS}" "${WF}-${SUITE}" --ignore-not-found 2>/dev/null \
             && echo "Cleaned ${WF}-${SUITE}" || true
         done

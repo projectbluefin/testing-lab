@@ -37,7 +37,7 @@ spec:
         - name: namespace
           value: "bazzite-test"
         - name: suites
-          value: "smoke,common,developer,software,system"
+          value: "system"
         - name: vm-memory
           value: "8Gi"
         - name: variant
