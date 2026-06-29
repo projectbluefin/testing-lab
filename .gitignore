@@ -3,3 +3,4 @@ bluefin-test-id_ed25519
 __pycache__/
 *.pyc
 argo-results/
+.worktrees/
