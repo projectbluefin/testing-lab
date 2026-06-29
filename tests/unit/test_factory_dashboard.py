@@ -80,6 +80,7 @@ def test_dashboard_renderer_loads_public_telemetry():
     assert 'confidence' in js
     assert 'Promotion timeline' in js
     assert 'Lineage & data quality' in js
+    assert 'Factory flow map' in js
 
 
 def test_dashboard_default_copy_has_no_private_links():

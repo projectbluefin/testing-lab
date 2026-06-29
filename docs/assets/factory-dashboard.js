@@ -4,10 +4,10 @@ const DEFAULT_COPY = {
     subtitle: 'Bluefin QA operations dashboard',
   },
   mission: {
-    headline: 'Ship image-based changes with evidence, not vibes.',
-    body: 'Live runs, failing work, and cluster health stay on one page so operators can tell whether the factory is moving or stalled.',
+    headline: 'Factory telemetry for image-based Linux, from source to signed artifact.',
+    body: 'Every station publishes evidence: promotion lanes, run lineage, coverage, and explicit unknown states when data is missing.',
   },
-  station_labels: ['Source', 'Assembly', 'Verification', 'Trust'],
+  station_labels: ['Source & intent', 'Assemble & bake', 'Verify & triage', 'Trust & ship'],
   trust_labels: ['Signing', 'SBOM', 'Attestation', 'CVE posture', 'Promotion timing'],
   links: [
     { label: 'Actions', href: 'https://github.com/projectbluefin/testing-lab/actions', tone: 'good' },
@@ -429,6 +429,26 @@ function buildLineagePanel(telemetry) {
   `;
 }
 
+function buildTourMap(stations) {
+  return `
+    <section class="section">
+      <h2>Factory flow map</h2>
+      <div class="station-grid">
+        ${stations.map((station) => `
+          <article class="station">
+            <div class="title">
+              <h3>${escapeHtml(station.title)}</h3>
+              <span class="status">${escapeHtml(station.chip.label)}</span>
+            </div>
+            <div class="badge ${station.chip.tone}">${escapeHtml(station.status)}</div>
+            <div class="subtext">${escapeHtml(station.body)}</div>
+          </article>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
 function render(copy, stats, history, telemetry) {
   const root = document.getElementById('factory-dashboard');
   const runs = Array.isArray(stats?.recent_runs) ? stats.recent_runs : [];
@@ -454,6 +474,32 @@ function render(copy, stats, history, telemetry) {
   const stationAssemble = stationStates.assemble || {};
   const stationVerify = stationStates.verify || {};
   const stationTrust = stationStates.trust_and_ship || {};
+  const stationCards = [
+    {
+      title: copy.station_labels[0],
+      status: `${summary.total} runs in window`,
+      body: `Input source is ${stationSource.trigger || latest?.trigger || 'unknown'}; latest label ${latest?.label || 'unknown'}.`,
+      chip: { label: stationSource.status || 'unknown', tone: stationSource.status === 'unknown' ? 'warn' : 'run' },
+    },
+    {
+      title: copy.station_labels[1],
+      status: `${compactNumber(stats?.test_coverage?.scenarios_total || 0)} scenarios tracked`,
+      body: `Scenario pass rate ${metricValue(scenarioMetric, 'unknown')}; image coverage ${compactNumber(stats?.test_coverage?.images_with_results || 0)}.`,
+      chip: { label: stationAssemble.status || 'unknown', tone: stationAssemble.status === 'unknown' ? 'warn' : 'good' },
+    },
+    {
+      title: copy.station_labels[2],
+      status: `${summary.failed} failing`,
+      body: `Verification has ${summary.complete} complete runs and ${openBugs.length} linked bugs for triage.`,
+      chip: { label: stationVerify.status || (summary.failed ? 'failed' : 'published'), tone: summary.failed ? 'bad' : 'good' },
+    },
+    {
+      title: copy.station_labels[3],
+      status: `${metricValue(unknownMetric, 'unknown')} unknown-state ratio`,
+      body: `Telemetry snapshot is ${telemetrySnapshot.state || 'unknown'} with confidence labels and evidence links attached.`,
+      chip: { label: stationTrust.status || telemetrySnapshot.state || 'unknown', tone: telemetrySnapshot.state === 'fresh' ? 'good' : 'warn' },
+    },
+  ];
 
   root.innerHTML = `
     <header class="topbar">
@@ -503,6 +549,7 @@ function render(copy, stats, history, telemetry) {
         </div>
       </aside>
     </section>
+    ${buildTourMap(stationCards)}
 
     <section class="section">
       <div class="metric-grid">
@@ -544,30 +591,7 @@ function render(copy, stats, history, telemetry) {
     <section class="section">
       <h2>Stations</h2>
       <div class="station-grid">
-        ${buildStation({
-          title: copy.station_labels[0],
-          status: `${summary.total} runs in window`,
-          body: `Input source is ${stationSource.trigger || latest?.trigger || 'unknown'}; latest label ${latest?.label || 'unknown'}.`,
-          chip: { label: stationSource.status || 'unknown', tone: stationSource.status === 'unknown' ? 'warn' : 'run' },
-        })}
-        ${buildStation({
-          title: copy.station_labels[1],
-          status: `${compactNumber(stats?.test_coverage?.scenarios_total || 0)} scenarios tracked`,
-          body: `Scenario pass rate ${metricValue(scenarioMetric, 'unknown')}; image coverage ${compactNumber(stats?.test_coverage?.images_with_results || 0)}.`,
-          chip: { label: stationAssemble.status || 'unknown', tone: stationAssemble.status === 'unknown' ? 'warn' : 'good' },
-        })}
-        ${buildStation({
-          title: copy.station_labels[2],
-          status: `${summary.failed} failing`,
-          body: `Verification has ${summary.complete} complete runs and ${openBugs.length} linked bugs for triage.`,
-          chip: { label: stationVerify.status || (summary.failed ? 'failed' : 'published'), tone: summary.failed ? 'bad' : 'good' },
-        })}
-        ${buildStation({
-          title: copy.station_labels[3],
-          status: `${metricValue(unknownMetric, 'unknown')} unknown-state ratio`,
-          body: `Telemetry snapshot is ${telemetrySnapshot.state || 'unknown'} with confidence labels and evidence links attached.`,
-          chip: { label: stationTrust.status || telemetrySnapshot.state || 'unknown', tone: telemetrySnapshot.state === 'fresh' ? 'good' : 'warn' },
-        })}
+        ${stationCards.map(buildStation).join('')}
       </div>
     </section>
 

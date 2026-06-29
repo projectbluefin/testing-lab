@@ -4,10 +4,10 @@
     "subtitle": "Bluefin QA operations dashboard"
   },
   "mission": {
-    "headline": "Ship image-based changes with evidence, not vibes.",
-    "body": "Live runs, failing work, and cluster health stay on one page so operators can tell whether the factory is moving or stalled."
+    "headline": "Factory telemetry for image-based Linux, from source to signed artifact.",
+    "body": "Every station publishes evidence: promotion lanes, run lineage, coverage, and explicit unknown states when data is missing."
   },
-  "station_labels": ["Source", "Assembly", "Verification", "Trust"],
+  "station_labels": ["Source & intent", "Assemble & bake", "Verify & triage", "Trust & ship"],
   "trust_labels": ["Signing", "SBOM", "Attestation", "CVE posture", "Promotion timing"],
   "links": [
     {
