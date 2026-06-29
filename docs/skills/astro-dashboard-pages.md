@@ -65,6 +65,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 17. When rendering outcomes charts or heatmaps, conditionally format labels (e.g. 'primary' vs 'fallback' vs 'none') depending on whether the primary result is completed or in a fallback-only/pending state.
 18. If a hero status card is made dynamic, conditionally render it to summarize partial/full primary coverage while preserving any expected smoke-test regex assertions (e.g. `/No completed Bazaar-specific software result is published/i`) in the text output.
 19. Ensure state/status calculations are resilient to all published status strings. For example, check for specific incomplete states (like 'pending' or 'missing') rather than asserting negative checks on specific completed states (like 'completed') when the true completed statuses are 'passed' or 'failed'.
+20. When a page evolves from one tracked entity to multiple (for example adding Firefox alongside Bazaar), include the new dimension in chart/table labels and category keys (app + variant + branch) so rendering stays unambiguous.
 
 ## Common Rationalizations
 

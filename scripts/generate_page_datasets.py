@@ -386,54 +386,77 @@ def build_applications_matrix(root: Path, collected_at: str) -> dict:
             'state_reason': None,
             'source_url': repo_blob_url('docs/data/page-contracts.md'),
             'collected_at': collected_at,
-            'derivation': 'Catalog entry from the page contract: applications v1 is Bazaar-only.',
-        }
+            'derivation': 'Catalog entry from the page contract: applications v1 includes Bazaar and Firefox.',
+        },
+        {
+            'id': 'firefox',
+            'display_name': 'Firefox',
+            'scope': 'v1',
+            'primary_suite': 'software',
+            'fallback_suites': [],
+            'state': 'available',
+            'state_reason': None,
+            'source_url': repo_blob_url('docs/data/page-contracts.md'),
+            'collected_at': collected_at,
+            'derivation': 'Catalog entry from the page contract: applications v1 includes Bazaar and Firefox.',
+        },
     ]
 
     rows_with_primary_results = 0
     rows_with_fallbacks = 0
-    for cell in software_cells:
-        variant = cell['variant']
-        branch = cell['branch']
-        relative_results_path = cell['results_path']
-        primary_result = results_by_path.get(relative_results_path, {})
-        primary_last_run = primary_result.get('last_run')
-        if primary_last_run:
-            rows_with_primary_results += 1
+    for application in applications:
+        app_id = application['id']
+        app_name = application['display_name']
+        for cell in software_cells:
+            variant = cell['variant']
+            branch = cell['branch']
+            relative_results_path = cell['results_path']
+            primary_result = results_by_path.get(relative_results_path, {})
+            primary_last_run = primary_result.get('last_run')
+            if primary_last_run:
+                rows_with_primary_results += 1
 
-        fallback_relative_path = f'results/{variant}-{branch}-common.json'
-        fallback_result = results_by_path.get(fallback_relative_path, {})
-        fallback_signals = bazaar_fallback_signals(fallback_relative_path, fallback_result, collected_at)
-        if fallback_signals:
-            rows_with_fallbacks += 1
+            fallback_signals = []
+            if app_id == 'bazaar':
+                fallback_relative_path = f'results/{variant}-{branch}-common.json'
+                fallback_result = results_by_path.get(fallback_relative_path, {})
+                fallback_signals = bazaar_fallback_signals(fallback_relative_path, fallback_result, collected_at)
+            if fallback_signals:
+                rows_with_fallbacks += 1
 
-        state = 'available' if primary_last_run else 'unavailable'
-        state_reason = None if primary_last_run else (
-            'No completed Bazaar-specific software result is published for this variant/branch; fallback signals remain coarse only.'
-        )
-        rows.append(
-            {
-                'id': f'bazaar-{variant}-{branch}',
-                'app_id': 'bazaar',
-                'variant': variant,
-                'branch': branch,
-                'primary_suite': 'software',
-                'primary_result_status': primary_result.get('status', 'missing'),
-                'primary_last_run': primary_last_run,
-                'scenario_total': primary_result.get('scenarios'),
-                'scenario_failed': primary_result.get('failed'),
-                'fallback_signal_count': len(fallback_signals),
-                'fallback_signals': fallback_signals,
-                'state': state,
-                'state_reason': state_reason,
-                'source_url': normalize_result_source_url(relative_results_path, primary_result),
-                'collected_at': collected_at,
-                'derivation': (
-                    f'Seed row from docs/data/test-surface.json software cells; join docs/{relative_results_path} '
-                    'for primary evidence and attach coarse Bazaar fallback signals from matching non-application results.'
-                ),
-            }
-        )
+            state = 'available' if primary_last_run else 'unavailable'
+            state_reason = None if primary_last_run else (
+                f'No completed {app_name}-specific software result is published for this variant/branch; '
+                'fallback signals remain coarse only.'
+            )
+            rows.append(
+                {
+                    'id': f'{app_id}-{variant}-{branch}',
+                    'app_id': app_id,
+                    'variant': variant,
+                    'branch': branch,
+                    'primary_suite': 'software',
+                    'primary_result_status': primary_result.get('status', 'missing'),
+                    'primary_last_run': primary_last_run,
+                    'scenario_total': primary_result.get('scenarios'),
+                    'scenario_failed': primary_result.get('failed'),
+                    'fallback_signal_count': len(fallback_signals),
+                    'fallback_signals': fallback_signals,
+                    'state': state,
+                    'state_reason': state_reason,
+                    'source_url': normalize_result_source_url(relative_results_path, primary_result),
+                    'collected_at': collected_at,
+                    'derivation': (
+                        f'Seed row from docs/data/test-surface.json software cells for {app_name}; '
+                        f'join docs/{relative_results_path} for primary evidence.'
+                        + (
+                            ' Attach coarse Bazaar fallback signals from matching non-application results.'
+                            if app_id == 'bazaar'
+                            else ' No fallback suite is configured for Firefox yet.'
+                        )
+                    ),
+                }
+            )
 
     unavailable_rows = [row for row in rows if row['state'] == 'unavailable']
 

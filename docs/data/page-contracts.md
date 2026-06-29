@@ -74,7 +74,7 @@ Purpose: one row per `(variant, branch, suite)` result for the `/tests` page.
 
 ## `docs/data/applications-matrix.json`
 
-Purpose: app-first rows for the `/applications` page. V1 is Bazaar only.
+Purpose: app-first rows for the `/applications` page. V1 currently tracks Bazaar and Firefox.
 
 ### Top-level shape
 
@@ -87,7 +87,7 @@ Purpose: app-first rows for the `/applications` page. V1 is Bazaar only.
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Stable app id (`bazaar`) |
+| `id` | Stable app id (`bazaar`, `firefox`) |
 | `display_name` | Page label |
 | `scope` | Current rollout scope (`v1`) |
 | `primary_suite` | Preferred evidence source |
@@ -98,7 +98,7 @@ Purpose: app-first rows for the `/applications` page. V1 is Bazaar only.
 
 | Field | Meaning |
 | --- | --- |
-| `id` | Stable key (`bazaar-bluefin-testing`) |
+| `id` | Stable key (`bazaar-bluefin-testing`, `firefox-bluefin-testing`) |
 | `app_id` | Foreign key into `applications[]` |
 | `variant` / `branch` | Page filter dimensions |
 | `primary_suite` | Intended app evidence lane |

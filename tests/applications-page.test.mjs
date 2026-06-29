@@ -21,8 +21,13 @@ test('applications page renders Bazaar evidence, chart mounts, and explicit unav
 
   assert.match(
     applicationsPage,
-    /No completed Bazaar-specific software result is published/i,
+    /No completed application-specific software result is published/i,
     'applications page keeps unavailable primary evidence explicit',
+  );
+  assert.match(
+    applicationsPage,
+    /Firefox/i,
+    'applications page includes Firefox as a tracked application',
   );
   assert.match(
     applicationsPage,

@@ -99,12 +99,12 @@ def test_applications_matrix_keeps_bazaar_fallbacks_explicit():
     assert dataset['schema_version'] == 'v1'
     assert dataset['_meta']['page'] == 'applications'
     assert dataset['_meta']['starter_artifact'] is False
-    assert [app['id'] for app in dataset['applications']] == ['bazaar']
+    assert [app['id'] for app in dataset['applications']] == ['bazaar', 'firefox']
 
     metrics = {metric['id']: metric for metric in dataset['summary_metrics']}
-    assert metrics['tracked_applications']['value'] == 1
-    assert metrics['application_rows']['value'] == 5
-    assert metrics['rows_with_primary_app_results']['value'] == 3
+    assert metrics['tracked_applications']['value'] == 2
+    assert metrics['application_rows']['value'] == 10
+    assert metrics['rows_with_primary_app_results']['value'] == 6
     assert metrics['rows_with_fallback_signals']['value'] == 1
 
     rows = {row['id']: row for row in dataset['rows']}
@@ -119,3 +119,5 @@ def test_applications_matrix_keeps_bazaar_fallbacks_explicit():
     ]
     assert rows['bazaar-dakota-testing']['fallback_signal_count'] == 0
     assert rows['bazaar-aurora-testing']['state'] == 'unavailable'
+    assert rows['firefox-bluefin-testing']['state'] == 'available'
+    assert rows['firefox-bluefin-testing']['fallback_signal_count'] == 0

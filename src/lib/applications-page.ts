@@ -85,9 +85,11 @@ interface ResultEvidenceFile {
 export interface ApplicationsPageModel {
   dataset: ApplicationsDataset;
   application: ApplicationEntry;
+  applications: ApplicationEntry[];
   summaryMetrics: SummaryMetric[];
   summaryMetricMap: Record<string, SummaryMetric | undefined>;
   rows: Array<ApplicationRow & {
+    app: ApplicationEntry;
     latestEvidenceAt: string | null;
     matchedScenarioCount: number;
     primaryEvidenceLink: string;
@@ -95,6 +97,7 @@ export interface ApplicationsPageModel {
   }>;
   fallbackSignals: Array<
     FallbackSignal & {
+      app: ApplicationEntry;
       variant: string;
       branch: string;
       rowId: string;
@@ -118,6 +121,8 @@ export interface ApplicationsPageModel {
     outcomes: Array<{
       variant: string;
       branch: string;
+      appId: string;
+      appName: string;
       stateScore: number;
       stateLabel: string;
       primaryStatus: string;
@@ -128,6 +133,8 @@ export interface ApplicationsPageModel {
     fallbackDistribution: Array<{
       variant: string;
       branch: string;
+      appId: string;
+      appName: string;
       suite: string;
       status: string;
       signalCount: number;
@@ -178,6 +185,10 @@ function uniqueStrings(values: string[]) {
 export function loadApplicationsPageModel(datasetPath: string, repoRoot: string): ApplicationsPageModel {
   const dataset = readJson<ApplicationsDataset>(datasetPath);
   const application = dataset.applications[0];
+  const applicationMap = Object.fromEntries(dataset.applications.map((entry) => [entry.id, entry])) as Record<
+    string,
+    ApplicationEntry
+  >;
 
   const rows = dataset.rows.map((row) => {
     const latestFallback = row.fallback_signals
@@ -193,6 +204,7 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
 
     return {
       ...row,
+      app: applicationMap[row.app_id] ?? application,
       latestEvidenceAt,
       matchedScenarioCount,
       primaryEvidenceLink: row.source_url,
@@ -203,6 +215,7 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
   const fallbackSignals = rows.flatMap((row) =>
     row.fallback_signals.map((signal) => ({
       ...signal,
+      app: row.app,
       variant: row.variant,
       branch: row.branch,
       rowId: row.id,
@@ -213,7 +226,7 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
   const historyEvents = [
     ...rows.flatMap((row) =>
       readEvidenceHistory(repoRoot, row.source_url).map((entry) => ({
-        label: `${row.variant}/${row.branch} ${row.primary_suite} primary`,
+        label: `${row.app.display_name} ${row.variant}/${row.branch} ${row.primary_suite} primary`,
         sourceKind: 'primary' as const,
         variant: row.variant,
         branch: row.branch,
@@ -228,7 +241,7 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
     ),
     ...fallbackSignals.flatMap((signal) =>
       readEvidenceHistory(repoRoot, signal.source_url).map((entry) => ({
-        label: `${signal.variant}/${signal.branch} ${signal.suite} fallback`,
+        label: `${signal.app.display_name} ${signal.variant}/${signal.branch} ${signal.suite} fallback`,
         sourceKind: 'fallback' as const,
         variant: signal.variant,
         branch: signal.branch,
@@ -250,6 +263,7 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
   return {
     dataset,
     application,
+    applications: dataset.applications,
     summaryMetrics: dataset.summary_metrics,
     summaryMetricMap,
     rows,
@@ -259,6 +273,8 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
       outcomes: rows.map((row) => ({
         variant: row.variant,
         branch: row.branch,
+        appId: row.app_id,
+        appName: row.app.display_name,
         stateScore:
           row.state === 'available'
             ? 2
@@ -279,7 +295,9 @@ export function loadApplicationsPageModel(datasetPath: string, repoRoot: string)
       fallbackDistribution: rows.map((row) => ({
         variant: row.variant,
         branch: row.branch,
-        suite: row.fallback_signals[0]?.suite ?? application.fallback_suites[0] ?? 'n/a',
+        appId: row.app_id,
+        appName: row.app.display_name,
+        suite: row.fallback_signals[0]?.suite ?? row.app.fallback_suites[0] ?? 'n/a',
         status: row.fallback_signals[0]?.status ?? 'none',
         signalCount: row.fallback_signal_count,
         matchedScenarioCount: row.matchedScenarioCount,

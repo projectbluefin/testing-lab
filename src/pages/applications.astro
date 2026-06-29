@@ -10,6 +10,7 @@ const pageModel = loadApplicationsPageModel(
 
 const {
   application,
+  applications,
   chartData,
   dataset,
   fallbackSignals,
@@ -39,7 +40,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
 
 <SiteLayout
   title="Applications"
-  description="Bazaar-first application reliability view from the published applications matrix."
+  description="Application reliability view from the published applications matrix."
   current="applications"
 >
   <section class="summary-grid" aria-label="Applications summary metrics">
@@ -60,7 +61,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       <p class="status-card__eyebrow">{application.display_name}</p>
       {rows.every(r => r.primary_result_status === 'pending' || r.primary_result_status === 'missing') ? (
         <>
-          <h2>No completed Bazaar-specific software result is published</h2>
+          <h2>No completed application-specific software result is published</h2>
           <p>
             {rows[0]?.state_reason} All {summaryMetricMap.application_rows?.value ?? rows.length} tracked rows are
             still missing primary app-specific runs, and only{' '}
@@ -70,14 +71,18 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
         </>
       ) : (
         <>
-          <h2>Bazaar primary coverage is partially active</h2>
+          <h2>Primary coverage is partially active</h2>
           <p>
             Primary app-specific evidence is now published for {rows.filter(r => r.primary_result_status !== 'pending' && r.primary_result_status !== 'missing').map(r => r.variant).join(', ')}.
-            No completed Bazaar-specific software result is published for the remaining variants: {rows.filter(r => r.primary_result_status === 'pending' || r.primary_result_status === 'missing').map(r => r.variant).join(', ')}.
+            No completed application-specific software result is published for the remaining variants: {rows.filter(r => r.primary_result_status === 'pending' || r.primary_result_status === 'missing').map(r => r.variant).join(', ')}.
           </p>
         </>
       )}
       <dl class="status-card__meta">
+        <div>
+          <dt>Tracked applications</dt>
+          <dd>{applications.map((entry) => entry.display_name).join(', ')}</dd>
+        </div>
         <div>
           <dt>Primary suite</dt>
           <dd>{application.primary_suite}</dd>
@@ -101,7 +106,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       <p class="status-card__eyebrow">Availability posture</p>
       <h2>Unavailable states stay visible</h2>
       <ul class="status-list">
-        <li>{noPrimaryEvidence} of {rows.length} rows lack primary Bazaar evidence.</li>
+        <li>{noPrimaryEvidence} of {rows.length} rows lack primary application evidence.</li>
         <li>{rowsWithoutFallback} of {rows.length} rows have no fallback signal at all.</li>
         <li>{historyEvents.length} historical runs can be traced through linked evidence files.</li>
       </ul>
@@ -117,17 +122,17 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       <p class="status-card__eyebrow">Outcomes across variants and branches</p>
       <h2>Outcome matrix</h2>
       <p>
-        Heatmap shows where Bazaar has primary coverage, fallback-only signal, or no application evidence at
+        Heatmap shows where each tracked app has primary coverage, fallback-only signal, or no application evidence at
         all.
       </p>
-      <div id="applications-outcomes-chart" class="chart-surface" role="img" aria-label="Bazaar outcome matrix chart"></div>
+      <div id="applications-outcomes-chart" class="chart-surface" role="img" aria-label="Application outcome matrix chart"></div>
     </article>
 
     <article class="status-card chart-card">
       <p class="status-card__eyebrow">Fallback signal distribution</p>
       <h2>Fallback coverage by variant</h2>
       <p>
-        Bars compare coarse fallback signal count against matched Bazaar scenario count per variant/branch.
+        Bars compare coarse fallback signal count against matched app scenario count per variant/branch.
       </p>
       <div id="applications-fallback-chart" class="chart-surface" role="img" aria-label="Fallback signal distribution chart"></div>
     </article>
@@ -151,6 +156,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
         <table class="data-table">
           <thead>
             <tr>
+              <th scope="col">App</th>
               <th scope="col">Variant</th>
               <th scope="col">Branch</th>
               <th scope="col">Primary status</th>
@@ -162,7 +168,8 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
           <tbody>
             {rows.map((row) => (
               <tr>
-                <th scope="row">{row.variant}</th>
+                <th scope="row">{row.app.display_name}</th>
+                <td>{row.variant}</td>
                 <td>{row.branch}</td>
                 <td>
                   <span class:list={['pill', `pill--${row.primary_result_status}`]}>
@@ -178,7 +185,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
                   <strong>{row.fallback_signal_count}</strong>
                   <p class="table-note">
                     {row.fallback_signal_count > 0
-                      ? `${row.matchedScenarioCount} matched Bazaar scenarios`
+                      ? `${row.matchedScenarioCount} matched app scenarios`
                       : 'No coarse fallback signals published'}
                   </p>
                 </td>
@@ -351,7 +358,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
         renderUnavailable('applications-outcomes-chart', 'No outcome rows published in applications-matrix.json.');
       } else {
         const branches = [...new Set(outcomes.map((row) => row.branch))];
-        const variants = outcomes.map((row) => row.variant);
+        const variants = outcomes.map((row) => `${row.appName}/${row.variant}`);
         const outcomeChart = echarts.init(outcomeContainer);
         outcomeChart.setOption({
           aria: { enabled: true },
@@ -359,11 +366,11 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
             formatter(params) {
               const row = outcomes[params.dataIndex];
               return [
-                `<strong>${row.variant}/${row.branch}</strong>`,
+                `<strong>${row.appName} · ${row.variant}/${row.branch}</strong>`,
                 row.stateLabel,
                 `Primary status: ${row.primaryStatus}`,
                 `Fallback signals: ${row.fallbackSignalCount}`,
-                `Matched Bazaar scenarios: ${row.matchedScenarioCount}`,
+                `Matched app scenarios: ${row.matchedScenarioCount}`,
                 `Latest evidence: ${row.latestEvidenceAt ?? 'none published'}`,
               ].join('<br>');
             },
@@ -409,7 +416,7 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       if (fallbackDistribution.length === 0) {
         renderUnavailable('applications-fallback-chart', 'No fallback distribution published in applications-matrix.json.');
       } else {
-        const categories = fallbackDistribution.map((row) => `${row.variant}/${row.branch}`);
+        const categories = fallbackDistribution.map((row) => `${row.appName}/${row.variant}/${row.branch}`);
         const fallbackChart = echarts.init(fallbackContainer);
         fallbackChart.setOption({
           aria: { enabled: true },
