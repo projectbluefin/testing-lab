@@ -928,38 +928,37 @@ function buildTestSurface(surface, runs) {
 
 function buildImageStatusSection(stats) {
   const images = stats?.factory?.images || {};
-  const rows = Object.entries(images);
+  const rows = Object.entries(images).filter(([, data]) =>
+    data && (data.stable_age_days != null || data.testing_age_days != null));
   if (!rows.length) return '';
   return `
     <section class="section">
       <div class="section-head"><h2>Image status</h2></div>
-      <p class="section-sub">Days since stable/testing was last observed passing, plus open PR queue depth by source repo.</p>
+      <p class="section-sub">Days since latest published release in each lane, sourced from each repo's GitHub Releases feed.</p>
       <div class="image-status-grid">
         ${rows.map(([name, data]) => {
     const stable = data?.stable_age_days;
     const testing = data?.testing_age_days;
     const stableTone = stable == null ? 'warn' : stable > 14 ? 'bad' : stable > 7 ? 'warn' : 'good';
     const testingTone = testing == null ? 'warn' : testing > 7 ? 'bad' : testing > 3 ? 'warn' : 'good';
-    const repoUrl = data?.repo ? `https://github.com/${data.repo}/pulls` : '';
+    const releaseFeedUrl = data?.repo ? `https://github.com/${data.repo}/releases` : '';
     return `
           <article class="image-status-card">
             <div class="image-status-head">
               <h3 class="mono">${escapeHtml(name)}</h3>
-              ${repoUrl ? `<a class="section-link" href="${escapeHtml(repoUrl)}" target="_blank" rel="noreferrer">PR queue →</a>` : ''}
+              ${releaseFeedUrl ? `<a class="section-link" href="${escapeHtml(releaseFeedUrl)}" target="_blank" rel="noreferrer">Releases →</a>` : ''}
             </div>
             <div class="pulse-stats">
-              <div class="pulse-stat">
+              ${stable == null ? '' : `<div class="pulse-stat">
                 <div class="pulse-stat-value tone-${stableTone}">${escapeHtml(stable == null ? '—' : `${stable}d`)}</div>
                 <div class="pulse-stat-name">stable age</div>
-              </div>
-              <div class="pulse-stat">
+                ${data?.stable_source_url ? `<div class="pulse-stat-name"><a href="${escapeHtml(data.stable_source_url)}" target="_blank" rel="noreferrer">${escapeHtml(data?.stable_tag || 'source')}</a></div>` : ''}
+              </div>`}
+              ${testing == null ? '' : `<div class="pulse-stat">
                 <div class="pulse-stat-value tone-${testingTone}">${escapeHtml(testing == null ? '—' : `${testing}d`)}</div>
                 <div class="pulse-stat-name">testing age</div>
-              </div>
-              <div class="pulse-stat">
-                <div class="pulse-stat-value">${escapeHtml(data?.open_prs == null ? '—' : String(data.open_prs))}</div>
-                <div class="pulse-stat-name">open PRs</div>
-              </div>
+                ${data?.testing_source_url ? `<div class="pulse-stat-name"><a href="${escapeHtml(data.testing_source_url)}" target="_blank" rel="noreferrer">${escapeHtml(data?.testing_tag || 'source')}</a></div>` : ''}
+              </div>`}
             </div>
           </article>
         `;

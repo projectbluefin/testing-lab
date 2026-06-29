@@ -198,59 +198,84 @@ jobs:
               except Exception:
                   return None
 
-          def summarize_image_status(recent_runs):
-              # Use observed workflow labels (image:tag) and enrich with source repo PR counts.
+          def summarize_image_status():
+              # Source-of-truth: GitHub Releases feed only.
               image_map = {
-                  'bluefin': 'projectbluefin/bluefin',
-                  'bluefin-lts': 'projectbluefin/bluefin-lts',
-                  'dakota': 'projectbluefin/dakota',
-                  'aurora': 'projectbluefin/aurora',
-                  'bazzite': 'ublue-os/bazzite',
+                  'bluefin': {
+                      'repo': 'projectbluefin/bluefin',
+                      'stable_selector': {'tag_regex': r'^stable-'},
+                      'testing_selector': {'tag_regex': r'^testing-'},
+                  },
+                  'bluefin-lts': {
+                      'repo': 'projectbluefin/bluefin-lts',
+                      'stable_selector': {'tag_regex': r'^stable-'},
+                      'testing_selector': {'tag_regex': r'^testing-'},
+                  },
+                  'dakota': {
+                      'repo': 'projectbluefin/dakota',
+                      'stable_selector': {'tag_regex': r'^stable-'},
+                      'testing_selector': {'tag_regex': r'^testing-'},
+                  },
+                  'aurora': {
+                      'repo': 'ublue-os/aurora',
+                      'stable_selector': {'tag_regex': r'^stable-'},
+                      'testing_selector': {'tag_regex': r'^testing-'},
+                  },
+                  'bazzite': {
+                      'repo': 'ublue-os/bazzite',
+                      'stable_selector': {'tag_regex': r'^[0-9]'},
+                      'testing_selector': {'tag_regex': r'^testing-'},
+                  },
               }
+
               now_dt = datetime.datetime.now(datetime.timezone.utc)
+
+              def release_match(release, selector):
+                  if not selector or not isinstance(release, dict):
+                      return False
+                  if release.get('draft'):
+                      return False
+                  tag_name = release.get('tag_name') or ''
+                  if not re.search(selector.get('tag_regex', r'.*'), tag_name, re.IGNORECASE):
+                      return False
+                  prerelease = selector.get('prerelease')
+                  if prerelease is None:
+                      return True
+                  return bool(release.get('prerelease')) == bool(prerelease)
+
+              def first_release(releases, selector):
+                  for rel in (releases or []):
+                      if release_match(rel, selector):
+                          return rel
+                  return None
+
               summary = {}
-              for image in image_map.keys():
+              for image, cfg in image_map.items():
+                  repo = cfg['repo']
+                  releases = run_json(f"gh api repos/{repo}/releases?per_page=100")
+                  if not isinstance(releases, list):
+                      releases = []
+                  stable_rel = first_release(releases, cfg.get('stable_selector'))
+                  testing_rel = first_release(releases, cfg.get('testing_selector'))
+
+                  stable_seen_at = stable_rel.get('published_at') if stable_rel else None
+                  testing_seen_at = testing_rel.get('published_at') if testing_rel else None
+                  stable_dt = parse_iso(stable_seen_at)
+                  testing_dt = parse_iso(testing_seen_at)
+
                   summary[image] = {
-                      'stable_seen_at': None,
-                      'testing_seen_at': None,
-                      'stable_age_days': None,
-                      'testing_age_days': None,
-                      'open_prs': None,
-                      'repo': image_map[image],
+                      'repo': repo,
+                      'source': 'github-releases',
+                      'releases_api': f"https://api.github.com/repos/{repo}/releases",
+                      'stable_seen_at': stable_seen_at,
+                      'stable_age_days': max(0, int((now_dt - stable_dt).total_seconds() // 86400)) if stable_dt else None,
+                      'stable_tag': stable_rel.get('tag_name') if stable_rel else None,
+                      'stable_source_url': stable_rel.get('html_url') if stable_rel else None,
+                      'testing_seen_at': testing_seen_at,
+                      'testing_age_days': max(0, int((now_dt - testing_dt).total_seconds() // 86400)) if testing_dt else None,
+                      'testing_tag': testing_rel.get('tag_name') if testing_rel else None,
+                      'testing_source_url': testing_rel.get('html_url') if testing_rel else None,
                   }
-
-              for run in (recent_runs or []):
-                  if run.get('overall') != 'passed':
-                      continue
-                  label = run.get('label') or ''
-                  started = parse_iso(run.get('started_at'))
-                  if not started or ':' not in label:
-                      continue
-                  image, tag = label.split(':', 1)
-                  if image not in summary:
-                      continue
-                  if tag == 'stable':
-                      prev = parse_iso(summary[image]['stable_seen_at'])
-                      if prev is None or started > prev:
-                          summary[image]['stable_seen_at'] = run.get('started_at')
-                  if tag == 'testing':
-                      prev = parse_iso(summary[image]['testing_seen_at'])
-                      if prev is None or started > prev:
-                          summary[image]['testing_seen_at'] = run.get('started_at')
-
-              for image, row in summary.items():
-                  stable_dt = parse_iso(row.get('stable_seen_at'))
-                  testing_dt = parse_iso(row.get('testing_seen_at'))
-                  if stable_dt:
-                      row['stable_age_days'] = max(0, int((now_dt - stable_dt).total_seconds() // 86400))
-                  if testing_dt:
-                      row['testing_age_days'] = max(0, int((now_dt - testing_dt).total_seconds() // 86400))
-                  repo = row.get('repo')
-                  if repo:
-                      prs = run_json(f"gh pr list --repo {repo} --state open --limit 200 --json number")
-                      if isinstance(prs, list):
-                          row['open_prs'] = len(prs)
-
               return summary
 
           # --- Open bugs ---
@@ -312,10 +337,16 @@ jobs:
           if merged_7d > 0:
               stats['github']['testing_lab']['prs_merged_7d'] = merged_7d
 
-          # --- Hive counts sync ---
-          stats.setdefault('hive', {})
-          stats['hive']['open_issues'] = issue_count
-          stats['hive']['open_prs']    = pr_count
+          # --- Hive/org-wide counts (source: GitHub search API) ---
+          hive_open_issues = run_json("gh api search/issues -f q='org:projectbluefin is:issue is:open' --jq .total_count")
+          hive_open_prs = run_json("gh api search/issues -f q='org:projectbluefin is:pr is:open' --jq .total_count")
+          if isinstance(hive_open_issues, int) and isinstance(hive_open_prs, int):
+              stats.setdefault('hive', {})
+              stats['hive']['open_issues'] = hive_open_issues
+              stats['hive']['open_prs'] = hive_open_prs
+              stats['hive']['source'] = 'github-search-api'
+          else:
+              stats.pop('hive', None)
 
           # --- Optional live Argo snapshot (available from homelab/ghost runners) ---
           argo = run_json("curl -k -sS --max-time 12 https://192.168.1.102:32746/api/v1/workflows/argo")
@@ -451,7 +482,7 @@ jobs:
 
           # --- Update metadata timestamps ---
           factory = stats.setdefault('factory', {})
-          factory['images'] = summarize_image_status(stats.get('recent_runs', []))
+          factory['images'] = summarize_image_status()
 
           # --- Update metadata timestamps ---
           meta = stats.setdefault('_meta', {})
@@ -517,9 +548,19 @@ jobs:
               }, f, indent=2)
 
           # --- Public telemetry contract for dashboard evidence ---
-          expected_result_docs = len(list(Path('docs/results').glob('*.json')))
-          observed_result_docs = expected_result_docs
-          coverage_ratio = 1.0 if expected_result_docs else 0.0
+          expected_paths = []
+          test_surface = run_json("cat docs/data/test-surface.json")
+          if isinstance(test_surface, dict):
+              for cell in test_surface.get('surface', []):
+                  rp = cell.get('results_path')
+                  if isinstance(rp, str) and rp.startswith('results/'):
+                      expected_paths.append(f"docs/{rp}")
+          expected_paths = sorted(set(expected_paths))
+          observed_paths = [p for p in expected_paths if Path(p).exists()]
+          missing_docs = [p.replace('docs/', '', 1) for p in expected_paths if not Path(p).exists()]
+          expected_result_docs = len(expected_paths)
+          observed_result_docs = len(observed_paths)
+          coverage_ratio = round((observed_result_docs / expected_result_docs), 4) if expected_result_docs else 0.0
 
           snapshot_state = freshness_state
           if freshness_state == 'unknown':
@@ -545,9 +586,6 @@ jobs:
           running_now = len([r for r in recent_runs if r.get('overall') == 'running'])
           scenarios_total = stats.get('test_coverage', {}).get('scenarios_total', 0)
           scenarios_failed = stats.get('test_coverage', {}).get('scenarios_failed', 0)
-          unknown_station_count = len([s for s in stats.get('station_states', {}).values() if s.get('status') in ('unknown', 'not_attested', 'not_published')])
-          station_total = max(1, len(stats.get('station_states', {})))
-
           metric_evidence = [{'kind': 'collector-run', 'url': collector_url}]
           if collector_sha:
               metric_evidence.append({'kind': 'commit', 'url': collector_commit_url})
@@ -577,7 +615,7 @@ jobs:
                   'expected_result_docs': expected_result_docs,
                   'observed_result_docs': observed_result_docs,
                   'coverage_ratio': coverage_ratio,
-                  'missing_docs': [],
+                  'missing_docs': missing_docs,
               },
               'metrics': [
                   {
@@ -615,19 +653,6 @@ jobs:
                       'denominator': max(1, len(recent_runs)),
                       'formula': 'count(runs where overall=running)',
                       'window_hours': 1,
-                      'confidence': 'high',
-                      'state': snapshot_state,
-                      'evidence': metric_evidence,
-                  },
-                  {
-                      'id': 'unknown_station_ratio',
-                      'label': 'Unknown station ratio',
-                      'value': round((unknown_station_count / station_total) * 100, 2),
-                      'unit': 'percent',
-                      'numerator': unknown_station_count,
-                      'denominator': station_total,
-                      'formula': 'unknown_station_count / total_stations * 100',
-                      'window_hours': 24,
                       'confidence': 'high',
                       'state': snapshot_state,
                       'evidence': metric_evidence,
