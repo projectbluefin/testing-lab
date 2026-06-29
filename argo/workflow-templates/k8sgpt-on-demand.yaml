@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/part-of: testing-lab
 spec:
   entrypoint: analyze
-  serviceAccountName: argo
+  serviceAccountName: k8sgpt-runner
   podGC:
     strategy: OnWorkflowSuccess
   ttlStrategy:
