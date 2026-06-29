@@ -322,6 +322,45 @@ jobs:
 
           with open(stats_path, 'w') as f:
               json.dump(stats, f, indent=2)
+
+          # --- Write dashboard history rollups ---
+          recent_runs = stats.get('recent_runs', [])
+          by_day = {}
+          for run in recent_runs:
+              started = run.get('started_at')
+              if not started:
+                  continue
+              day = started[:10]
+              bucket = by_day.setdefault(day, {'date': day, 'throughput': 0, 'passed': 0, 'running': 0, 'failed': 0, 'durations': []})
+              bucket['throughput'] += 1
+              bucket['passed'] += 1 if run.get('overall') == 'passed' else 0
+              bucket['running'] += 1 if run.get('overall') == 'running' else 0
+              bucket['failed'] += 1 if run.get('overall') == 'fail' else 0
+              if run.get('overall') == 'passed' and isinstance(run.get('duration_min'), (int, float)):
+                  bucket['durations'].append(run['duration_min'])
+          rollups = []
+          for day in sorted(by_day):
+              bucket = by_day[day]
+              throughput = bucket['throughput']
+              reliability = round((bucket['passed'] / throughput) * 100) if throughput else 0
+              speed_min = round(sorted(bucket['durations'])[len(bucket['durations']) // 2]) if bucket['durations'] else 0
+              pressure = bucket['running'] + bucket['failed']
+              rollups.append({
+                  'date': day,
+                  'throughput': throughput,
+                  'reliability': reliability,
+                  'speed_min': speed_min,
+                  'pressure': pressure,
+              })
+
+          history_path = 'docs/data/factory-history.json'
+          with open(history_path, 'w') as f:
+              json.dump({
+                  'window_days': 7,
+                  'generated_from': 'factory-stats.json',
+                  'rollups': rollups[-7:],
+              }, f, indent=2)
+
           print(f"Updated {stats_path}: {len(bugs)} open bugs, {total_scenarios} scenarios, {len(images_with_results)} images with results")
           PYEOF
 
@@ -329,7 +368,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots/ docs/data/factory-stats.json
+          git add docs/screenshots/ docs/data/factory-stats.json docs/data/factory-history.json docs/index.html docs/assets/factory-dashboard.*
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else

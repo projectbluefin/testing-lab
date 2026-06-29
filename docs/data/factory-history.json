@@ -1,0 +1,55 @@
+{
+  "window_days": 7,
+  "generated_from": "factory-stats.json",
+  "rollups": [
+    {
+      "date": "2026-06-22",
+      "throughput": 2,
+      "reliability": 100,
+      "speed_min": 0,
+      "pressure": 0
+    },
+    {
+      "date": "2026-06-23",
+      "throughput": 4,
+      "reliability": 100,
+      "speed_min": 0,
+      "pressure": 0
+    },
+    {
+      "date": "2026-06-24",
+      "throughput": 0,
+      "reliability": 0,
+      "speed_min": 0,
+      "pressure": 0
+    },
+    {
+      "date": "2026-06-25",
+      "throughput": 3,
+      "reliability": 100,
+      "speed_min": 0,
+      "pressure": 0
+    },
+    {
+      "date": "2026-06-26",
+      "throughput": 4,
+      "reliability": 75,
+      "speed_min": 0,
+      "pressure": 1
+    },
+    {
+      "date": "2026-06-27",
+      "throughput": 5,
+      "reliability": 80,
+      "speed_min": 1,
+      "pressure": 0
+    },
+    {
+      "date": "2026-06-28",
+      "throughput": 8,
+      "reliability": 88,
+      "speed_min": 1,
+      "pressure": 1
+    }
+  ]
+}

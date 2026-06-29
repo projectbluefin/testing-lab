@@ -1,0 +1,46 @@
+{
+  "brand": {
+    "title": "Factory Tour",
+    "subtitle": "Bluefin QA operations dashboard"
+  },
+  "mission": {
+    "headline": "Ship image-based changes with evidence, not vibes.",
+    "body": "Live runs, failing work, and cluster health stay on one page so operators can tell whether the factory is moving or stalled."
+  },
+  "station_labels": ["Source", "Assembly", "Verification", "Trust"],
+  "trust_labels": ["Signing", "SBOM", "Attestation", "CVE posture", "Promotion timing"],
+  "links": [
+    {
+      "label": "Argo UI",
+      "href": "https://192.168.1.102:32746",
+      "tone": "good"
+    },
+    {
+      "label": "Refresh data",
+      "href": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml",
+      "tone": "muted"
+    },
+    {
+      "label": "Runbook",
+      "href": "https://github.com/projectbluefin/testing-lab/blob/main/RUNBOOK.md",
+      "tone": "muted"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "screenshots/bluefin-testing-smoke-latest.png",
+      "title": "Bluefin testing smoke",
+      "suite": "smoke"
+    },
+    {
+      "file": "screenshots/bluefin-lts-testing-smoke-latest.png",
+      "title": "Bluefin LTS testing smoke",
+      "suite": "smoke"
+    },
+    {
+      "file": "screenshots/dakota-testing-smoke-latest.png",
+      "title": "Dakota testing smoke",
+      "suite": "smoke"
+    }
+  ]
+}
