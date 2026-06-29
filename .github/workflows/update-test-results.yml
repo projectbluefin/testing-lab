@@ -701,7 +701,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/screenshots/ docs/data/factory-stats.json docs/data/factory-history.json docs/data/factory-telemetry.json docs/data/upstream-status.json docs/data/tests-matrix.json docs/data/applications-matrix.json docs/index.html docs/assets/factory-dashboard.* docs/_astro/ docs/upstream/ docs/tests/ docs/applications/
+          git add -A docs/
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
