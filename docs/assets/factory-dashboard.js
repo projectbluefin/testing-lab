@@ -586,6 +586,21 @@ function buildTwprTile(m) {
     </article>`;
 }
 
+function resolveFabric(stats, copy) {
+  // Live observation from the collector wins. Static config is honored only
+  // when explicitly marked verified=true by an operator (GitOps).
+  const live = stats?.factory?.cluster?.fabric;
+  if (live && Array.isArray(live.links) && live.links.length) {
+    return { ...live, source: 'live' };
+  }
+  const configured = copy?.fabric;
+  if (configured && configured.verified === true
+      && Array.isArray(configured.links) && configured.links.length) {
+    return { ...configured, source: 'configured' };
+  }
+  return null;
+}
+
 function buildFabricStrip(fabric, nodes) {
   if (!fabric || !Array.isArray(fabric.links) || !fabric.links.length) return '';
   const known = new Set((nodes || []).map((n) => n.name).filter(Boolean));
@@ -609,16 +624,92 @@ function buildFabricStrip(fabric, nodes) {
       </li>
     `;
   }).join('');
+  const sourceLabel = fabric.source === 'live' ? 'observed' : 'declared';
   return `
     <div class="fabric-strip" aria-label="Thunderbolt/USB4 fabric">
       <div class="fabric-head">
         <span class="fabric-label">${escapeHtml(fabric.label || 'Thunderbolt / USB4 mesh')}</span>
         ${fabric.tagline ? `<span class="fabric-tagline">${escapeHtml(fabric.tagline)}</span>` : ''}
+        <span class="fabric-source chip muted">${escapeHtml(sourceLabel)}</span>
       </div>
       <ul class="fabric-links">${items}</ul>
     </div>
   `;
 }
+
+function buildFactoryPulse(stats) {
+  const gh = stats?.github?.testing_lab || {};
+  const hive = stats?.hive || {};
+  const freshness = stats?._meta?.freshness || {};
+  const ageMin = stats?._meta?.freshness_minutes;
+  const cards = [];
+
+  if (hive.open_issues != null || hive.open_prs != null) {
+    cards.push({
+      key: 'hive',
+      label: 'Hive (cross-factory)',
+      sub: 'Open work across every projectbluefin repo',
+      stats: [
+        { name: 'open issues', value: hive.open_issues ?? '\u2014' },
+        { name: 'open PRs', value: hive.open_prs ?? '\u2014' },
+      ],
+      link: { href: 'https://github.com/orgs/projectbluefin/repositories', text: 'org' },
+    });
+  }
+  if (gh.open_issues != null || gh.open_prs != null || gh.prs_merged_7d != null) {
+    cards.push({
+      key: 'lab',
+      label: 'testing-lab repo',
+      sub: 'Issues, PRs, and merge velocity for this dashboard\u2019s home repo',
+      stats: [
+        { name: 'open issues', value: gh.open_issues ?? '\u2014' },
+        { name: 'open PRs', value: gh.open_prs ?? '\u2014' },
+        { name: 'PRs merged (7d)', value: gh.prs_merged_7d ?? '\u2014' },
+      ],
+      link: { href: 'https://github.com/projectbluefin/testing-lab/pulls', text: 'PR queue' },
+    });
+  }
+  if (freshness.state || ageMin != null) {
+    const tone = freshness.state === 'fresh' ? 'good' : freshness.state === 'stale' ? 'bad' : 'warn';
+    const ageLabel = ageMin == null ? 'unknown' : (ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin / 60)}h ago`);
+    cards.push({
+      key: 'freshness',
+      label: 'Snapshot freshness',
+      sub: `Fresh when data is under ${freshness.threshold_minutes ?? 180} minutes old; stale otherwise.`,
+      stats: [
+        { name: 'state', value: freshness.state || 'unknown', tone },
+        { name: 'age', value: ageLabel },
+      ],
+    });
+  }
+  if (!cards.length) return '';
+  return `
+    <section class="section">
+      <div class="section-head"><h2>Factory pulse</h2></div>
+      <p class="section-sub">How busy the factory itself is right now \u2014 not just the cluster, but the issues, PRs, and data feeding this page.</p>
+      <div class="pulse-grid">
+        ${cards.map((c) => `
+          <article class="pulse-card">
+            <header>
+              <h3>${escapeHtml(c.label)}</h3>
+              ${c.link ? `<a class="section-link" href="${escapeHtml(c.link.href)}" target="_blank" rel="noreferrer">${escapeHtml(c.link.text)} \u2192</a>` : ''}
+            </header>
+            <p class="pulse-sub">${escapeHtml(c.sub)}</p>
+            <div class="pulse-stats">
+              ${c.stats.map((s) => `
+                <div class="pulse-stat">
+                  <div class="pulse-stat-value ${s.tone ? 'tone-' + s.tone : ''}">${escapeHtml(String(s.value))}</div>
+                  <div class="pulse-stat-name">${escapeHtml(s.name)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
 
 function buildClusterNodesPanel(nodes, summary, freshness, telemetrySnapshot, openBugsCount) {
   const totalRam = nodes.reduce((sum, n) => sum + (n.ram_gb || 0), 0);
@@ -637,7 +728,7 @@ function buildClusterNodesPanel(nodes, summary, freshness, telemetrySnapshot, op
         </div>
       </div>
       <p class="section-sub">Who\u2019s donating cycles to test Bluefin right now \u2014 each card is a real machine running real tests.</p>
-      ${buildFabricStrip(DATA.copy?.fabric, nodes)}
+      ${buildFabricStrip(resolveFabric(DATA.stats, DATA.copy), nodes)}
       <div class="nodes-grid">
         ${nodes.length ? nodes.map((node) => `
           <article class="node-card">
@@ -799,6 +890,8 @@ function render(copy, stats, history, telemetry) {
     </header>
 
     ${buildClusterNodesPanel(clusterNodes, summary, freshness, telemetrySnapshot, openBugs.length)}
+
+    ${buildFactoryPulse(stats)}
 
     ${buildTrustWindowSection(DATA.derivedTrust)}
 

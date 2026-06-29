@@ -406,6 +406,21 @@ img { max-width: 100%; display: block; }
 /* ===== section subtitle (teaching line) ===== */
 .section-sub { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 2px 0 10px; max-width: 70ch; }
 
+/* ===== factory pulse cards ===== */
+.pulse-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.pulse-card { border: 1px solid var(--border); background: var(--panel-2); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.pulse-card header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pulse-card h3 { margin: 0; font-size: 15px; letter-spacing: -0.005em; color: var(--text); text-transform: none; }
+.pulse-sub { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.pulse-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+.pulse-stat { display: flex; flex-direction: column; gap: 2px; min-width: 70px; }
+.pulse-stat-value { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.1; }
+.pulse-stat-value.tone-good { color: var(--good); }
+.pulse-stat-value.tone-bad  { color: var(--bad); }
+.pulse-stat-value.tone-warn { color: var(--warn); }
+.pulse-stat-name { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.fabric-source { font-size: 10px; letter-spacing: 0.06em; }
+
 /* ===== redesign: section headers + dense layouts ===== */
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .section-head h2 { margin: 0; }

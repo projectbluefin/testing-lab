@@ -45,10 +45,8 @@
   ],
   "fabric": {
     "label": "Thunderbolt / USB4 mesh",
-    "tagline": "40 Gbps node-to-node interconnect — edit factory-copy.json to declare real links.",
-    "links": [
-      { "a": "ghost", "b": "exo-0", "speed_gbps": 40, "tech": "USB4" },
-      { "a": "ghost", "b": "exo-2", "speed_gbps": 40, "tech": "USB4" }
-    ]
+    "tagline": "40 Gbps node-to-node interconnect.",
+    "verified": false,
+    "links": []
   }
 }
