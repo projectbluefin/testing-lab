@@ -6,17 +6,17 @@
       "type": "rolling",
       "hours": 24
     },
-    "state": "degraded",
+    "state": "unknown",
     "age_minutes": null,
     "threshold_minutes": 180
   },
   "lineage": {
     "collector": {
       "workflow": ".github/workflows/update-test-results.yml",
-      "run_id": "bootstrap",
-      "run_url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml",
+      "run_id": null,
+      "run_url": "https://github.com/projectbluefin/testing-lab/actions",
       "job": "update",
-      "commit_sha": "bootstrap",
+      "commit_sha": "",
       "commit_url": "https://github.com/projectbluefin/testing-lab/commits/main"
     },
     "inputs_digest_sha256": "sha256:bootstrap",
@@ -44,11 +44,11 @@
       "formula": "passed_suite_runs / completed_suite_runs * 100",
       "window_hours": 24,
       "confidence": "high",
-      "state": "degraded",
+      "state": "unknown",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml"
+          "url": "https://github.com/projectbluefin/testing-lab/actions"
         }
       ]
     },
@@ -62,11 +62,11 @@
       "formula": "(scenarios_total - scenarios_failed) / scenarios_total * 100",
       "window_hours": 24,
       "confidence": "medium",
-      "state": "degraded",
+      "state": "unknown",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml"
+          "url": "https://github.com/projectbluefin/testing-lab/actions"
         }
       ]
     },
@@ -77,32 +77,14 @@
       "unit": "count",
       "numerator": 19,
       "denominator": 25,
-      "formula": "running_runs + pending_runs",
+      "formula": "count(runs where overall=running)",
       "window_hours": 1,
       "confidence": "high",
-      "state": "degraded",
+      "state": "unknown",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml"
-        }
-      ]
-    },
-    {
-      "id": "result_doc_coverage",
-      "label": "Result doc coverage",
-      "value": 100.0,
-      "unit": "percent",
-      "numerator": 22,
-      "denominator": 22,
-      "formula": "observed_result_docs / expected_result_docs * 100",
-      "window_hours": 24,
-      "confidence": "high",
-      "state": "degraded",
-      "evidence": [
-        {
-          "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml"
+          "url": "https://github.com/projectbluefin/testing-lab/actions"
         }
       ]
     },
@@ -116,11 +98,11 @@
       "formula": "unknown_station_count / total_stations * 100",
       "window_hours": 24,
       "confidence": "high",
-      "state": "degraded",
+      "state": "unknown",
       "evidence": [
         {
           "kind": "collector-run",
-          "url": "https://github.com/projectbluefin/testing-lab/actions/workflows/update-test-results.yml"
+          "url": "https://github.com/projectbluefin/testing-lab/actions"
         }
       ]
     }
