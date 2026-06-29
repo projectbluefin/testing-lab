@@ -99,6 +99,7 @@ spec:
             cpu: 500m
             memory: 512Mi
       outputs:
-        artifacts:
-          - name: k8sgpt-results
-            path: /tmp/results/k8sgpt-results.json
+        parameters:
+          - name: k8sgpt-results-json
+            valueFrom:
+              path: /tmp/results/k8sgpt-results.json
