@@ -1,7 +1,7 @@
 {
   "brand": {
-    "title": "Factory Tour",
-    "subtitle": "Bluefin QA operations dashboard"
+    "title": "Project Bluefin Operating System Factory",
+    "subtitle": "Cloud Native Linux Desktop Testing — Power to the People"
   },
   "mission": {
     "headline": "Factory telemetry for image-based Linux, from source to signed artifact.",
@@ -42,5 +42,13 @@
       "title": "Dakota testing smoke",
       "suite": "smoke"
     }
-  ]
+  ],
+  "fabric": {
+    "label": "Thunderbolt / USB4 mesh",
+    "tagline": "40 Gbps node-to-node interconnect — edit factory-copy.json to declare real links.",
+    "links": [
+      { "a": "ghost", "b": "exo-0", "speed_gbps": 40, "tech": "USB4" },
+      { "a": "ghost", "b": "exo-2", "speed_gbps": 40, "tech": "USB4" }
+    ]
+  }
 }

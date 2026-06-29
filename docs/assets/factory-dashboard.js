@@ -1,7 +1,7 @@
 const DEFAULT_COPY = {
   brand: {
-    title: 'Factory Tour',
-    subtitle: 'Bluefin QA operations dashboard',
+    title: 'Project Bluefin Operating System Factory',
+    subtitle: 'Cloud Native Linux Desktop Testing — Power to the People',
   },
   mission: {
     headline: 'Factory telemetry for image-based Linux, from source to signed artifact.',
@@ -19,6 +19,11 @@ const DEFAULT_COPY = {
     { file: 'screenshots/bluefin-lts-testing-smoke-latest.png', title: 'Bluefin LTS testing smoke', suite: 'smoke' },
     { file: 'screenshots/dakota-testing-smoke-latest.png', title: 'Dakota testing smoke', suite: 'smoke' },
   ],
+  fabric: {
+    label: 'Thunderbolt / USB4 mesh',
+    tagline: '40 Gbps node-to-node interconnect.',
+    links: [],
+  },
 };
 
 const DATA = {
@@ -27,6 +32,7 @@ const DATA = {
   history: null,
   telemetry: null,
   derivedTrust: null,
+  testSurface: null,
 };
 
 const fmt = new Intl.DateTimeFormat(undefined, {
@@ -366,6 +372,7 @@ function buildPromotionTimeline(runs) {
   return `
     <section class="section">
       <h2>Promotion timeline</h2>
+      <p class="section-sub">Which image lanes shipped a green build most recently.</p>
       <div class="panel">
         <table class="coverage-table">
           <thead>
@@ -450,65 +457,121 @@ function buildTourMap(stations) {
   `;
 }
 
+const RIGOR_LADDER = [
+  { id: 'builds-pass', name: 'Builds pass', def: 'CI is green: code compiles, images build, tests don\u2019t crash.', achieved: true },
+  { id: 'numbers',     name: 'Numbers, not vibes', def: 'Pass rates ship with sample size attached \u2014 counts come from results files, not gut feel.', achieved: true },
+  { id: 'confidence',  name: 'Honest confidence', def: 'Each pass rate has a confidence range so small samples can\u2019t pretend to be certainty.', achieved: true, current: true },
+  { id: 'reproducible', name: 'Reruns reproduce', def: 'Anyone re-derives every number on this page from signed inputs and a pinned notebook.', achieved: false },
+  { id: 'regression',  name: 'Regressions auto-detected', def: 'Statistical change-point detection flags drops without a human staring at the chart.', achieved: false },
+  { id: 'slo-backed',  name: 'Bound by SLOs', def: 'Every failure mode has a service-level objective and error budget; breaches automatically open work.', achieved: false },
+];
+
+function buildRigorLadder() {
+  const rungs = RIGOR_LADDER.map((r, i) => {
+    const state = r.current ? 'current' : (r.achieved ? 'achieved' : 'future');
+    const mark = r.current ? '\u2192' : (r.achieved ? '\u2713' : '\u25a2');
+    return `
+      <li class="rigor-rung rigor-${state}">
+        <div class="rigor-head">
+          <span class="rigor-mark" aria-hidden="true">${mark}</span>
+          <span class="rigor-step">Step ${i + 1}</span>
+          <span class="rigor-name">${escapeHtml(r.name)}</span>
+          ${r.current ? '<span class="rigor-badge">we are here</span>' : ''}
+        </div>
+        <p class="rigor-def">${escapeHtml(r.def)}</p>
+      </li>
+    `;
+  }).join('');
+  return `
+    <div class="rigor-ladder" aria-label="Rigor ladder">
+      <div class="rigor-ladder-head">
+        <span class="rigor-ladder-label">How rigorous are these numbers?</span>
+        <span class="rigor-ladder-tagline">Each rung is a level the factory either has reached or hasn\u2019t yet. Future rungs are shown so you can see what comes next.</span>
+      </div>
+      <ol class="rigor-rungs">${rungs}</ol>
+    </div>
+  `;
+}
+
+function tilePassRateHistory(metric) {
+  const hist = metric?.history || metric?.samples;
+  if (Array.isArray(hist) && hist.length) {
+    return hist
+      .map((p) => (typeof p === 'number' ? p : p?.value))
+      .filter((v) => typeof v === 'number')
+      .map((v) => v <= 1 ? v * 100 : v);
+  }
+  return [];
+}
+
+function sparkPolyline(values, { width = 120, height = 28, tone = 'accent' } = {}) {
+  if (!values.length) {
+    return `<svg class="tile-spark empty" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="${height - 1}" x2="${width}" y2="${height - 1}"></line></svg>`;
+  }
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 100);
+  const span = Math.max(max - min, 1);
+  const stepX = width / Math.max(values.length - 1, 1);
+  const pts = values.map((v, i) => {
+    const x = i * stepX;
+    const y = height - ((v - min) / span) * (height - 2) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="tile-spark ${tone}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></polyline></svg>`;
+}
+
 function buildTrustWindowSection(derived) {
   if (!derived || !Array.isArray(derived.metrics) || derived.metrics.length === 0) {
     return `
     <section class="section twpr-section" id="trust-window-pass-rate">
       <div class="twpr-heading">
-        <h2>Trust-Window Pass Rate <span class="twpr-tag">research-grade</span></h2>
+        <h2>Pass rate, with honest confidence</h2>
+        <p class="section-sub">How often each build passes its tests \u2014 reported with a confidence range so small samples don\u2019t lie.</p>
         <p class="twpr-intro">No derived data yet. The hourly derive workflow has not committed output. See <a href="./about/methodology.html">methodology</a>.</p>
       </div>
+      ${buildRigorLadder()}
     </section>`;
   }
-  const audiences = [
-    { value: 'contributor', label: '24h (contributor)' },
-    { value: 'user', label: '7d (user)' },
-    { value: 'downstream', label: '30d (downstream)' },
-  ];
-  const byAudience = {};
+  // De-duplicate by (variant, branch, suite); keep the most recent per cell.
+  const byKey = new Map();
   for (const m of derived.metrics) {
-    const aud = m?.context?.audience || 'user';
-    (byAudience[aud] = byAudience[aud] || []).push(m);
+    const c = m?.context || {};
+    const key = `${c.variant || '?'}|${c.branch || '?'}|${c.suite || '?'}`;
+    const existing = byKey.get(key);
+    if (!existing || String(m.observed_at || m.window_end || '').localeCompare(String(existing.observed_at || existing.window_end || '')) > 0) {
+      byKey.set(key, m);
+    }
   }
-  for (const k of Object.keys(byAudience)) {
-    byAudience[k].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
-  }
+  const tiles = [...byKey.values()].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
   const gen = derived.generator || {};
-  const tabs = audiences.map((a, i) => `
-    <button type="button" class="twpr-tab ${a.value === 'user' ? 'active' : ''}" data-audience="${a.value}">${escapeHtml(a.label)} <span class="twpr-count">${(byAudience[a.value] || []).length}</span></button>
-  `).join('');
-  const panels = audiences.map((a) => `
-    <div class="twpr-panel ${a.value === 'user' ? 'active' : ''}" data-audience-panel="${a.value}">
-      ${(byAudience[a.value] || []).length === 0
-        ? `<p class="twpr-empty">No records in this window.</p>`
-        : `<div class="twpr-grid">${(byAudience[a.value] || []).map(buildTwprTile).join('')}</div>`}
-    </div>
-  `).join('');
   return `
   <section class="section twpr-section" id="trust-window-pass-rate">
     <div class="twpr-heading">
-      <h2>Trust-Window Pass Rate <span class="twpr-tag">research-grade</span></h2>
+      <h2>Pass rate, with honest confidence</h2>
+      <p class="section-sub">How often each build passes its tests \u2014 reported with a confidence range so small samples don\u2019t lie.</p>
       <p class="twpr-intro">
-        Wilson 95% confidence interval per (variant, branch, suite) over an audience window.
-        Method: <a href="./about/methodology.html#trust_window_pass_rate">methodology</a> · Notebook: <a href="./methods/01_pass_rate_wilson.html">01_pass_rate_wilson.html</a>${gen.commit_sha ? ` · Generated from <span class="mono">${escapeHtml(String(gen.commit_sha).slice(0, 7))}</span>` : ''}
+        Method: <a href="./about/methodology.html#trust_window_pass_rate">Wilson 95% confidence interval</a> \u00b7 Notebook: <a href="./methods/01_pass_rate_wilson.html">01_pass_rate_wilson.html</a>${gen.commit_sha ? ` \u00b7 Generated from <span class="mono">${escapeHtml(String(gen.commit_sha).slice(0, 7))}</span>` : ''}
       </p>
     </div>
-    <div class="twpr-tabs" role="tablist">${tabs}</div>
-    <div class="twpr-panels">${panels}</div>
+    ${buildRigorLadder()}
+    ${tiles.length === 0
+      ? `<p class="twpr-empty">No records.</p>`
+      : `<div class="twpr-grid">${tiles.map(buildTwprTile).join('')}</div>`}
   </section>`;
 }
 
 function buildTwprTile(m) {
   const ctx = m.context || {};
-  const pct = m.value == null ? '—' : (m.value * 100).toFixed(1) + '%';
-  const lo = m.ci_lower == null ? '—' : (m.ci_lower * 100).toFixed(1);
-  const hi = m.ci_upper == null ? '—' : (m.ci_upper * 100).toFixed(1);
-  const n = (m.n == null ? '—' : m.n);
+  const pct = m.value == null ? '\u2014' : (m.value * 100).toFixed(1) + '%';
+  const lo = m.ci_lower == null ? '\u2014' : (m.ci_lower * 100).toFixed(1);
+  const hi = m.ci_upper == null ? '\u2014' : (m.ci_upper * 100).toFixed(1);
+  const n = (m.n == null ? '\u2014' : m.n);
   const activeFMs = (m.failure_modes || []).filter((f) => f.active);
   const stateTone = m.state === 'fresh' ? 'good' : (m.state === 'degraded' ? 'bad' : 'warn');
   const fmChip = activeFMs.length > 0
-    ? `<details class="twpr-fmea"><summary class="twpr-fmea-chip twpr-fmea-active" title="${activeFMs.length} active failure mode${activeFMs.length === 1 ? '' : 's'}">⚠ ${activeFMs.length} active</summary><ul>${activeFMs.map((f) => `<li><strong>${escapeHtml(f.id)}</strong>: ${escapeHtml(f.description)}</li>`).join('')}</ul></details>`
+    ? `<details class="twpr-fmea"><summary class="twpr-fmea-chip twpr-fmea-active" title="${activeFMs.length} active failure mode${activeFMs.length === 1 ? '' : 's'}">\u26a0 ${activeFMs.length} active</summary><ul>${activeFMs.map((f) => `<li><strong>${escapeHtml(f.id)}</strong>: ${escapeHtml(f.description)}</li>`).join('')}</ul></details>`
     : `<span class="twpr-fmea-chip twpr-fmea-clean" title="No active failure modes">FMEA clean</span>`;
+  const history = tilePassRateHistory(m);
   return `
     <article class="twpr-tile">
       <header class="twpr-tile-header">
@@ -516,10 +579,201 @@ function buildTwprTile(m) {
         <span class="chip ${stateTone}">${escapeHtml(m.state || 'unknown')}</span>
       </header>
       <div class="twpr-value">${pct}</div>
-      <div class="twpr-ci">95% CI [${lo}, ${hi}]% · <span class="mono">n=${escapeHtml(String(n))}</span></div>
-      <div class="twpr-method">Wilson 95% · confidence ${escapeHtml(m.confidence || 'unknown')}</div>
+      <div class="twpr-ci">95% CI [${lo}, ${hi}]% \u00b7 <span class="mono">n=${escapeHtml(String(n))}</span></div>
+      ${sparkPolyline(history, { tone: 'accent' })}
+      <div class="twpr-method">Wilson 95% \u00b7 confidence ${escapeHtml(m.confidence || 'unknown')}</div>
       <div class="twpr-fmea-row">${fmChip}</div>
     </article>`;
+}
+
+function buildFabricStrip(fabric, nodes) {
+  if (!fabric || !Array.isArray(fabric.links) || !fabric.links.length) return '';
+  const known = new Set((nodes || []).map((n) => n.name).filter(Boolean));
+  const items = fabric.links.map((link) => {
+    const a = link.a || '?';
+    const b = link.b || '?';
+    const speed = link.speed_gbps ? `${link.speed_gbps} Gbps` : 'link';
+    const tech = link.tech || 'USB4';
+    const aOnline = known.has(a);
+    const bOnline = known.has(b);
+    const tone = (aOnline && bOnline) ? 'good' : 'muted';
+    return `
+      <li class="fabric-link ${tone}">
+        <span class="fabric-end ${aOnline ? '' : 'offline'} mono">${escapeHtml(a)}</span>
+        <span class="fabric-pipe" aria-hidden="true">
+          <span class="fabric-pulse"></span>
+          <span class="fabric-speed">${escapeHtml(speed)}</span>
+        </span>
+        <span class="fabric-end ${bOnline ? '' : 'offline'} mono">${escapeHtml(b)}</span>
+        <span class="fabric-tech chip muted">${escapeHtml(tech)}</span>
+      </li>
+    `;
+  }).join('');
+  return `
+    <div class="fabric-strip" aria-label="Thunderbolt/USB4 fabric">
+      <div class="fabric-head">
+        <span class="fabric-label">${escapeHtml(fabric.label || 'Thunderbolt / USB4 mesh')}</span>
+        ${fabric.tagline ? `<span class="fabric-tagline">${escapeHtml(fabric.tagline)}</span>` : ''}
+      </div>
+      <ul class="fabric-links">${items}</ul>
+    </div>
+  `;
+}
+
+function buildClusterNodesPanel(nodes, summary, freshness, telemetrySnapshot, openBugsCount) {
+  const totalRam = nodes.reduce((sum, n) => sum + (n.ram_gb || 0), 0);
+  const totalCpu = nodes.reduce((sum, n) => sum + (n.cpu_threads || 0), 0);
+  const snapTone = telemetrySnapshot.state === 'fresh' ? 'good' : telemetrySnapshot.state === 'degraded' ? 'bad' : 'warn';
+  return `
+    <section class="section nodes-section">
+      <div class="nodes-header">
+        <span class="label">Contributor Clusters \u2014 Live Snapshot</span>
+        <div class="nodes-summary">
+          <span class="chip ${snapTone}">snapshot <strong>${escapeHtml(telemetrySnapshot.state || 'unknown')}</strong></span>
+          <span class="chip muted">refreshed <strong>${escapeHtml(hoursAgo(freshness))}</strong></span>
+          <span class="chip muted">runs in window <strong>${escapeHtml(summary.total)}</strong></span>
+          <span class="chip ${summary.failed ? 'bad' : 'good'}">failing <strong>${escapeHtml(summary.failed)}</strong></span>
+          <span class="chip muted">open bugs <strong><a href="https://github.com/projectbluefin/testing-lab/issues?q=is%3Aissue+is%3Aopen+label%3Abug" target="_blank" rel="noreferrer">${escapeHtml(openBugsCount)}</a></strong></span>
+        </div>
+      </div>
+      <p class="section-sub">Who\u2019s donating cycles to test Bluefin right now \u2014 each card is a real machine running real tests.</p>
+      ${buildFabricStrip(DATA.copy?.fabric, nodes)}
+      <div class="nodes-grid">
+        ${nodes.length ? nodes.map((node) => `
+          <article class="node-card">
+            <header>
+              <h3 class="mono">${escapeHtml(node.name)}</h3>
+              <span class="badge ${node.status === 'ready' ? 'pass' : 'fail'}">${escapeHtml(node.status)}</span>
+            </header>
+            <div class="node-role">${escapeHtml(node.role)}</div>
+            <div class="node-stats">
+              <span class="chip muted"><strong>${escapeHtml(node.cpu_threads)}</strong> threads</span>
+              <span class="chip muted"><strong>${escapeHtml(node.ram_gb)}</strong> GB RAM</span>
+            </div>
+          </article>
+        `).join('') : '<div class="loading">No cluster snapshot.</div>'}
+        <article class="node-card node-card-total">
+          <header><h3>Cluster total</h3></header>
+          <div class="node-role">${escapeHtml(nodes.length)} nodes</div>
+          <div class="node-stats">
+            <span class="chip muted"><strong>${escapeHtml(totalCpu)}</strong> threads</span>
+            <span class="chip muted"><strong>${escapeHtml(totalRam)}</strong> GB RAM</span>
+          </div>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function describeRun(run) {
+  const id = String(run.id || '');
+  const label = run.label || 'cluster-wide';
+  const lower = id.toLowerCase();
+  if (/^build-cd-sync[-/]/.test(lower)) return `Building and syncing ${label}`;
+  if (/^build[-/]/.test(lower)) return `Building ${label}`;
+  if (/(^|-)smoke(-|$)/.test(lower)) return `Smoke test for ${label}`;
+  if (/^provision[-/]/.test(lower)) return `Provisioning ${label} VM`;
+  if (/^teardown[-/]/.test(lower)) return `Tearing down ${label} VM`;
+  if (/^promote[-/]/.test(lower) || /-promote-/.test(lower)) return `Promoting ${label}`;
+  if (/^poll[-/]/.test(lower) || /-poller$/.test(lower) || /^image-poll[-/]/.test(lower)) return `Polling ${label} for new image digests`;
+  if (/(^|-)pr-/.test(lower) || /^pr[-/]/.test(lower)) return `PR validation for ${label}`;
+  if (/cleanup|gc(-|$)/.test(lower)) return `Cleanup pass on ${label}`;
+  if (/^nightly[-/]/.test(lower)) return `Nightly run for ${label}`;
+  if (/^run-/.test(lower) || /-tests?(-|$)/.test(lower)) return `Running tests against ${label}`;
+  // Generic fallback: humanize the leading hyphen-separated verbs.
+  const head = id.split('-').slice(0, 3).join(' ');
+  return `${head} for ${label}`;
+}
+
+function buildRecentRunsChangelog(runs) {
+  if (!runs.length) {
+    return '<section class="section"><h2>Recent runs</h2><div class="panel"><div class="loading">No runs in window.</div></div></section>';
+  }
+  const rows = runs.slice(0, 20).map((run) => {
+    const status = runStatusClass(run.overall);
+    const dot = run.overall === 'passed' ? '●' : run.overall === 'running' ? '◌' : run.overall === 'fail' ? '●' : '○';
+    return `
+      <li class="changelog-row">
+        <span class="changelog-dot ${status}" aria-hidden="true">${dot}</span>
+        <div class="changelog-main">
+          <a class="changelog-label mono" href="${escapeHtml(fallbackRunQueryUrl(run))}" target="_blank" rel="noreferrer">${escapeHtml(run.id)}</a>
+          <div class="changelog-desc">${escapeHtml(describeRun(run))}</div>
+        </div>
+        <div class="changelog-time">
+          <span>${escapeHtml(hoursAgo(run.started_at))}</span>
+          <span class="muted">${escapeHtml(formatTime(run.started_at))}</span>
+        </div>
+        <div class="changelog-extra">
+          <span class="chip muted">${escapeHtml(minutesLabel(run.duration_min))}</span>
+          <span class="chip muted">${escapeHtml(run.trigger || 'manual')}</span>
+          <span class="badge ${status}">${escapeHtml(run.overall)}</span>
+        </div>
+      </li>
+    `;
+  }).join('');
+  return `
+    <section class="section">
+      <div class="section-head">
+        <h2>Recent runs</h2>
+        <a class="section-link" href="https://github.com/projectbluefin/testing-lab/actions" target="_blank" rel="noreferrer">all runs on GitHub Actions \u2192</a>
+      </div>
+      <p class="section-sub">Most recent workflow attempts and what each one was trying to do.</p>
+      <ol class="changelog">${rows}</ol>
+    </section>
+  `;
+}
+
+function suiteResultBaseName(cell) {
+  return cell.results_path.replace(/^results\//, '').replace(/\.json$/, '');
+}
+
+function buildTestSurface(surface, runs) {
+  if (!surface || !surface.length) {
+    return '<section class="section"><h2>Test surface</h2><div class="panel"><div class="loading">No test surface manifest.</div></div></section>';
+  }
+  const runByLabel = new Map();
+  for (const r of runs || []) {
+    if (r?.label && !runByLabel.has(r.label)) runByLabel.set(r.label, r);
+  }
+  const cellsHtml = surface.map((cell) => {
+    const screenshotUrl = cell.screenshot_path ? `./${cell.screenshot_path}` : null;
+    const resultsUrl = `./${cell.results_path}`;
+    const repoUrl = `https://github.com/projectbluefin/testing-lab/blob/main/docs/${cell.results_path}`;
+    const labelCandidates = [
+      `${cell.variant}:${cell.branch}`,
+      `${cell.variant}-${cell.branch}`,
+    ];
+    const matchingRun = labelCandidates.map((l) => runByLabel.get(l)).find(Boolean);
+    const runTone = matchingRun ? runStatusClass(matchingRun.overall) : 'pending';
+    const runText = matchingRun ? matchingRun.overall : 'no recent run';
+    const imgHtml = screenshotUrl
+      ? `<img class="surface-shot" src="${escapeHtml(screenshotUrl)}" alt="${escapeHtml(cell.variant)}/${escapeHtml(cell.suite)} latest capture" loading="lazy">`
+      : `<div class="surface-shot surface-shot-missing"><span>no capture published</span></div>`;
+    return `
+      <article class="surface-cell">
+        ${imgHtml}
+        <div class="surface-meta">
+          <div class="surface-key mono">${escapeHtml(cell.variant)}/<span class="muted">${escapeHtml(cell.branch)}</span>/<strong>${escapeHtml(cell.suite)}</strong></div>
+          <div class="surface-row">
+            <span class="badge ${runTone}">${escapeHtml(runText)}</span>
+            <a class="surface-link mono" href="${escapeHtml(resultsUrl)}" target="_blank" rel="noreferrer">results.json</a>
+            <a class="surface-link mono" href="${escapeHtml(repoUrl)}" target="_blank" rel="noreferrer">repo</a>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+  const withShot = surface.filter((c) => c.screenshot_path).length;
+  return `
+    <section class="section">
+      <div class="section-head">
+        <h2>Test surface</h2>
+        <span class="section-meta muted">${escapeHtml(surface.length)} expected (variant \u00d7 branch \u00d7 suite) \u00b7 <strong>${escapeHtml(withShot)}</strong> with screenshot \u00b7 <strong>${escapeHtml(surface.length - withShot)}</strong> missing</span>
+      </div>
+      <p class="section-sub">Every (variant \u00d7 branch \u00d7 suite) combination the factory promises to cover, and whether we have a fresh screenshot for it.</p>
+      <div class="surface-grid">${cellsHtml}</div>
+    </section>
+  `;
 }
 
 function render(copy, stats, history, telemetry) {
@@ -528,51 +782,10 @@ function render(copy, stats, history, telemetry) {
   const openBugs = Array.isArray(stats?.open_bugs) ? stats.open_bugs : [];
   const clusterNodes = stats?.factory?.cluster?.nodes || [];
   const coverage = stats?.test_coverage?.coverage_by_suite || {};
-  const latest = latestRun(runs);
   const summary = summarizeRuns(runs);
-  const historySeries = (history?.rollups?.length ? history.rollups : deriveHistory(runs)).slice(-7);
-  const throughputSeries = historySeries.map((entry) => entry.throughput || 0);
-  const reliabilitySeries = historySeries.map((entry) => entry.reliability || 0);
-  const speedSeries = historySeries.map((entry) => entry.speed_min || 0);
-  const pressureSeries = historySeries.map((entry) => entry.pressure || 0);
   const freshness = stats?._meta?.refreshed_at || stats?._meta?.generated;
-  const liveOk = stats?._meta?.live_snapshot_ok;
   const telemetrySnapshot = telemetry?.snapshot || {};
-  const suiteMetric = metricById(telemetry, 'suite_pass_rate_24h');
-  const queueMetric = metricById(telemetry, 'queue_pressure_now');
-  const scenarioMetric = metricById(telemetry, 'scenario_pass_rate_24h');
-  const unknownMetric = metricById(telemetry, 'unknown_station_ratio');
-  const stationStates = stats?.station_states || {};
-  const stationSource = stationStates.source_and_intent || {};
-  const stationAssemble = stationStates.assemble || {};
-  const stationVerify = stationStates.verify || {};
-  const stationTrust = stationStates.trust_and_ship || {};
-  const stationCards = [
-    {
-      title: copy.station_labels[0],
-      status: `${summary.total} runs in window`,
-      body: `Input source is ${stationSource.trigger || latest?.trigger || 'unknown'}; latest label ${latest?.label || 'unknown'}.`,
-      chip: { label: stationSource.status || 'unknown', tone: stationSource.status === 'unknown' ? 'warn' : 'run' },
-    },
-    {
-      title: copy.station_labels[1],
-      status: `${compactNumber(stats?.test_coverage?.scenarios_total || 0)} scenarios tracked`,
-      body: `Scenario pass rate ${metricValue(scenarioMetric, 'unknown')}; image coverage ${compactNumber(stats?.test_coverage?.images_with_results || 0)}.`,
-      chip: { label: stationAssemble.status || 'unknown', tone: stationAssemble.status === 'unknown' ? 'warn' : 'good' },
-    },
-    {
-      title: copy.station_labels[2],
-      status: `${summary.failed} failing`,
-      body: `Verification has ${summary.complete} complete runs and ${openBugs.length} linked bugs for triage.`,
-      chip: { label: stationVerify.status || (summary.failed ? 'failed' : 'published'), tone: summary.failed ? 'bad' : 'good' },
-    },
-    {
-      title: copy.station_labels[3],
-      status: `${metricValue(unknownMetric, 'unknown')} unknown-state ratio`,
-      body: `Telemetry snapshot is ${telemetrySnapshot.state || 'unknown'} with confidence labels and evidence links attached.`,
-      chip: { label: stationTrust.status || telemetrySnapshot.state || 'unknown', tone: telemetrySnapshot.state === 'fresh' ? 'good' : 'warn' },
-    },
-  ];
+  const surface = DATA.testSurface?.surface || [];
 
   root.innerHTML = `
     <header class="topbar">
@@ -585,147 +798,29 @@ function render(copy, stats, history, telemetry) {
       </div>
     </header>
 
-    <section class="hero">
-      <div class="hero-copy">
-        <span class="label">Mission brief</span>
-        <h2>${escapeHtml(copy.mission.headline)}</h2>
-        <p>${escapeHtml(copy.mission.body)}</p>
-        <div class="pill-row">
-          <span class="pill ${telemetrySnapshot.state === 'fresh' ? 'good' : 'warn'}"><strong>${telemetrySnapshot.state || (liveOk ? 'live' : 'unknown')}</strong> snapshot</span>
-          <span class="pill muted">refreshed ${escapeHtml(hoursAgo(freshness))}</span>
-          <span class="pill muted">${escapeHtml(summary.total)} recent runs</span>
-          <span class="pill muted">${escapeHtml(openBugs.length)} open bugs</span>
-        </div>
-      </div>
-      <aside class="hero-aside">
-        <span class="label">Current readout</span>
-        <div class="pill-row">
-          <span class="chip ${suiteMetric?.state === 'unknown' ? 'warn' : (summary.failed ? 'bad' : 'good')}">reliability <strong>${escapeHtml(metricValue(suiteMetric, 'unknown'))}</strong> <span class="mono">${suiteMetric ? `${suiteMetric.numerator}/${suiteMetric.denominator}` : 'unknown'}</span></span>
-          <span class="chip ${queueMetric?.state === 'unknown' ? 'warn' : (queueMetric?.value ? 'warn' : 'good')}">running <strong>${escapeHtml(queueMetric ? queueMetric.numerator : 'unknown')}</strong></span>
-          <span class="chip muted">median speed <strong>${escapeHtml(minutesLabel(summary.speed))}</strong></span>
-          <span class="chip muted">cluster RAM <strong>${escapeHtml(compactNumber(stats?.factory?.cluster?.total_ram_gb || 0))} GB</strong></span>
-        </div>
-        <div style="margin-top: 14px" class="meta">
-          <span>latest run: ${escapeHtml(latest?.id || 'none')}</span>
-          <span>${escapeHtml(latest?.label || 'n/a')}</span>
-          <span>${escapeHtml(formatTime(latest?.started_at))}</span>
-        </div>
-        <div class="label" style="margin-top: 14px">Cluster nodes</div>
-        <div class="pill-row">
-          ${clusterNodes.length ? clusterNodes.map((node) => `
-            <span class="pill ${node.status === 'ready' ? 'good' : 'bad'}">
-              <strong>${escapeHtml(node.name)}</strong>
-              ${escapeHtml(node.status)}
-              ${escapeHtml(node.role)}
-            </span>
-          `).join('') : '<span class="pill muted">no cluster snapshot</span>'}
-        </div>
-      </aside>
-    </section>
-    ${buildTourMap(stationCards)}
+    ${buildClusterNodesPanel(clusterNodes, summary, freshness, telemetrySnapshot, openBugs.length)}
 
-    <section class="section">
-      <div class="metric-grid">
-        ${buildMetricCard({
-          title: 'Speed to release',
-          value: minutesLabel(summary.speed),
-          subtext: 'Median duration of passed runs in the current window.',
-          spark: sparkBars(speedSeries.map((value) => value || 0)),
-          tone: 'good',
-        })}
-        ${buildMetricCard({
-          title: 'Throughput',
-          value: compactNumber(summary.total),
-          subtext: 'Runs surfaced in the live window.',
-          spark: sparkBars(throughputSeries),
-          tone: 'run',
-        })}
-        ${buildMetricCard({
-          title: 'Reliability',
-          value: metricValue(suiteMetric, 'unknown'),
-          subtext: suiteMetric
-            ? `${suiteMetric.numerator}/${suiteMetric.denominator} · confidence ${suiteMetric.confidence} · ${suiteMetric.window_hours}h`
-            : 'unknown · no telemetry evidence available',
-          spark: suiteMetric ? sparkBars(reliabilitySeries) : '<span class="loading">no evidence</span>',
-          tone: summary.failed ? 'warn' : 'good',
-        })}
-        ${buildMetricCard({
-          title: 'Queue pressure',
-          value: metricValue(queueMetric, 'unknown'),
-          subtext: queueMetric
-            ? `${queueMetric.numerator}/${queueMetric.denominator} · confidence ${queueMetric.confidence} · ${queueMetric.window_hours}h`
-            : 'unknown · no telemetry evidence available',
-          spark: queueMetric ? sparkBars(pressureSeries) : '<span class="loading">no evidence</span>',
-          tone: summary.running ? 'warn' : 'good',
-        })}
-      </div>
-    </section>
+    ${buildTrustWindowSection(DATA.derivedTrust)}
 
-    <section class="section">
-      <h2>Stations</h2>
-      <div class="station-grid">
-        ${stationCards.map(buildStation).join('')}
-      </div>
-    </section>
+    ${buildRecentRunsChangelog(runs)}
 
-    <section class="section">
-      <h2>Trust layer</h2>
-      <div class="trust-row">
-        ${copy.trust_labels.map((label, index) => `
-          <article class="trust-item">
-            <div class="title">
-              <h3>${escapeHtml(label)}</h3>
-              <span class="badge ${telemetrySnapshot.state === 'fresh' ? 'pass' : telemetrySnapshot.state === 'degraded' ? 'fail' : 'pending'}">${escapeHtml(telemetrySnapshot.state || 'unknown')}</span>
-            </div>
-            <div class="subtext">
-              ${index === 0 ? `Collector run: ${(telemetry?.lineage?.collector?.run_url ? `<a href="${escapeHtml(telemetry.lineage.collector.run_url)}" target="_blank" rel="noreferrer">source</a>` : 'unknown')}` :
-                index === 1 ? `Snapshot age: ${telemetrySnapshot.age_minutes == null ? 'unknown' : `${telemetrySnapshot.age_minutes}m`} (threshold ${telemetrySnapshot.threshold_minutes ?? 'unknown'}m).` :
-                index === 2 ? `${telemetry?.metrics?.length || 0} metrics expose numerator/denominator and formula.` :
-                index === 3 ? `${telemetry?.errors?.length || 0} telemetry errors reported in this snapshot.` :
-                `Last refresh was ${escapeHtml(hoursAgo(freshness))}.`}
-            </div>
-          </article>
-        `).join('')}
-      </div>
-    </section>
+    ${buildTestSurface(surface, runs)}
+
+    ${buildPromotionTimeline(runs)}
 
     ${buildTelemetryEvidence(telemetry)}
-    ${buildPromotionTimeline(runs)}
-    ${buildLineagePanel(telemetry)}
-
-    <section class="split section">
-      <article class="panel">
-        <h2>Recent runs</h2>
-        <div class="run-grid">
-          ${runs.slice(0, 8).map(buildRun).join('')}
-        </div>
-      </article>
-      <article class="panel">
-        <h2>Open bugs</h2>
-        <div class="bug-grid">
-          ${openBugs.slice(0, 8).map(buildBug).join('')}
-        </div>
-      </article>
-    </section>
 
     <section class="section">
-      <h2>Coverage</h2>
+      <h2>Coverage by suite</h2>
       <div class="panel">
         ${buildCoverageTable(coverage)}
       </div>
     </section>
 
-    ${buildTrustWindowSection(DATA.derivedTrust)}
-
-    <section class="section">
-      <h2>Screenshots</h2>
-      <div class="shot-grid">
-        ${copy.screenshots.map(buildScreenshot).join('')}
-      </div>
-    </section>
+    ${buildLineagePanel(telemetry)}
 
     <div class="footer">
-      Snapshot generated ${escapeHtml(formatTime(stats?._meta?.generated))} · refreshed ${escapeHtml(formatTime(stats?._meta?.refreshed_at))} · ${escapeHtml(copy.station_labels.join(' / '))}
+      Snapshot generated ${escapeHtml(formatTime(stats?._meta?.generated))} · refreshed ${escapeHtml(formatTime(stats?._meta?.refreshed_at))} · source: <a href="https://github.com/projectbluefin/testing-lab/blob/main/docs/" target="_blank" rel="noreferrer">repo</a>
     </div>
   `;
   attachTwprTabs(root);
@@ -744,18 +839,20 @@ function attachTwprTabs(root) {
 }
 
 async function main() {
-  const [copy, stats, history, telemetry, derivedTrust] = await Promise.all([
+  const [copy, stats, history, telemetry, derivedTrust, testSurface] = await Promise.all([
     loadJson('./data/factory-copy.json', DEFAULT_COPY),
     loadJson('./data/factory-stats.json', { recent_runs: [], open_bugs: [], _meta: {}, test_coverage: {}, factory: { cluster: { nodes: [], total_ram_gb: 0 } } }),
     loadJson('./data/factory-history.json', { rollups: [] }),
     loadJson('./data/factory-telemetry.json', { snapshot: {}, metrics: [], coverage: {}, lineage: {}, errors: [] }),
     loadJson('./data/derived/trust_window_pass_rate.json', null),
+    loadJson('./data/test-surface.json', { surface: [] }),
   ]);
   DATA.copy = copy;
   DATA.stats = stats;
   DATA.history = history;
   DATA.telemetry = telemetry;
   DATA.derivedTrust = derivedTrust;
+  DATA.testSurface = testSurface;
   render(copy, stats, history, telemetry);
 }
 
