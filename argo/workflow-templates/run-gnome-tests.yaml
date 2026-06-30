@@ -332,26 +332,23 @@ spec:
         ${SSH} "date --iso-8601=seconds > /tmp/results/test-start-time.txt" || true
 
         BEHAVE_RC=0
-        if [[ "${SUITE}" == "system" ]]; then
-          ${SSH} "
-            export PATH=\$HOME/.local/bin:\$PATH
-            export PYTHONPATH=/tmp/bluefin-tests
-            python3 -m behave /tmp/bluefin-tests/${REMOTE_SUITE}/features/ --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG}
-          " || BEHAVE_RC=$?
-        elif [[ "${SUITE}" == "common" ]]; then
-          # common suite is SSH-driven from the runner container (no AT-SPI/display).
+        if [[ "${SUITE}" == "common" || "${SUITE}" == "system" ]]; then
+          # common/system suites are SSH-driven from the runner container (no AT-SPI/display).
           # It reads VM_IP, VM_USER, and SSH_KEY from the environment, which are
-          # available here but NOT inside the VM. Run behave from this container
-          # so it can reach the test SSH key at ${SSH_KEY}.
+          # available here but NOT inside the VM.
           if ! python3 -c 'import behave' 2>/dev/null; then
             python3 -m pip --version &>/dev/null || python3 -m ensurepip --user 2>&1 | tail -2 || true
             python3 -m pip install --quiet behave 2>&1 | tail -3
+          fi
+          SUITE_FEATURE_DIR="common"
+          if [[ "${SUITE}" == "system" ]]; then
+            SUITE_FEATURE_DIR="lifecycle"
           fi
           export VM_IP="${VM_IP}"
           export VM_USER="${VM_USER}"
           export SSH_KEY="${SSH_KEY}"
           PYTHONPATH=/workspace/bluefin-test-suite \
-          python3 -m behave /workspace/bluefin-test-suite/tests/common/features/ \
+          python3 -m behave /workspace/bluefin-test-suite/tests/${SUITE_FEATURE_DIR}/features/ \
             --format json.pretty --outfile /tmp/results/results.json --no-capture ${TAGS_ARG} || BEHAVE_RC=$?
         else
           # Write a runner script to the VM to avoid shell-quoting issues
