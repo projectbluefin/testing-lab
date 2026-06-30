@@ -6,7 +6,19 @@ import { serializeJsonScript } from '../lib/json-script';
 const baseUrl = import.meta.env.BASE_URL;
 const pageModel = loadHomebrewPageModel(`${process.cwd()}/docs/data/homebrew-ecosystem.json`);
 
-const { dataset, summaryMetrics, summaryMetricMap, taps, rows, availableRows, unavailableRows, chartData } = pageModel;
+const {
+  dataset,
+  summaryMetrics,
+  summaryMetricMap,
+  taps,
+  rows,
+  availableRows,
+  unavailableRows,
+  packageLeaderboard,
+  tapDensityRows,
+  tapDensitySummary,
+  chartData,
+} = pageModel;
 
 const serializedPageData = serializeJsonScript(chartData);
 
@@ -100,7 +112,7 @@ const formatUtc = (value: string | null) =>
       </ul>
       <p class="callout-note">
         This page reads repo-owned migrated Homebrew artifacts committed under <code>docs/data/</code>.
-        Bluefin-family lanes reuse the transplanted Brewfile package totals, higher-density lane markers stay visible,
+        Mapped tap lanes reuse transplanted Brewfile package totals, higher-density lane markers stay visible,
         and unmatched lanes remain explicitly unavailable.
       </p>
     </article>
@@ -116,6 +128,130 @@ const formatUtc = (value: string | null) =>
         repo-owned artifact from formulae.brew.sh or upstream tap repos.
       </p>
       <div id="homebrew-lanes-chart" class="chart-surface" role="img" aria-label="Homebrew lane coverage status chart"></div>
+    </article>
+  </section>
+
+  <section class="detail-grid">
+    <article class="status-card">
+      <p class="status-card__eyebrow">Package-level analytics</p>
+      <h2>Package leaderboard</h2>
+      <p>
+        Dense package-level analytics are grouped from Homebrew package entries and sorted by installs.
+        Lanes with missing analytics remain visible in the density table below.
+      </p>
+      {packageLeaderboard.length === 0 ? (
+        <p class="table-note">
+          Package leaderboard unavailable. No package-level Homebrew analytics are published in the current dataset.
+        </p>
+      ) : (
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Package</th>
+                <th scope="col">Tap</th>
+                <th scope="col">Installs (90d)</th>
+                <th scope="col">Downloads</th>
+                <th scope="col">Status</th>
+                <th scope="col">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {packageLeaderboard.map((pkg) => (
+                <tr>
+                  <th scope="row">{pkg.package_name}</th>
+                  <td>
+                    {pkg.tap_url ? (
+                      <a href={pkg.tap_url}>{pkg.tap_name ?? pkg.tap_url}</a>
+                    ) : pkg.tap_name ? (
+                      pkg.tap_name
+                    ) : (
+                      <span class="table-note">Unavailable</span>
+                    )}
+                  </td>
+                  <td>{pkg.install_count !== null ? pkg.install_count.toLocaleString() : <span class="table-note">Unavailable</span>}</td>
+                  <td>{pkg.download_count !== null ? pkg.download_count.toLocaleString() : <span class="table-note">Unavailable</span>}</td>
+                  <td>
+                    <span class:list={['pill', pkg.state === 'available' ? 'pill--pass' : 'pill--missing']}>
+                      {pkg.state}
+                    </span>
+                    {pkg.state !== 'available' && pkg.state_reason && <p class="table-note">{pkg.state_reason}</p>}
+                  </td>
+                  <td><a href={pkg.source_url}>Source</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+
+    <article class="status-card">
+      <p class="status-card__eyebrow">Tap density across tracked lanes</p>
+      <h2>Tap density across tracked lanes</h2>
+      <dl class="status-card__meta">
+        <div>
+          <dt>Lanes with package density</dt>
+          <dd>{tapDensitySummary.lanesWithPackageDensity}</dd>
+        </div>
+        <div>
+          <dt>Lanes awaiting package density</dt>
+          <dd>{tapDensitySummary.lanesAwaitingPackageDensity}</dd>
+        </div>
+        <div>
+          <dt>Packages in tap scope</dt>
+          <dd>{tapDensitySummary.totalPackagesInScope}</dd>
+        </div>
+        <div>
+          <dt>Distinct taps with packages</dt>
+          <dd>{tapDensitySummary.distinctTapsWithPackages}</dd>
+        </div>
+        <div>
+          <dt>Average packages per covered lane</dt>
+          <dd>{tapDensitySummary.averagePackagesPerLane}</dd>
+        </div>
+      </dl>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Lane</th>
+              <th scope="col">Tap</th>
+              <th scope="col">Package count</th>
+              <th scope="col">Lane installs</th>
+              <th scope="col">Lane downloads</th>
+              <th scope="col">Status</th>
+              <th scope="col">Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tapDensityRows.map((lane) => (
+              <tr>
+                <th scope="row">{lane.lane_label}</th>
+                <td>
+                  {lane.tap_url ? (
+                    <a href={lane.tap_url}>{lane.tap_name ?? lane.tap_url}</a>
+                  ) : lane.tap_name ? (
+                    lane.tap_name
+                  ) : (
+                    <span class="table-note">Unavailable</span>
+                  )}
+                </td>
+                <td>{lane.package_count !== null ? lane.package_count.toLocaleString() : <span class="table-note">Unavailable</span>}</td>
+                <td>{lane.install_count !== null ? lane.install_count.toLocaleString() : <span class="table-note">Unavailable</span>}</td>
+                <td>{lane.download_count !== null ? lane.download_count.toLocaleString() : <span class="table-note">Unavailable</span>}</td>
+                <td>
+                  <span class:list={['pill', lane.state === 'available' ? 'pill--pass' : 'pill--missing']}>
+                    {lane.state}
+                  </span>
+                  {lane.state !== 'available' && lane.state_reason && <p class="table-note">{lane.state_reason}</p>}
+                </td>
+                <td><a href={lane.source_url}>Source</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </article>
   </section>
 

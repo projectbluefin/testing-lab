@@ -147,8 +147,8 @@ def test_homebrew_ecosystem_derives_all_tracked_lanes():
 
     metrics = {m['id']: m for m in dataset['summary_metrics']}
     assert metrics['tracked_image_lanes']['value'] == 10
-    assert metrics['lanes_with_brew_data']['value'] == 4
-    assert metrics['lanes_awaiting_brew_data']['value'] == 6
+    assert metrics['lanes_with_brew_data']['value'] == 6
+    assert metrics['lanes_awaiting_brew_data']['value'] == 4
 
 
 def test_homebrew_ecosystem_non_bluefin_rows_are_unavailable_without_brew_data():
@@ -227,11 +227,13 @@ def test_homebrew_ecosystem_exposes_transplanted_tap_catalog():
 
     assert 'bluefin/brewfile' in taps
     assert taps['bluefin/brewfile']['url'] == 'https://github.com/projectbluefin/common'
-    assert taps['bluefin/brewfile']['package_count'] == 3
+    assert taps['bluefin/brewfile']['package_count'] == 115
     assert taps['bluefin/brewfile']['variant_scope'] == ['bluefin', 'bluefin-lts']
     assert taps['bluefin/brewfile']['top_packages'][0]['name'] == 'gh'
-    assert metrics['lanes_with_brew_data']['value'] == 4
-    assert metrics['lanes_awaiting_brew_data']['value'] == 6
+    assert 'bazzite/brewfile' in taps
+    assert taps['bazzite/brewfile']['package_count'] == 20
+    assert metrics['lanes_with_brew_data']['value'] == 6
+    assert metrics['lanes_awaiting_brew_data']['value'] == 4
 
 
 def test_homebrew_ecosystem_includes_package_density_structures():
@@ -243,9 +245,9 @@ def test_homebrew_ecosystem_includes_package_density_structures():
     assert dataset['package_leaderboard'], 'Expected package leaderboard entries'
     first = dataset['package_leaderboard'][0]
     assert first['tap_name'] == 'bluefin/brewfile'
-    assert first['package_count'] == 3
-    assert first['install_count'] == 1676399
-    assert first['download_count'] == 623884
+    assert first['package_count'] == 115
+    assert first['install_count'] == 4207114
+    assert first['download_count'] == 1566064
 
 
 def test_homebrew_ecosystem_maps_multiple_taps_by_variant_scope(monkeypatch):

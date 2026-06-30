@@ -80,8 +80,39 @@ test('homebrew page renders summary metrics, lane details, explicit unavailable 
   );
   assert.match(
     homebrewPage,
-    /3-package subset/i,
-    'homebrew page discloses that values come from a 3-package subset reused across branches',
+    /115-package tap/i,
+    'homebrew page discloses that transplanted values include full tap scope reused across branches',
+  );
+
+  assert.match(
+    homebrewPage,
+    /Package leaderboard/i,
+    'homebrew page renders package leaderboard section',
+  );
+  assert.match(
+    homebrewPage,
+    /claude-code|gemini-cli|gh/i,
+    'homebrew page renders package-level leaderboard entries',
+  );
+  assert.match(
+    homebrewPage,
+    /bazzite\/brewfile/i,
+    'homebrew page renders imported bazzite tap coverage',
+  );
+  assert.match(
+    homebrewPage,
+    /Tap density across tracked lanes/i,
+    'homebrew page renders tap density section',
+  );
+  assert.match(
+    homebrewPage,
+    /Packages in tap scope/i,
+    'homebrew page renders richer tap density metrics',
+  );
+  assert.match(
+    homebrewPage,
+    /Unavailable<\/span>/i,
+    'homebrew page keeps explicit unavailable states visible in density lanes',
   );
 });
 

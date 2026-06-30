@@ -1,16 +1,1380 @@
 {
   "generated_at": "2026-04-07T20:45:10Z",
-  "source_url": "https://github.com/castrojo/bootc-ecosystem/blob/main/src/data/brewfile-stats.json",
+  "source_url": "https://raw.githubusercontent.com/castrojo/bootc-ecosystem/main/src/data/brewfile-stats.json",
   "taps": [
     {
       "name": "bluefin/brewfile",
       "url": "https://github.com/projectbluefin/common",
-      "description": "Bluefin family Brewfile package set transplanted from bootc-ecosystem source data.",
-      "variant_scope": ["bluefin", "bluefin-lts"],
+      "growth_pct": null,
       "packages": [
-        { "name": "gh", "downloads": 333799, "installs_90d": 878576 },
-        { "name": "claude-code", "downloads": 173016, "installs_90d": 443649 },
-        { "name": "gemini-cli", "downloads": 117069, "installs_90d": 354174 }
+        {
+          "name": "gh",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 333799,
+          "installs_90d": 878576,
+          "installs_365d": 2296266,
+          "velocity7d": 0
+        },
+        {
+          "name": "claude-code",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 173016,
+          "installs_90d": 443649,
+          "installs_365d": 665945,
+          "velocity7d": 0
+        },
+        {
+          "name": "gemini-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 117069,
+          "installs_90d": 354174,
+          "installs_365d": 654707,
+          "velocity7d": 0
+        },
+        {
+          "name": "mise",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 88621,
+          "installs_90d": 229840,
+          "installs_365d": 622710,
+          "velocity7d": 0
+        },
+        {
+          "name": "codex",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 75012,
+          "installs_90d": 197247,
+          "installs_365d": 308934,
+          "velocity7d": 0
+        },
+        {
+          "name": "yq",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 58022,
+          "installs_90d": 163289,
+          "installs_365d": 562191,
+          "velocity7d": 0
+        },
+        {
+          "name": "ripgrep",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 55762,
+          "installs_90d": 157485,
+          "installs_365d": 405802,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubectl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 53464,
+          "installs_90d": 151092,
+          "installs_365d": 592676,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubernetes-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 53464,
+          "installs_90d": 151092,
+          "installs_365d": 592676,
+          "velocity7d": 0
+        },
+        {
+          "name": "nvim",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 52105,
+          "installs_90d": 128472,
+          "installs_365d": 527597,
+          "velocity7d": 0
+        },
+        {
+          "name": "helm",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 47345,
+          "installs_90d": 147599,
+          "installs_365d": 553621,
+          "velocity7d": 0
+        },
+        {
+          "name": "fd",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 45944,
+          "installs_90d": 83197,
+          "installs_365d": 183622,
+          "velocity7d": 0
+        },
+        {
+          "name": "copilot-cli",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 37414,
+          "installs_90d": 89443,
+          "installs_365d": 99457,
+          "velocity7d": 0
+        },
+        {
+          "name": "swiftlint",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 28715,
+          "installs_90d": 93986,
+          "installs_365d": 431423,
+          "velocity7d": 0
+        },
+        {
+          "name": "atuin",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 28291,
+          "installs_90d": 53182,
+          "installs_365d": 109842,
+          "velocity7d": 0
+        },
+        {
+          "name": "lima",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 19777,
+          "installs_90d": 40728,
+          "installs_365d": 154157,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-jetbrains-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17836,
+          "installs_90d": 41137,
+          "installs_365d": 86197,
+          "velocity7d": 0
+        },
+        {
+          "name": "starship",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17718,
+          "installs_90d": 50297,
+          "installs_365d": 178845,
+          "velocity7d": 0
+        },
+        {
+          "name": "zoxide",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17583,
+          "installs_90d": 55551,
+          "installs_365d": 129105,
+          "velocity7d": 0
+        },
+        {
+          "name": "bat",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17105,
+          "installs_90d": 50361,
+          "installs_365d": 194599,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubectx",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 14599,
+          "installs_90d": 20749,
+          "installs_365d": 51131,
+          "velocity7d": 0
+        },
+        {
+          "name": "argocd",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 14377,
+          "installs_90d": 42246,
+          "installs_365d": 179380,
+          "velocity7d": 0
+        },
+        {
+          "name": "llmfit",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 13598,
+          "installs_90d": 19073,
+          "installs_365d": 19074,
+          "velocity7d": 0
+        },
+        {
+          "name": "eza",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 13038,
+          "installs_90d": 34652,
+          "installs_365d": 228579,
+          "velocity7d": 0
+        },
+        {
+          "name": "k9s",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 12910,
+          "installs_90d": 48692,
+          "installs_365d": 233872,
+          "velocity7d": 0
+        },
+        {
+          "name": "grpc",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 12864,
+          "installs_90d": 39157,
+          "installs_365d": 167301,
+          "velocity7d": 0
+        },
+        {
+          "name": "k3d",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 11706,
+          "installs_90d": 31192,
+          "installs_365d": 82004,
+          "velocity7d": 0
+        },
+        {
+          "name": "direnv",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 10952,
+          "installs_90d": 35282,
+          "installs_365d": 158360,
+          "velocity7d": 0
+        },
+        {
+          "name": "whisper-cpp",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 10427,
+          "installs_90d": 22949,
+          "installs_365d": 32874,
+          "velocity7d": 0
+        },
+        {
+          "name": "chezmoi",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 9935,
+          "installs_90d": 33683,
+          "installs_365d": 110758,
+          "velocity7d": 0
+        },
+        {
+          "name": "uutils-coreutils",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 8930,
+          "installs_90d": 21873,
+          "installs_365d": 100250,
+          "velocity7d": 0
+        },
+        {
+          "name": "qwen-code",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 8477,
+          "installs_90d": 22304,
+          "installs_365d": 38801,
+          "velocity7d": 0
+        },
+        {
+          "name": "swiftformat",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 7159,
+          "installs_90d": 23152,
+          "installs_365d": 107956,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-fira-code-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 6112,
+          "installs_90d": 16953,
+          "installs_365d": 52821,
+          "velocity7d": 0
+        },
+        {
+          "name": "minikube",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 5530,
+          "installs_90d": 25455,
+          "installs_365d": 96896,
+          "velocity7d": 0
+        },
+        {
+          "name": "kind",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 5246,
+          "installs_90d": 15551,
+          "installs_365d": 71343,
+          "velocity7d": 0
+        },
+        {
+          "name": "syft",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2822,
+          "installs_90d": 10019,
+          "installs_365d": 28255,
+          "velocity7d": 0
+        },
+        {
+          "name": "grype",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2658,
+          "installs_90d": 9651,
+          "installs_365d": 29793,
+          "velocity7d": 0
+        },
+        {
+          "name": "ugrep",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2643,
+          "installs_90d": 8081,
+          "installs_365d": 29812,
+          "velocity7d": 0
+        },
+        {
+          "name": "block-goose-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2415,
+          "installs_90d": 12260,
+          "installs_365d": 23595,
+          "velocity7d": 0
+        },
+        {
+          "name": "llm",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2262,
+          "installs_90d": 4115,
+          "installs_365d": 16112,
+          "velocity7d": 0
+        },
+        {
+          "name": "tealdeer",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2011,
+          "installs_90d": 6222,
+          "installs_365d": 29972,
+          "velocity7d": 0
+        },
+        {
+          "name": "helix",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1953,
+          "installs_90d": 5995,
+          "installs_365d": 33874,
+          "velocity7d": 0
+        },
+        {
+          "name": "mistral-vibe",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1881,
+          "installs_90d": 3553,
+          "installs_365d": 4380,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-source-code-pro",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1866,
+          "installs_90d": 6014,
+          "installs_365d": 15895,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-blex-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1831,
+          "installs_90d": 5999,
+          "installs_365d": 14135,
+          "velocity7d": 0
+        },
+        {
+          "name": "istioctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1736,
+          "installs_90d": 5630,
+          "installs_365d": 26356,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-0xproto-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1733,
+          "installs_90d": 4990,
+          "installs_365d": 10691,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-sauce-code-pro-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1731,
+          "installs_90d": 5661,
+          "installs_365d": 15126,
+          "velocity7d": 0
+        },
+        {
+          "name": "devcontainer",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1730,
+          "installs_90d": 6068,
+          "installs_365d": 10988,
+          "velocity7d": 0
+        },
+        {
+          "name": "opa",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1595,
+          "installs_90d": 4543,
+          "installs_365d": 13659,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-caskaydia-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1581,
+          "installs_90d": 5170,
+          "installs_365d": 13077,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-droid-sans-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1512,
+          "installs_90d": 4994,
+          "installs_365d": 12344,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-ubuntu-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1511,
+          "installs_90d": 4907,
+          "installs_365d": 12246,
+          "velocity7d": 0
+        },
+        {
+          "name": "micro",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1488,
+          "installs_90d": 5245,
+          "installs_365d": 14018,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-go-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1461,
+          "installs_90d": 4949,
+          "installs_365d": 12237,
+          "velocity7d": 0
+        },
+        {
+          "name": "font-comic-shanns-mono-nerd-font",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1460,
+          "installs_90d": 4250,
+          "installs_365d": 7661,
+          "velocity7d": 0
+        },
+        {
+          "name": "argo",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1440,
+          "installs_90d": 4197,
+          "installs_365d": 11777,
+          "velocity7d": 0
+        },
+        {
+          "name": "trash-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1389,
+          "installs_90d": 4457,
+          "installs_365d": 17402,
+          "velocity7d": 0
+        },
+        {
+          "name": "dysk",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1372,
+          "installs_90d": 4699,
+          "installs_365d": 33171,
+          "velocity7d": 0
+        },
+        {
+          "name": "kimi-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1275,
+          "installs_90d": 3706,
+          "installs_365d": 5053,
+          "velocity7d": 0
+        },
+        {
+          "name": "prometheus",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1249,
+          "installs_90d": 3742,
+          "installs_365d": 16816,
+          "velocity7d": 0
+        },
+        {
+          "name": "etcd",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1217,
+          "installs_90d": 2698,
+          "installs_365d": 11344,
+          "velocity7d": 0
+        },
+        {
+          "name": "bash-preexec",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1162,
+          "installs_90d": 3895,
+          "installs_365d": 15376,
+          "velocity7d": 0
+        },
+        {
+          "name": "podman-tui",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1078,
+          "installs_90d": 1337,
+          "installs_365d": 3446,
+          "velocity7d": 0
+        },
+        {
+          "name": "cdk8s",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1046,
+          "installs_90d": 3361,
+          "installs_365d": 22982,
+          "velocity7d": 0
+        },
+        {
+          "name": "operator-sdk",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1008,
+          "installs_90d": 1542,
+          "installs_365d": 6569,
+          "velocity7d": 0
+        },
+        {
+          "name": "swiftly",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 991,
+          "installs_90d": 2136,
+          "installs_365d": 3494,
+          "velocity7d": 0
+        },
+        {
+          "name": "nats-server",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 909,
+          "installs_90d": 1878,
+          "installs_365d": 8257,
+          "velocity7d": 0
+        },
+        {
+          "name": "cilium-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 871,
+          "installs_90d": 4558,
+          "installs_365d": 15057,
+          "velocity7d": 0
+        },
+        {
+          "name": "ramalama",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 735,
+          "installs_90d": 2133,
+          "installs_365d": 7581,
+          "velocity7d": 0
+        },
+        {
+          "name": "aichat",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 574,
+          "installs_90d": 1631,
+          "installs_365d": 7149,
+          "velocity7d": 0
+        },
+        {
+          "name": "dagger",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 564,
+          "installs_90d": 2164,
+          "installs_365d": 8713,
+          "velocity7d": 0
+        },
+        {
+          "name": "virtctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 490,
+          "installs_90d": 695,
+          "installs_365d": 2396,
+          "velocity7d": 0
+        },
+        {
+          "name": "envoy",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 466,
+          "installs_90d": 1534,
+          "installs_365d": 5792,
+          "velocity7d": 0
+        },
+        {
+          "name": "flux",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 430,
+          "installs_90d": 1010,
+          "installs_365d": 12515,
+          "velocity7d": 0
+        },
+        {
+          "name": "cmctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 410,
+          "installs_90d": 1854,
+          "installs_365d": 7810,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubescape",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 375,
+          "installs_90d": 1425,
+          "installs_365d": 4797,
+          "velocity7d": 0
+        },
+        {
+          "name": "k8sgpt",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 364,
+          "installs_90d": 1061,
+          "installs_365d": 5309,
+          "velocity7d": 0
+        },
+        {
+          "name": "nerdctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 280,
+          "installs_90d": 827,
+          "installs_365d": 3016,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubectl-cnpg",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 251,
+          "installs_90d": 750,
+          "installs_365d": 2463,
+          "velocity7d": 0
+        },
+        {
+          "name": "devspace",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 239,
+          "installs_90d": 833,
+          "installs_365d": 3084,
+          "velocity7d": 0
+        },
+        {
+          "name": "kyverno",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 232,
+          "installs_90d": 1432,
+          "installs_365d": 4898,
+          "velocity7d": 0
+        },
+        {
+          "name": "k3sup",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 205,
+          "installs_90d": 617,
+          "installs_365d": 2367,
+          "velocity7d": 0
+        },
+        {
+          "name": "mesheryctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 169,
+          "installs_90d": 380,
+          "installs_365d": 2373,
+          "velocity7d": 0
+        },
+        {
+          "name": "crossplane",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 162,
+          "installs_90d": 658,
+          "installs_365d": 2153,
+          "velocity7d": 0
+        },
+        {
+          "name": "openfga",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 156,
+          "installs_90d": 343,
+          "installs_365d": 1217,
+          "velocity7d": 0
+        },
+        {
+          "name": "opentelemetry-cpp",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 135,
+          "installs_90d": 396,
+          "installs_365d": 1380,
+          "velocity7d": 0
+        },
+        {
+          "name": "atlantis",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 124,
+          "installs_90d": 298,
+          "installs_365d": 1065,
+          "velocity7d": 0
+        },
+        {
+          "name": "ko",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 120,
+          "installs_90d": 480,
+          "installs_365d": 3733,
+          "velocity7d": 0
+        },
+        {
+          "name": "harbor-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 89,
+          "installs_90d": 219,
+          "installs_365d": 301,
+          "velocity7d": 0
+        },
+        {
+          "name": "kubevela",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 78,
+          "installs_90d": 195,
+          "installs_365d": 727,
+          "velocity7d": 0
+        },
+        {
+          "name": "falco",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 78,
+          "installs_90d": 200,
+          "installs_365d": 1361,
+          "velocity7d": 0
+        },
+        {
+          "name": "coredns",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 72,
+          "installs_90d": 362,
+          "installs_365d": 1232,
+          "velocity7d": 0
+        },
+        {
+          "name": "linkerd",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 55,
+          "installs_90d": 164,
+          "installs_365d": 752,
+          "velocity7d": 0
+        },
+        {
+          "name": "thanos",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 52,
+          "installs_90d": 183,
+          "installs_365d": 622,
+          "velocity7d": 0
+        },
+        {
+          "name": "kn",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 44,
+          "installs_90d": 226,
+          "installs_365d": 1397,
+          "velocity7d": 0
+        },
+        {
+          "name": "cri-tools",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 42,
+          "installs_90d": 149,
+          "installs_365d": 968,
+          "velocity7d": 0
+        },
+        {
+          "name": "kumactl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 39,
+          "installs_90d": 145,
+          "installs_365d": 908,
+          "velocity7d": 0
+        },
+        {
+          "name": "c7n",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 37,
+          "installs_90d": 140,
+          "installs_365d": 657,
+          "velocity7d": 0
+        },
+        {
+          "name": "kwctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 35,
+          "installs_90d": 74,
+          "installs_365d": 436,
+          "velocity7d": 0
+        },
+        {
+          "name": "wasmedge",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 31,
+          "installs_90d": 155,
+          "installs_365d": 808,
+          "velocity7d": 0
+        },
+        {
+          "name": "karmadactl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 28,
+          "installs_90d": 116,
+          "installs_365d": 419,
+          "velocity7d": 0
+        },
+        {
+          "name": "notation",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 21,
+          "installs_90d": 67,
+          "installs_365d": 274,
+          "velocity7d": 0
+        },
+        {
+          "name": "porter",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 20,
+          "installs_90d": 80,
+          "installs_365d": 262,
+          "velocity7d": 0
+        },
+        {
+          "name": "cortex",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 19,
+          "installs_90d": 75,
+          "installs_365d": 232,
+          "velocity7d": 0
+        },
+        {
+          "name": "vitess",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 16,
+          "installs_90d": 100,
+          "installs_365d": 328,
+          "velocity7d": 0
+        },
+        {
+          "name": "litmusctl",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 16,
+          "installs_90d": 59,
+          "installs_365d": 233,
+          "velocity7d": 0
+        },
+        {
+          "name": "tremor-runtime",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2,
+          "installs_90d": 2,
+          "installs_365d": 9,
+          "velocity7d": 0
+        },
+        {
+          "name": "bluefin-wallpapers",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        },
+        {
+          "name": "bluefin-wallpapers-extra",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        },
+        {
+          "name": "tiup",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        },
+        {
+          "name": "bazzite-wallpapers",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        },
+        {
+          "name": "aurora-wallpapers",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        },
+        {
+          "name": "framework-wallpapers",
+          "type": "cask",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 0,
+          "installs_90d": 0,
+          "installs_365d": 0,
+          "velocity7d": 0
+        }
+      ],
+      "updated_at": "2026-04-07T20:45:10Z",
+      "description": "Bluefin family Brewfile package set transplanted from bootc-ecosystem source data.",
+      "variant_scope": [
+        "bluefin",
+        "bluefin-lts"
+      ]
+    },
+    {
+      "name": "bazzite/brewfile",
+      "url": "https://github.com/ublue-os/bazzite",
+      "growth_pct": null,
+      "packages": [
+        {
+          "name": "gh",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 333799,
+          "installs_90d": 878576,
+          "installs_365d": 2296266,
+          "velocity7d": 0
+        },
+        {
+          "name": "yq",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 58022,
+          "installs_90d": 163289,
+          "installs_365d": 562191,
+          "velocity7d": 0
+        },
+        {
+          "name": "rg",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 55762,
+          "installs_90d": 157485,
+          "installs_365d": 405802,
+          "velocity7d": 0
+        },
+        {
+          "name": "fd",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 45944,
+          "installs_90d": 83197,
+          "installs_365d": 183622,
+          "velocity7d": 0
+        },
+        {
+          "name": "atuin",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 28291,
+          "installs_90d": 53182,
+          "installs_365d": 109842,
+          "velocity7d": 0
+        },
+        {
+          "name": "shellcheck",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 25415,
+          "installs_90d": 67948,
+          "installs_365d": 188665,
+          "velocity7d": 0
+        },
+        {
+          "name": "glab",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 24503,
+          "installs_90d": 81322,
+          "installs_365d": 218664,
+          "velocity7d": 0
+        },
+        {
+          "name": "starship",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17718,
+          "installs_90d": 50297,
+          "installs_365d": 178845,
+          "velocity7d": 0
+        },
+        {
+          "name": "zoxide",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17583,
+          "installs_90d": 55551,
+          "installs_365d": 129105,
+          "velocity7d": 0
+        },
+        {
+          "name": "bat",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 17105,
+          "installs_90d": 50361,
+          "installs_365d": 194599,
+          "velocity7d": 0
+        },
+        {
+          "name": "eza",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 13038,
+          "installs_90d": 34652,
+          "installs_365d": 228579,
+          "velocity7d": 0
+        },
+        {
+          "name": "direnv",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 10952,
+          "installs_90d": 35282,
+          "installs_365d": 158360,
+          "velocity7d": 0
+        },
+        {
+          "name": "chezmoi",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 9935,
+          "installs_90d": 33683,
+          "installs_365d": 110758,
+          "velocity7d": 0
+        },
+        {
+          "name": "television",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 4873,
+          "installs_90d": 19070,
+          "installs_365d": 63946,
+          "velocity7d": 0
+        },
+        {
+          "name": "stress-ng",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 3407,
+          "installs_90d": 8530,
+          "installs_365d": 29369,
+          "velocity7d": 0
+        },
+        {
+          "name": "ugrep",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2643,
+          "installs_90d": 8081,
+          "installs_365d": 29812,
+          "velocity7d": 0
+        },
+        {
+          "name": "tealdeer",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 2011,
+          "installs_90d": 6222,
+          "installs_365d": 29972,
+          "velocity7d": 0
+        },
+        {
+          "name": "trash-cli",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1389,
+          "installs_90d": 4457,
+          "installs_365d": 17402,
+          "velocity7d": 0
+        },
+        {
+          "name": "dysk",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1372,
+          "installs_90d": 4699,
+          "installs_365d": 33171,
+          "velocity7d": 0
+        },
+        {
+          "name": "bash-preexec",
+          "type": "formula",
+          "is_stale": false,
+          "freshness_known": false,
+          "downloads": 1162,
+          "installs_90d": 3895,
+          "installs_365d": 15376,
+          "velocity7d": 0
+        }
+      ],
+      "updated_at": "2026-04-07T20:45:10Z",
+      "description": "Bazzite Brewfile package set transplanted from bootc-ecosystem source data.",
+      "variant_scope": [
+        "bazzite"
       ]
     }
   ]
