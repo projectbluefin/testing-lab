@@ -379,3 +379,67 @@ def test_adoption_metrics_names_authoritative_upstream_sources():
     assert 'GHCR' in metrics['lanes_with_pull_data']['derivation'] or \
            'registry' in metrics['lanes_with_pull_data']['derivation'].lower()
     assert 'countme' in metrics['lanes_with_countme_data']['derivation'].lower()
+
+
+# --- Provenance fix tests (TDD: added to drive the source_url fix) ---
+
+REPO_HB_MIGRATED_URL = (
+    'https://github.com/projectbluefin/testing-lab/blob/main/'
+    'docs/data/homebrew-package-stats-migrated.json'
+)
+REPO_AC_MIGRATED_URL = (
+    'https://github.com/projectbluefin/testing-lab/blob/main/'
+    'docs/data/adoption-countme-migrated.json'
+)
+OLD_UPSTREAM_SLUG = 'castrojo/bootc-ecosystem'
+
+
+def test_homebrew_available_rows_use_repo_owned_source_url():
+    """Available Homebrew rows must point to the repo-owned migrated artifact, not castrojo/bootc-ecosystem."""
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+
+    for row in dataset['rows']:
+        if row['state'] == 'available':
+            assert row['source_url'] == REPO_HB_MIGRATED_URL, (
+                f"Row {row['id']} source_url must be the repo-owned migrated artifact, "
+                f"got: {row['source_url']}"
+            )
+            assert OLD_UPSTREAM_SLUG not in row['source_url'], (
+                f"Row {row['id']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+            )
+
+
+def test_homebrew_tap_entries_use_repo_owned_source_url():
+    """Tap entries transplanted from migrated artifact must use repo-owned source_url."""
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+
+    assert dataset['taps'], "Expected at least one tap entry"
+    for tap in dataset['taps']:
+        assert tap['source_url'] == REPO_HB_MIGRATED_URL, (
+            f"Tap {tap['name']} source_url must be the repo-owned migrated artifact, "
+            f"got: {tap['source_url']}"
+        )
+        assert OLD_UPSTREAM_SLUG not in tap['source_url'], (
+            f"Tap {tap['name']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+        )
+
+
+def test_adoption_available_rows_use_repo_owned_source_url():
+    """Available Adoption rows must point to the repo-owned migrated artifact, not castrojo/bootc-ecosystem."""
+    module = load_module()
+
+    dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
+
+    for row in dataset['rows']:
+        if row['state'] == 'available':
+            assert row['source_url'] == REPO_AC_MIGRATED_URL, (
+                f"Row {row['id']} source_url must be the repo-owned migrated artifact, "
+                f"got: {row['source_url']}"
+            )
+            assert OLD_UPSTREAM_SLUG not in row['source_url'], (
+                f"Row {row['id']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+            )

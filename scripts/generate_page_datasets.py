@@ -552,7 +552,7 @@ def build_homebrew_ecosystem(root: Path, collected_at: str) -> dict:
                 'description': tap.get('description'),
                 'state': 'available',
                 'state_reason': None,
-                'source_url': migrated['source_url'],
+                'source_url': repo_blob_url('docs/data/homebrew-package-stats-migrated.json'),
                 'collected_at': collected_at,
                 'derivation': 'Transplanted from repo-owned docs/data/homebrew-package-stats-migrated.json.',
             }
@@ -575,7 +575,7 @@ def build_homebrew_ecosystem(root: Path, collected_at: str) -> dict:
                     'download_count': download_count,
                     'state': 'available',
                     'state_reason': None,
-                    'source_url': migrated['source_url'],
+                    'source_url': repo_blob_url('docs/data/homebrew-package-stats-migrated.json'),
                     'collected_at': collected_at,
                     'derivation': 'Variant inherits the transplanted Bluefin-family Brewfile package totals without branch-specific splitting.',
                 }
@@ -728,7 +728,7 @@ def build_adoption_metrics(root: Path, collected_at: str) -> dict:
                     'No registry pull-count data (GHCR or container registry API) or active-device data '
                     '(Fedora countme infrastructure) is tracked in docs/data/ for this lane.'
                 ),
-                'source_url': migrated_countme.get('source_url', releases_url) if countme_value is not None else releases_url,
+                'source_url': repo_blob_url('docs/data/adoption-countme-migrated.json') if countme_value is not None else releases_url,
                 'collected_at': collected_at,
                 'derivation': (
                     'Variant-scoped countme value transplanted from repo-owned docs/data/adoption-countme-migrated.json; '
