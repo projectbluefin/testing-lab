@@ -2313,6 +2313,14 @@
       "slsa": "success"
     },
     {
+      "image": "Bluefin-LTS",
+      "cosign": "Yes",
+      "sbom": "Yes",
+      "zstd": "No",
+      "chunked": "none",
+      "slsa": "success"
+    },
+    {
       "image": "Aurora",
       "cosign": "Yes",
       "sbom": "Yes",
@@ -2329,52 +2337,28 @@
       "slsa": "success"
     },
     {
-      "image": "ublue-os",
-      "cosign": "Yes",
-      "sbom": "Yes",
-      "zstd": "Not tracked",
-      "chunked": "none",
-      "slsa": "none"
-    },
-    {
-      "image": "uCore",
+      "image": "Dakota",
       "cosign": "Yes",
       "sbom": "Yes",
       "zstd": "No",
       "chunked": "none",
-      "slsa": "danger"
+      "slsa": "success"
     },
     {
-      "image": "Zirconium",
-      "cosign": "No",
-      "sbom": "No",
+      "image": "Flatcar",
+      "cosign": "Yes",
+      "sbom": "Yes",
       "zstd": "Yes",
-      "chunked": "none",
-      "slsa": "danger"
-    },
-    {
-      "image": "bootcrew",
-      "cosign": "Yes",
-      "sbom": "No",
-      "zstd": "No",
       "chunked": "success",
-      "slsa": "danger"
+      "slsa": "success"
     },
     {
-      "image": "secureblue",
-      "cosign": "Not tracked",
-      "sbom": "Not tracked",
-      "zstd": "No",
-      "chunked": "none",
-      "slsa": "danger"
-    },
-    {
-      "image": "BlueBuild",
+      "image": "Fedora",
       "cosign": "Yes",
-      "sbom": "No",
-      "zstd": "Not tracked",
-      "chunked": "none",
-      "slsa": "none"
+      "sbom": "Yes",
+      "zstd": "Yes",
+      "chunked": "success",
+      "slsa": "success"
     }
   ]
 }

@@ -142,6 +142,54 @@ function readJson<T>(filePath: string): T {
 export function loadAdoptionPageModel(datasetPath: string): AdoptionPageModel {
   const dataset = readJson<AdoptionDataset>(datasetPath);
 
+  if (dataset.countme_trend) {
+    const allowedDistros = ['bazzite', 'bluefin', 'bluefin-lts', 'aurora', 'dakota', 'flatcar', 'fedora'];
+    const labelMap: Record<string, string> = {
+      'bazzite': 'Bazzite',
+      'bluefin': 'Bluefin',
+      'bluefin-lts': 'Bluefin LTS',
+      'aurora': 'Aurora',
+      'dakota': 'Dakota',
+      'flatcar': 'Flatcar',
+      'fedora': 'Fedora'
+    };
+    
+    dataset.countme_trend.DISTROS = dataset.countme_trend.DISTROS.filter(d => allowedDistros.includes(d));
+    dataset.countme_trend.LABELS = dataset.countme_trend.DISTROS.map(d => labelMap[d] || d);
+    
+    // Ensure all 7 allowed distros are present in the arrays
+    for (const d of allowedDistros) {
+      if (!dataset.countme_trend.DISTROS.includes(d)) {
+        dataset.countme_trend.DISTROS.push(d);
+        dataset.countme_trend.LABELS.push(labelMap[d]);
+      }
+    }
+
+    const sanitizeTrendList = (list: any[]) => {
+      return list.map(item => {
+        const newDistros: Record<string, number> = {};
+        let newTotal = 0;
+        allowedDistros.forEach(d => {
+          const val = item.distros?.[d] || 0;
+          newDistros[d] = val;
+          newTotal += val;
+        });
+        return {
+          ...item,
+          distros: newDistros,
+          total: newTotal
+        };
+      });
+    };
+
+    if (Array.isArray(dataset.countme_trend.monthly)) {
+      dataset.countme_trend.monthly = sanitizeTrendList(dataset.countme_trend.monthly);
+    }
+    if (Array.isArray(dataset.countme_trend.weekly)) {
+      dataset.countme_trend.weekly = sanitizeTrendList(dataset.countme_trend.weekly);
+    }
+  }
+
   const summaryMetricMap = Object.fromEntries(
     dataset.summary_metrics.map((metric) => [metric.id, metric]),
   ) as Record<string, SummaryMetric | undefined>;

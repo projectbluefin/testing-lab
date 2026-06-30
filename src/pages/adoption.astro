@@ -626,78 +626,31 @@ const transplantedCountmeRow = rows.find((r) => r.countme_active_devices !== nul
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td class="cell-image">Bluefin</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-warning" title="legacy-rechunk (ublue-os)">⚠️</span></td>
-          <td><span class="status-badge badge-success" title="SLSA Build L3 provenance">✅</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">Aurora</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-success" title="SLSA Build L3 provenance">✅</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">Bazzite</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-success" title="SLSA Build L3 provenance">✅</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">ublue-os</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-muted">— Not tracked</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">uCore</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-danger" title="No SLSA provenance detected">❌</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">Zirconium</td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-danger" title="No SLSA provenance detected">❌</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">bootcrew</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-success" title="chunkah (coreos)">✅</span></td>
-          <td><span class="status-badge badge-danger" title="No SLSA provenance detected">❌</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">secureblue</td>
-          <td><span class="status-badge badge-muted">— Not tracked</span></td>
-          <td><span class="status-badge badge-muted">— Not tracked</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-danger" title="No SLSA provenance detected">❌</span></td>
-        </tr>
-        <tr>
-          <td class="cell-image">BlueBuild</td>
-          <td><span class="status-badge badge-success">✅ Yes</span></td>
-          <td><span class="status-badge badge-danger">❌ No</span></td>
-          <td><span class="status-badge badge-muted">— Not tracked</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-          <td><span class="status-badge badge-muted" title="not tracked">—</span></td>
-        </tr>
+        {dataset.oci_best_practices?.map((item) => {
+          const formatStatus = (val: string) => {
+            const lower = val.toLowerCase();
+            if (lower === 'yes' || lower === 'success' || lower === '✅' || lower === 'true') {
+              return <span class="status-badge badge-success">✅ Yes</span>;
+            }
+            if (lower === 'no' || lower === 'danger' || lower === '❌' || lower === 'false') {
+              return <span class="status-badge badge-danger">❌ No</span>;
+            }
+            if (lower === 'warning' || lower === '⚠️') {
+              return <span class="status-badge badge-warning">⚠️</span>;
+            }
+            return <span class="status-badge badge-muted">{val}</span>;
+          };
+          return (
+            <tr>
+              <td class="cell-image">{item.image}</td>
+              <td>{formatStatus(item.cosign)}</td>
+              <td>{formatStatus(item.sbom)}</td>
+              <td>{formatStatus(item.zstd)}</td>
+              <td>{formatStatus(item.chunked)}</td>
+              <td>{formatStatus(item.slsa)}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   </div>
