@@ -11,6 +11,7 @@ metadata:
     - /websites/flatcar
     - /argoproj/argo-workflows
     - /kubernetes/website
+    - /bootc-dev/bootc
 ---
 
 # Flatcar Node Onboarding — testing-lab Skill
@@ -132,6 +133,10 @@ Known high-signal failure modes seen in this streak:
 - `Pod was active on the node longer than the specified deadline` during `build-kernel`:
   workflow timeout was too short for full SDK compile+image.
 - Manual `Terminated` runs while `build-kernel` was still progressing.
+- Flatcar 4593.2.3 ships Docker 28 natively, and `run_sdk_container` expects to use it inside the VM.
+- The VM can spend several minutes just bringing `dockerd` to `active`; do not treat a quiet `docker pull` as a dead build unless the pull stops advancing.
+- Keep the SDK data-root on the build PVC and use a cache-first pull with a bounded timeout plus upstream fallback when the local mirror stalls.
+- If the SDK pull is moving, inspect `/var/tmp/build/docker` growth before restarting or deleting the workflow.
 
 Current baseline for workflow timeout:
 - `argo/workflow-templates/flatcar-kernel-build.yaml` uses `activeDeadlineSeconds: 21600` (6h).
