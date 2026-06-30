@@ -38,6 +38,12 @@ spec:
           value: "dakota"
         - name: containerdisk-tag
           value: "dakota-latest"
+        - name: ssh-key-secret
+          value: "bluefin-test-ssh-key"
+        - name: branch
+          value: "main"
+        - name: vm-memory
+          value: "8Gi"
     entrypoint: check-and-trigger
     templates:
       - name: check-and-trigger
@@ -75,3 +81,9 @@ spec:
                     value: "{{workflow.parameters.suites}}"
                   - name: variant
                     value: "{{workflow.parameters.variant}}"
+                  - name: ssh-key-secret
+                    value: "{{workflow.parameters.ssh-key-secret}}"
+                  - name: branch
+                    value: "{{workflow.parameters.branch}}"
+                  - name: vm-memory
+                    value: "{{workflow.parameters.vm-memory}}"
