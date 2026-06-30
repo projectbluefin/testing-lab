@@ -60,6 +60,14 @@ spec:
     steps:
     - - name: create-build-pvc
         template: create-build-pvc
+    - - name: prepare-flatcar-disk
+        template: prepare-flatcar-disk
+        arguments:
+          parameters:
+          - name: flatcar-version
+            value: "current"
+          - name: flatcar-channel
+            value: "stable"
     - - name: create-vm
         template: create-vm
     - - name: wait-for-ssh
@@ -114,6 +122,60 @@ spec:
           resources:
             requests:
               storage: "{{workflow.parameters.storage}}"
+
+  - name: prepare-flatcar-disk
+    inputs:
+      parameters:
+      - name: flatcar-version
+      - name: flatcar-channel
+    volumes:
+    - name: work
+      emptyDir:
+        sizeLimit: 20Gi
+    script:
+      image: quay.io/fedora/fedora:latest
+      command: [bash]
+      securityContext:
+        privileged: true
+        runAsUser: 0
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+      volumeMounts:
+      - name: work
+        mountPath: /mnt/work
+      source: |
+        set -euo pipefail
+        CHANNEL="{{inputs.parameters.flatcar-channel}}"
+        VERSION="{{inputs.parameters.flatcar-version}}"
+        URL="https://stable.release.flatcar-linux.net/amd64-usr/${VERSION}/flatcar_production_qemu_image.img.bz2"
+        CONTAINERDISK="192.168.1.102:30500/flatcar-containerdisk:latest"
+        # ponytail: :latest tag is fine — flatcar build runs are serialized by workflow submission
+
+        echo "Installing qemu-img and bzip2..." >&2
+        dnf install -y -q qemu-img bzip2 buildah
+
+        echo "Downloading Flatcar ${CHANNEL} ${VERSION}..." >&2
+        curl -L --fail --retry 3 -o /mnt/work/flatcar.img.bz2 "${URL}"
+
+        echo "Decompressing bz2..." >&2
+        bzip2 -d /mnt/work/flatcar.img.bz2
+
+        echo "Converting qcow2 → raw..." >&2
+        qemu-img convert -f qcow2 -O raw /mnt/work/flatcar.img /mnt/work/flatcar.raw
+        rm -f /mnt/work/flatcar.img
+
+        echo "Wrapping as containerDisk and pushing to ${CONTAINERDISK}..." >&2
+        CTR=$(buildah from scratch)
+        buildah copy --chown 107:107 "${CTR}" /mnt/work/flatcar.raw /disk/flatcar.raw
+        buildah commit "${CTR}" "${CONTAINERDISK}"
+        buildah push --tls-verify=false "${CONTAINERDISK}"
+        buildah rm "${CTR}" 2>/dev/null || true
+        echo "Flatcar containerDisk ready: ${CONTAINERDISK}" >&2
 
   - name: create-vm
     resource:
