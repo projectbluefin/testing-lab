@@ -188,7 +188,7 @@
       "org": "ublue-os",
       "branch": "testing",
       "published_at": "2026-06-29T16:39:08Z",
-      "freshness_age_days": 0,
+      "freshness_age_days": 1,
       "open_prs": null,
       "state": "available",
       "state_reason": null,

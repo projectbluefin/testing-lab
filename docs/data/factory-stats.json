@@ -393,7 +393,7 @@
         "stable_tag": "44.20260629",
         "stable_source_url": "https://github.com/ublue-os/bazzite/releases/tag/44.20260629",
         "testing_seen_at": "2026-06-29T16:39:08Z",
-        "testing_age_days": 0,
+        "testing_age_days": 1,
         "testing_tag": "testing-44.20260629.1",
         "testing_source_url": "https://github.com/ublue-os/bazzite/releases/tag/testing-44.20260629.1"
       }
