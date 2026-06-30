@@ -113,6 +113,10 @@ spec:
         echo "Wrapping as containerDisk and pushing to ${CONTAINERDISK}..." >&2
         CTR=$(buildah from scratch)
         buildah copy --chown 107:107 "${CTR}" /mnt/work/flatcar.raw /disk/flatcar.raw
+        cat <<'JSON' > /mnt/work/containerDisk.json
+        {"volumes":[{"image":"flatcar.raw","capacity":"10Gi"}]}
+        JSON
+        buildah copy "${CTR}" /mnt/work/containerDisk.json /containerDisk.json
         buildah commit "${CTR}" "${CONTAINERDISK}"
         buildah push --tls-verify=false "${CONTAINERDISK}"
         buildah rm "${CTR}" 2>/dev/null || true
