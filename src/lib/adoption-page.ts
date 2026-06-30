@@ -166,6 +166,8 @@ export function loadAdoptionPageModel(datasetPath: string): AdoptionPageModel {
     label: `${row.variant}/${row.branch}`,
     hasPullData: row.pull_count !== null,
     hasCountmeData: row.countme_active_devices !== null,
+    pullCount: row.pull_count,
+    countmeActiveDevices: row.countme_active_devices,
     state: row.state,
   }));
 
