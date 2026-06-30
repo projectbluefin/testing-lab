@@ -279,7 +279,7 @@ spec:
           echo "[BUILD] filesystem args: <none>"
         fi
 
-        bootc install to-disk \
+        RUST_LOG=debug bootc install to-disk \
           ${FS_ARG} \
           --source-imgref "${SOURCE_IMGREF}" \
           --generic-image \
