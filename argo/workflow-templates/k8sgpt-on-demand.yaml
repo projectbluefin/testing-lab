@@ -27,7 +27,7 @@ spec:
         value: "Pod,Deployment,Service,Ingress,Node"
   templates:
     - name: analyze
-      activeDeadlineSeconds: 600
+      activeDeadlineSeconds: 1800
       container:
         image: 192.168.1.102:30500/fsdk/lab-runner:latest
         command: [sh, -c]
