@@ -307,7 +307,11 @@ spec:
         BOOTABLE_IMAGE="localhost/${TAG}-bootable:latest"
         BOOTABLE_CTX="${STAGING}/bootable-build"
         mkdir -p "${BOOTABLE_CTX}"
-        printf 'FROM %s\nLABEL containers.bootc=1\n' "${IMAGE}" > "${BOOTABLE_CTX}/Containerfile"
+        printf '%s\n' \
+          "FROM ${IMAGE}" \
+          "LABEL containers.bootc=1" \
+          "RUN set -eux; kver=\$(basename /usr/lib/modules/*); mkdir -p \"/usr/lib/modules/\${kver}\"; cp /boot/vmlinuz \"/usr/lib/modules/\${kver}/vmlinuz\"" \
+          > "${BOOTABLE_CTX}/Containerfile"
         echo "[BUILD] deriving bootable source image ${BOOTABLE_IMAGE}"
         podman build --tls-verify=false -t "${BOOTABLE_IMAGE}" -f "${BOOTABLE_CTX}/Containerfile" "${BOOTABLE_CTX}"
         SOURCE_IMGREF="containers-storage:${BOOTABLE_IMAGE}"
