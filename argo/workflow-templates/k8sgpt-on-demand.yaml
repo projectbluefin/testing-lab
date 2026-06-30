@@ -28,90 +28,74 @@ spec:
   templates:
     - name: analyze
       activeDeadlineSeconds: 1800
-      container:
-        image: 192.168.1.102:30500/fsdk/lab-runner:latest
-        command: [sh, -c]
-        args:
-          - |
-            set -eu
+      script:
+        image: cgr.dev/chainguard/python:latest-dev
+        command: [python3]
+        source: |
+          import json
+          import os
+          import re
+          import shutil
+          import subprocess
+          import tarfile
+          import urllib.request
+          from pathlib import Path
 
-            k8sgpt_version="v0.4.24"
-            mkdir -p /tmp/results
-            mkdir -p /tmp/bin
-            namespace="{{workflow.parameters.namespace}}"
-            filters="{{workflow.parameters.filters}}"
+          k8sgpt_version = "v0.4.24"
+          namespace = "{{workflow.parameters.namespace}}"
+          filters = "{{workflow.parameters.filters}}"
+          results_dir = Path("/tmp/results")
+          bin_dir = Path("/tmp/bin")
+          results_dir.mkdir(parents=True, exist_ok=True)
+          bin_dir.mkdir(parents=True, exist_ok=True)
 
-            if ! command -v curl >/dev/null 2>&1; then
-              echo "curl is required but not available in runner image" >&2
-              exit 1
-            fi
-            if ! command -v python3 >/dev/null 2>&1; then
-              echo "python3 is required but not available in runner image" >&2
-              exit 1
-            fi
+          if namespace and not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", namespace):
+            raise SystemExit(f"invalid namespace parameter: {namespace}")
+          if filters and not re.fullmatch(r"[A-Za-z,]+", filters):
+            raise SystemExit(f"invalid filters parameter: {filters}")
 
-            arch="$(uname -m)"
-            case "${arch}" in
-              x86_64|amd64)
-                archive="k8sgpt_Linux_x86_64.tar.gz"
-                ;;
-              aarch64|arm64)
-                archive="k8sgpt_Linux_arm64.tar.gz"
-                ;;
-              *)
-                echo "unsupported architecture: ${arch}" >&2
-                exit 1
-                ;;
-            esac
+          arch = os.uname().machine
+          if arch in {"x86_64", "amd64"}:
+            archive = "k8sgpt_Linux_x86_64.tar.gz"
+          elif arch in {"aarch64", "arm64"}:
+            archive = "k8sgpt_Linux_arm64.tar.gz"
+          else:
+            raise SystemExit(f"unsupported architecture: {arch}")
 
-            curl -fsSL "https://github.com/k8sgpt-ai/k8sgpt/releases/download/${k8sgpt_version}/${archive}" \
-              -o /tmp/k8sgpt.tgz
-            python3 - <<'PY'
-            import tarfile
-            with tarfile.open('/tmp/k8sgpt.tgz', 'r:gz') as tf:
-                member = tf.getmember('k8sgpt')
-                tf.extract(member, '/tmp/bin')
-            PY
-            chmod +x /tmp/bin/k8sgpt
+          archive_path = Path("/tmp/k8sgpt.tgz")
+          url = f"https://github.com/k8sgpt-ai/k8sgpt/releases/download/{k8sgpt_version}/{archive}"
+          with urllib.request.urlopen(url, timeout=60) as response, archive_path.open("wb") as fh:
+            shutil.copyfileobj(response, fh)
 
-            if [ -n "${namespace}" ]; then
-              if ! printf '%s' "${namespace}" | grep -Eq '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'; then
-                echo "invalid namespace parameter: ${namespace}" >&2
-                exit 1
-              fi
-            fi
-            if [ -n "${filters}" ]; then
-              if ! printf '%s' "${filters}" | grep -Eq '^[A-Za-z,]+$'; then
-                echo "invalid filters parameter: ${filters}" >&2
-                exit 1
-              fi
-            fi
+          with tarfile.open(archive_path, "r:gz") as tf:
+            member = tf.getmember("k8sgpt")
+            tf.extract(member, bin_dir)
+          k8sgpt = bin_dir / "k8sgpt"
+          k8sgpt.chmod(0o755)
 
-            set -- /tmp/bin/k8sgpt analyze --output=json
-            if [ -n "${filters}" ]; then
-              set -- "$@" --filter "${filters}"
-            fi
-            if [ -n "${namespace}" ]; then
-              set -- "$@" --namespace "${namespace}"
-            fi
+          cmd = [str(k8sgpt), "analyze", "--output=json"]
+          if filters:
+            cmd += ["--filter", filters]
+          if namespace:
+            cmd += ["--namespace", namespace]
 
-            "$@" > /tmp/results/k8sgpt-results.json
-            jq '
-              .results |= map(
-                select(
-                  .kind != "Service" or
-                  (
-                    .name != "argocd/argocd-applicationset-controller" and
-                    .name != "argocd/argocd-dex-server" and
-                    .name != "argocd/argocd-notifications-controller-metrics" and
-                    .name != "kubevirt/virt-exportproxy"
-                  )
-                )
-              )
-            ' /tmp/results/k8sgpt-results.json > /tmp/results/k8sgpt-results.filtered.json
-            mv /tmp/results/k8sgpt-results.filtered.json /tmp/results/k8sgpt-results.json
-            findings_count=$(jq '.results | length' /tmp/results/k8sgpt-results.json)
-            echo "k8sgpt findings: ${findings_count}"
+          result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+          data = json.loads(result.stdout)
+          ignored = {
+            "argocd/argocd-applicationset-controller",
+            "argocd/argocd-dex-server",
+            "argocd/argocd-notifications-controller-metrics",
+            "kubevirt/virt-exportproxy",
+          }
+          data["results"] = [
+            item for item in data.get("results", [])
+            if item.get("kind") != "Service" or item.get("name") not in ignored
+          ]
+
+          with (results_dir / "k8sgpt-results.json").open("w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+
+          print(f"k8sgpt findings: {len(data['results'])}")
         resources:
           requests:
             cpu: 100m
