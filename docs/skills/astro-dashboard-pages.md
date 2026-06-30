@@ -3,8 +3,8 @@ name: astro-dashboard-pages
 description: >
   Building or revising Astro dashboard detail pages backed by repo-tracked JSON and
   browser-side charts. Use when adding docs routes like /tests, /upstream, /bluefin, or
-  /applications that must render real evidence, explicit unavailable states, and
-  GitHub Pages-safe static output.
+  /applications that must render real evidence, explicit unavailable states, GitHub
+  Pages-safe static output, and dense table sections without crushed columns.
 metadata:
   context7-sources:
     - /withastro/docs
@@ -56,17 +56,18 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 11. Preserve explicit unavailable states and evidence links after filtering. Filtered pages must hide out-of-scope families, not hide missing data within in-scope families.
 12. This site is served on the custom domain root (`factory.projectbluefin.io`). Keep Astro paths root-relative (`/`) and still use `import.meta.env.BASE_URL` so links/scripts stay correct if hosting topology changes.
 13. Mark every browser-runtime script that must escape Cloudflare Rocket Loader with `data-cfasync="false"`, including bundled Astro page scripts, not just the legacy dashboard shell.
-14. Validate with the narrowest commands that prove the page works:
+14. Wide tables belong in full-width cards. If a section contains 6+ columns or package-density rows, let the card span the full grid row instead of squeezing it into a half-width column; otherwise headers wrap and the table becomes unreadable.
+15. Validate with the narrowest commands that prove the page works:
    - targeted Node test covering rendered HTML
    - `npm run build`
    - run `astro check` only if it completes in this repo scope; if it OOMs, record the blocker instead of claiming it passed
-15. When simulating or seeding results (such as primary application-specific results files), ensure you regenerate the core contracts using `python3 scripts/generate_page_datasets.py` so build-time Astro frontmatter picks up the changes immediately.
-16. In unit tests that validate dataset collectors, mock any dependencies on dynamically-updated or live-polled files (like `factory-stats.json`) by monkeypatching the loader to keep tests completely deterministic and isolated from homelab poller updates.
-17. When rendering outcomes charts or heatmaps, conditionally format labels (e.g. 'primary' vs 'fallback' vs 'none') depending on whether the primary result is completed or in a fallback-only/pending state.
-18. If a hero status card is made dynamic, conditionally render it to summarize partial/full primary coverage while preserving any expected smoke-test regex assertions (e.g. `/No completed Bazaar-specific software result is published/i`) in the text output.
-19. Ensure state/status calculations are resilient to all published status strings. For example, check for specific incomplete states (like 'pending' or 'missing') rather than asserting negative checks on specific completed states (like 'completed') when the true completed statuses are 'passed' or 'failed'.
-20. When a page evolves from one tracked entity to multiple (for example adding Firefox alongside Bazaar), include the new dimension in chart/table labels and category keys (app + variant + branch) so rendering stays unambiguous.
-21. If you reuse distro-wide or global source data across multiple branch rows, the caveat must be visible in rendered HTML, not only in JSON `derivation`. Call out scope plainly (for example global formula analytics, distro-wide snapshot, reused across branches, and snapshot window) and assert that disclosure in the built-page test.
+16. When simulating or seeding results (such as primary application-specific results files), ensure you regenerate the core contracts using `python3 scripts/generate_page_datasets.py` so build-time Astro frontmatter picks up the changes immediately.
+17. In unit tests that validate dataset collectors, mock any dependencies on dynamically-updated or live-polled files (like `factory-stats.json`) by monkeypatching the loader to keep tests completely deterministic and isolated from homelab poller updates.
+18. When rendering outcomes charts or heatmaps, conditionally format labels (e.g. 'primary' vs 'fallback' vs 'none') depending on whether the primary result is completed or in a fallback-only/pending state.
+19. If a hero status card is made dynamic, conditionally render it to summarize partial/full primary coverage while preserving any expected smoke-test regex assertions (e.g. `/No completed Bazaar-specific software result is published/i`) in the text output.
+20. Ensure state/status calculations are resilient to all published status strings. For example, check for specific incomplete states (like 'pending' or 'missing') rather than asserting negative checks on specific completed states (like 'completed') when the true completed statuses are 'passed' or 'failed'.
+21. When a page evolves from one tracked entity to multiple (for example adding Firefox alongside Bazaar), include the new dimension in chart/table labels and category keys (app + variant + branch) so rendering stays unambiguous.
+22. If you reuse distro-wide or global source data across multiple branch rows, the caveat must be visible in rendered HTML, not only in JSON `derivation`. Call out scope plainly (for example global formula analytics, distro-wide snapshot, reused across branches, and snapshot window) and assert that disclosure in the built-page test.
 
 ## Common Rationalizations
 
@@ -88,6 +89,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - Browser script invents fallback metrics not present in the contract
 - Runtime script tags lose `data-cfasync="false"` and Cloudflare rewrites the page boot path
 - Route split duplicates collector logic instead of reusing one shared model with page-level filters
+- Wide data tables are crammed into half-width cards and the columns collapse instead of scrolling
 - Validation mentions `astro check` as passing when it actually OOMed
 - Disclosure about reused global or distro-wide values exists only in JSON fields and is absent from rendered HTML
 
@@ -102,6 +104,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - [ ] Build cleanup includes every generated route directory (for example `docs/upstream`, `docs/bluefin`, `docs/tests`, `docs/applications`)
 - [ ] Built HTML prefixes Astro `_astro` assets with the active domain root path contract (currently `/_astro/*` on `factory.projectbluefin.io`)
 - [ ] Runtime script tags that must execute unmodified keep `data-cfasync="false"` in built HTML
+- [ ] Wide table sections span the full grid row so columns stay readable and scroll instead of collapsing
 - [ ] Targeted HTML test covers chart section labels, evidence links, and unavailable copy
 - [ ] Any reused global or distro-wide metrics disclose their scope in rendered HTML, and the page test asserts that disclosure
 - [ ] `npm run build` succeeds for the Astro worktree
