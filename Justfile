@@ -281,6 +281,14 @@ run-dakota-qa branch="main" variant="dakota":
       -p branch={{ branch }} \
       -n {{ argo_ns }} --watch
 
+# Run the in-cluster BuildStream build pipeline for bluefin-server
+# Usage: just run-bluefin-server-build
+run-bluefin-server-build ref="main" repo="https://github.com/castrojo/bluefin-server.git":
+    argo submit --from workflowtemplate/bluefin-server-build-pipeline \
+      -p ref={{ ref }} \
+      -p repo={{ repo }} \
+      -n {{ argo_ns }} --watch
+
 # ── Validation ───────────────────────────────────────────────────────────────
 
 # Apply bootstrap WorkflowTemplates to the cluster (run once during initial setup)

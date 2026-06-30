@@ -1,0 +1,132 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: bluefin-server-build-pipeline
+  namespace: argo
+  annotations:
+    description: |
+      In-cluster BuildStream build pipeline for bluefin-server.
+      Builds oci/bluefin-server-bootc.bst and publishes to the local Zot registry (:30500).
+      Triggered on git changes or manual on-demand submission.
+  labels:
+    app.kubernetes.io/component: bluefin-server-build
+    app.kubernetes.io/part-of: bluefin-test-suite
+spec:
+  serviceAccountName: argo
+  activeDeadlineSeconds: 14400   # 4 hours (compiles custom LTS kernel server tree)
+
+  arguments:
+    parameters:
+      - name: repo
+        value: "https://github.com/castrojo/bluefin-server.git"
+      - name: ref
+        value: "main"
+      - name: registry
+        value: "192.168.1.102:30500"
+
+  entrypoint: build
+
+  templates:
+
+    - name: build
+      inputs:
+        parameters:
+          - name: ref
+            value: "{{workflow.parameters.ref}}"
+          - name: repo
+            value: "{{workflow.parameters.repo}}"
+          - name: registry
+            value: "{{workflow.parameters.registry}}"
+      dag:
+        tasks:
+          - name: build-bluefin-server
+            template: bst-build
+            arguments:
+              parameters:
+                - name: element
+                  value: "oci/bluefin-server-bootc.bst"
+                - name: tag
+                  value: "bluefin-server-bootc"
+                - name: ref
+                  value: "{{inputs.parameters.ref}}"
+                - name: repo
+                  value: "{{inputs.parameters.repo}}"
+                - name: registry
+                  value: "{{inputs.parameters.registry}}"
+
+    - name: bst-build
+      inputs:
+        parameters:
+          - name: element
+          - name: tag
+          - name: ref
+          - name: repo
+          - name: registry
+      volumes:
+        - name: fuse
+          hostPath:
+            path: /dev/fuse
+        - name: bst-cache
+          emptyDir: {}
+      script:
+        image: "{{inputs.parameters.registry}}/bst2:64eb0b4930d57a92710822898fb73af6cc1ae35d"
+        command: [bash]
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            type: spc_t
+        resources:
+          requests:
+            cpu: "4"
+            memory: 14Gi
+          limits:
+            cpu: "8"
+            memory: 28Gi
+        volumeMounts:
+          - name: fuse
+            mountPath: /dev/fuse
+          - name: bst-cache
+            mountPath: /root/.cache/buildstream
+        source: |
+          set -euo pipefail
+
+          # Write in-cluster BST config — plain gRPC to in-cluster casd, no TLS
+          cat > /tmp/buildstream-cluster.conf << 'BSTCONF'
+          cache:
+            storage-service:
+              url: http://buildbox-casd.local-registry.svc.cluster.local:11002
+              push: true
+          BSTCONF
+
+          BST_CONF=/tmp/buildstream-cluster.conf
+          ELEMENT="{{inputs.parameters.element}}"
+          TAG="{{inputs.parameters.tag}}"
+          REF="{{inputs.parameters.ref}}"
+          REPO="{{inputs.parameters.repo}}"
+
+          echo "=== Cloning bluefin-server @ ${REF} ==="
+          git clone --depth=1 --branch "${REF}" "${REPO}" /src
+          cd /src
+
+          echo "=== Building ${ELEMENT} ==="
+          bst --config "${BST_CONF}" \
+              --no-interactive \
+              build "${ELEMENT}"
+
+          echo "=== Exporting ${ELEMENT} ==="
+          EXPORT_DIR="/tmp/export-$(basename ${ELEMENT} .bst)"
+          mkdir -p "${EXPORT_DIR}"
+          bst --config "${BST_CONF}" \
+              --no-interactive \
+              artifact checkout "${ELEMENT}" \
+              --directory "${EXPORT_DIR}"
+
+          echo "=== Pushing to local Zot ==="
+          # skopeo is not in the bst2 image; use podman instead.
+          # Load the OCI layout into podman local storage, then push by image ID.
+          # docker:// transport prefix is required for podman push to a registry.
+          IMAGE_ID=$(podman pull "oci:${EXPORT_DIR}" | tail -1)
+          podman push "${IMAGE_ID}" "docker://{{inputs.parameters.registry}}/${TAG}:latest" --tls-verify=false
+          podman rmi "${IMAGE_ID}" 2>/dev/null || true
+
+          echo "=== Build complete: {{inputs.parameters.registry}}/${TAG}:latest ==="
