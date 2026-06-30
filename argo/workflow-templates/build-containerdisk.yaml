@@ -279,19 +279,28 @@ spec:
           echo "[BUILD] filesystem args: <none>"
         fi
 
-        # The FSDK server image lacks dosfstools (mkfs.fat/mkdosfs). bootc needs mkfs.fat
-        # to format the EFI System partition. Inject wrappers via bootc's own sanctioned
-        # mechanism for accessing host tools: exec-in-host-mount-namespace.
+        # Inject missing host binaries via bootc exec-in-host-mount-namespace.
+        # The FSDK server image lacks dosfstools (mkfs.fat/mkdosfs) and podman.
+        # bootc needs mkfs.fat to format the EFI partition and podman to init
+        # the containers-storage imgstorage (CStorage::create runs "podman images").
+        mkdir -p /usr/local/sbin /usr/local/bin
         for TOOL in mkfs.fat mkdosfs; do
           if ! command -v "${TOOL}" >/dev/null 2>&1; then
-            mkdir -p /usr/local/sbin
             printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
               > "/usr/local/sbin/${TOOL}"
             chmod +x "/usr/local/sbin/${TOOL}"
             echo "[BUILD] ${TOOL} wrapper injected via bootc exec-in-host-mount-namespace"
           fi
         done
-        export PATH="/usr/local/sbin:${PATH}"
+        for TOOL in podman skopeo; do
+          if ! command -v "${TOOL}" >/dev/null 2>&1; then
+            printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
+              > "/usr/local/bin/${TOOL}"
+            chmod +x "/usr/local/bin/${TOOL}"
+            echo "[BUILD] ${TOOL} wrapper injected via bootc exec-in-host-mount-namespace"
+          fi
+        done
+        export PATH="/usr/local/sbin:/usr/local/bin:${PATH}"
 
         # The FSDK server image has no /etc/containers/ directory. The containers/image
         # library (used by bootc for imgstorage init) requires policy.json and
