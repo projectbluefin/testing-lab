@@ -102,6 +102,7 @@ Golden disks can be rotated via the `build-containerdisk` template.
 | VM stuck `Terminating` | KubeVirt controller race with launcher cleanup | Delete the `virt-launcher-*` pod and let reconciliation finish |
 | `run-gnome-tests` pod fails at startup | Workflow template structure error, often misplaced `volumes:` | Fix the template in git and let ArgoCD reconcile it |
 | WorkflowTemplate change appears ignored | Workflow was submitted before the new template was reconciled | Verify ArgoCD revision, wait or sync, then submit a new workflow |
+| `flatcar-kernel-build` fails after hours with `Pod was active on the node longer than the specified deadline` | Workflow/template `activeDeadlineSeconds` too short for a full Flatcar SDK kernel+image compile | Use a 6h workflow deadline for the pipeline and avoid tighter per-step deadline caps; if still blocked, use bare-metal fallback in `docs/skills/flatcar-node-onboarding.md` |
 | Flatcar runner: `pip3: command not found` | Fedora minimal lacks standalone `pip3` | Use `python3 -m pip install` in runner pods |
 | Flatcar runner: exit code 64 | Template has `outputs.artifacts` but Argo artifact storage is not configured | Remove artifact `outputs:` from the template |
 | Flatcar test: `ctr version` fails as `core` | containerd socket requires root | Use `sudo ctr version` (core has passwordless sudo) |

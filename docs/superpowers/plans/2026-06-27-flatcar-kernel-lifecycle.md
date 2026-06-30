@@ -8,6 +8,13 @@
 
 **Tech Stack:** Argo Workflows/CronWorkflows, Kubernetes ConfigMap state, Nebraska package API, Flatcar update_engine, `kubectl`/`curl`/`jq`
 
+## Current execution status (2026-06-29)
+
+- Day 4: no successful `flatcar-kernel-build` completion yet.
+- Recent dominant failure mode: long-running `build-kernel` executions timing out or being terminated before artifact registration.
+- Immediate corrective baseline in git: extend kernel build workflow timeout to 6h and remove duplicate tighter step-level deadline.
+- Until one successful build is recorded, treat this as a release blocker for the 7.1 USB4/Thunderbolt rollout.
+
 ## Global Constraints
 
 - Use one Flatcar update group: `GROUP=stable` for all nodes.

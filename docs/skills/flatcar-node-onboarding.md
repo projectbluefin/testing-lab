@@ -116,6 +116,27 @@ curl -s "http://192.168.1.102:30802/api/v1/apps/e96281a6-d1af-4bde-9a0a-97b76e56
   | python3 -m json.tool
 ```
 
+### 4a. Kernel run status and failure triage (June 2026)
+
+Current state: no successful `flatcar-kernel-build` completion over the recent 4-day window.
+Most runs fail in `build-kernel` (timeout/termination) or are manually terminated while stuck.
+
+Fast operator checks:
+```bash
+argo list -n argo | rg "flatcar-kernel-build" | head -n 20
+argo get -n argo <latest-flatcar-kernel-build-name>
+argo logs -n argo <latest-flatcar-kernel-build-name> -c main | tail -n 120
+```
+
+Known high-signal failure modes seen in this streak:
+- `Pod was active on the node longer than the specified deadline` during `build-kernel`:
+  workflow timeout was too short for full SDK compile+image.
+- Manual `Terminated` runs while `build-kernel` was still progressing.
+
+Current baseline for workflow timeout:
+- `argo/workflow-templates/flatcar-kernel-build.yaml` uses `activeDeadlineSeconds: 21600` (6h).
+- Avoid adding tighter per-step `activeDeadlineSeconds` unless measured compile time supports it.
+
 ---
 
 ## Known Flatcar Constraints
