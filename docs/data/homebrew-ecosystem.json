@@ -3,7 +3,7 @@
   "_meta": {
     "page": "homebrew",
     "description": "Collector-derived contract for the Homebrew ecosystem tab.",
-    "generated_at": "2026-06-30T00:39:40Z",
+    "generated_at": "2026-06-30T00:40:42Z",
     "starter_artifact": false,
     "status": "partial"
   },
@@ -16,7 +16,7 @@
       "state": "available",
       "state_reason": null,
       "source_url": "https://github.com/projectbluefin/testing-lab/blob/main/docs/data/variant-publishers.json",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Count all variant-branch lanes from docs/data/variant-publishers.json."
     },
     {
@@ -27,7 +27,7 @@
       "state": "available",
       "state_reason": null,
       "source_url": "https://github.com/projectbluefin/testing-lab/blob/main/docs/data/variant-publishers.json",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Count lanes with Homebrew analytics data from formulae.brew.sh or upstream tap repos present in docs/data/."
     },
     {
@@ -38,7 +38,7 @@
       "state": "available",
       "state_reason": null,
       "source_url": "https://github.com/projectbluefin/testing-lab/blob/main/docs/data/variant-publishers.json",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Count lanes with no Homebrew analytics data from formulae.brew.sh or upstream tap repos in docs/data/."
     }
   ],
@@ -55,7 +55,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/bluefin/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bluefin.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -69,7 +69,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/bluefin/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bluefin.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -83,7 +83,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/bluefin-lts/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bluefin-lts.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -97,7 +97,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/bluefin-lts/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bluefin-lts.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -111,7 +111,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/ublue-os/aurora/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json aurora.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -125,7 +125,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/ublue-os/aurora/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json aurora.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -139,7 +139,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/ublue-os/bazzite/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bazzite.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -153,7 +153,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/ublue-os/bazzite/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json bazzite.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -167,7 +167,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/dakota/releases",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json dakota.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     },
     {
@@ -181,7 +181,7 @@
       "state": "unavailable",
       "state_reason": "No Homebrew analytics data from formulae.brew.sh or upstream tap repos is tracked in docs/data/ for this lane. Collector will populate install_count/download_count once a repo-owned artifact fetched from those sources is committed.",
       "source_url": "https://github.com/projectbluefin/testing-lab/blob/main/docs/data/variant-publishers.json",
-      "collected_at": "2026-06-30T00:39:40Z",
+      "collected_at": "2026-06-30T00:40:42Z",
       "derivation": "Lane derived from docs/data/variant-publishers.json flatcar.branches; no Homebrew analytics data (formulae.brew.sh or upstream tap repos) found in docs/data/."
     }
   ]
