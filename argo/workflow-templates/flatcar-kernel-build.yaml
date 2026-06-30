@@ -305,6 +305,13 @@ spec:
         SCRIPTS_REF="{{inputs.parameters.flatcar-scripts-ref}}"
         SDK_VERSION="{{inputs.parameters.sdk-version}}"
 
+        # Pre-create output parameter files so Argo can always read them even
+        # when the remote build exits early (for example timeout during SDK pull).
+        printf "unavailable\n" > /tmp/sha1.txt
+        printf "unavailable\n" > /tmp/sha256.txt
+        printf "0\n" > /tmp/size.txt
+        printf "unavailable\n" > /tmp/filename.txt
+
         # Write SSH key
         echo "${SSH_KEY}" > /tmp/id_ed25519
         chmod 600 /tmp/id_ed25519
@@ -358,7 +365,7 @@ spec:
         sudo systemctl start docker
         sudo systemctl is-active docker
         echo "=== Preflight SDK cache pull ==="
-        timeout 10m docker pull 192.168.1.102:30501/ghcr/flatcar/flatcar-sdk-amd64:\${SDK_VERSION}
+        timeout 30m docker pull 192.168.1.102:30501/ghcr/flatcar/flatcar-sdk-amd64:\${SDK_VERSION}
 
         echo "=== Regenerate Manifest checksums via SDK ==="
         # Run ephemeral SDK container just for manifest generation
