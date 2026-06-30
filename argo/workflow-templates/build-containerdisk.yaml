@@ -294,8 +294,13 @@ spec:
         done
         for TOOL in podman skopeo; do
           if ! command -v "${TOOL}" >/dev/null 2>&1; then
-            printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
-              > "/usr/local/bin/${TOOL}"
+            if [ "${TOOL}" = skopeo ]; then
+              printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s --tls-verify=false "$@"\n' "${TOOL}" \
+                > "/usr/local/bin/${TOOL}"
+            else
+              printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
+                > "/usr/local/bin/${TOOL}"
+            fi
             chmod +x "/usr/local/bin/${TOOL}"
             echo "[BUILD] ${TOOL} wrapper injected via bootc exec-in-host-mount-namespace"
           fi
