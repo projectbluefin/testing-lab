@@ -202,13 +202,13 @@ spec:
       - name: run-udev
         mountPath: /run/udev
       - name: staging
-        mountPath: /mnt/staging
+        mountPath: /var/mnt/ghost-data/bluefin-cd-build
       source: |
         set -euo pipefail
         TAG="{{inputs.parameters.containerdisk-tag}}"
         IMAGE_TAG="{{inputs.parameters.image-tag}}"
         IMAGE="{{inputs.parameters.image}}:{{inputs.parameters.image-tag}}"
-        STAGING="/mnt/staging/${TAG}"
+        STAGING="/var/mnt/ghost-data/bluefin-cd-build/${TAG}"
         DISK="${STAGING}/disk.raw"
         BUILDLOG="${STAGING}/build.log"
 
@@ -314,6 +314,9 @@ spec:
             > /etc/containers/registries.conf
           echo "[BUILD] /etc/containers created with permissive policy"
         fi
+        export CONTAINERS_REGISTRIES_CONF="${STAGING}/registries.conf"
+        cp /etc/containers/registries.conf "${CONTAINERS_REGISTRIES_CONF}"
+        echo "[BUILD] CONTAINERS_REGISTRIES_CONF=${CONTAINERS_REGISTRIES_CONF}"
 
         bootc install to-disk \
           ${FS_ARG} \
@@ -405,7 +408,7 @@ spec:
           memory: 8Gi
       volumeMounts:
       - name: staging
-        mountPath: /mnt/staging
+        mountPath: /var/mnt/ghost-data/bluefin-cd-build
       source: |
         set -euo pipefail
 
@@ -418,7 +421,7 @@ spec:
         sync
 
         TAG="{{inputs.parameters.containerdisk-tag}}"
-        STAGING="/mnt/staging/${TAG}"
+        STAGING="/var/mnt/ghost-data/bluefin-cd-build/${TAG}"
         RAW="${STAGING}/disk.raw"
         QCOW="${STAGING}/containerdisk.qcow2"
         DEST="192.168.1.102:30500/bluefin-containerdisk:${TAG}"
