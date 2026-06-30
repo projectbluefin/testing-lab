@@ -294,8 +294,10 @@ spec:
         set -euo pipefail
         if ! command -v kubectl >/dev/null 2>&1; then
           KVER="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
-          curl -fsSL "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
-          chmod +x /usr/local/bin/kubectl
+          mkdir -p /tmp/bin
+          curl -fsSL "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl" -o /tmp/bin/kubectl
+          chmod +x /tmp/bin/kubectl
+          export PATH="/tmp/bin:${PATH}"
         fi
         git config --global --add safe.directory "*"
         VM_IP="{{inputs.parameters.vm-ip}}"
