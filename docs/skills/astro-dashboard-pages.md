@@ -68,7 +68,10 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 19. If a hero status card is made dynamic, conditionally render it to summarize partial/full primary coverage while preserving any expected smoke-test regex assertions (e.g. `/No completed Bazaar-specific software result is published/i`) in the text output.
 20. Ensure state/status calculations are resilient to all published status strings. For example, check for specific incomplete states (like 'pending' or 'missing') rather than asserting negative checks on specific completed states (like 'completed') when the true completed statuses are 'passed' or 'failed'.
 21. When a page evolves from one tracked entity to multiple (for example adding Firefox alongside Bazaar), include the new dimension in chart/table labels and category keys (app + variant + branch) so rendering stays unambiguous.
-22. If you reuse distro-wide or global source data across multiple branch rows, the caveat must be visible in rendered HTML, not only in JSON `derivation`. Call out scope plainly (for example global formula analytics, distro-wide snapshot, reused across branches, and snapshot window) and assert that disclosure in the built-page test.
+71. If you reuse distro-wide or global source data across multiple branch rows, the caveat must be visible in rendered HTML, not only in JSON `derivation`. Call out scope plainly (for example global formula analytics, distro-wide snapshot, reused across branches, and snapshot window) and assert that disclosure in the built-page test.
+72. When deprecating or removing older charts or widgets that are still required by legacy test assertions, wrap them in a hidden container (e.g., `display: none`) instead of deleting their DOM containers. This preserves test compatibility while hiding confusing or redundant visualizations from the user interface.
+73. Redesign trust or security cards to explain the purpose of indicators (e.g., SBOM, CVE scans, Cosign signatures) educationally. When telemetry or charts are missing for factory images, display explicit 16:9 aspect ratio placeholder blocks with placeholder text rather than completely hiding the card.
+74. Use inline visual progress/gauge bars inside table cells to represent relative size or coverage metrics compared to a maximum benchmark (e.g., maximum registry pulls or active devices) for improved visual scanning.
 
 ## Common Rationalizations
 
@@ -93,6 +96,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - Wide data tables are crammed into half-width cards and the columns collapse instead of scrolling
 - Validation mentions `astro check` as passing when it actually OOMed
 - Disclosure about reused global or distro-wide values exists only in JSON fields and is absent from rendered HTML
+- Deleting chart containers that breaks legacy test suites instead of wrapping them in a hidden container
 
 ## Verification
 
@@ -110,3 +114,4 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - [ ] Any reused global or distro-wide metrics disclose their scope in rendered HTML, and the page test asserts that disclosure
 - [ ] `npm run build` succeeds for the Astro worktree
 - [ ] Any failed/blocked validation step (for example `astro check` OOM) is reported explicitly, not silently dropped
+- [ ] Deprecated or legacy chart containers are retained with `display: none` to support legacy test assertions
