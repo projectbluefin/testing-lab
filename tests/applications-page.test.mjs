@@ -51,6 +51,21 @@ test('applications page renders Bazaar evidence, chart mounts, and explicit unav
   );
   assert.match(
     applicationsPage,
+    /Architectures/i,
+    'applications page displays architectures metadata',
+  );
+  assert.match(
+    applicationsPage,
+    /License/i,
+    'applications page displays license metadata',
+  );
+  assert.match(
+    applicationsPage,
+    /Flatpak SDK Runtime/i,
+    'applications page displays Flatpak SDK runtime metadata',
+  );
+  assert.match(
+    applicationsPage,
     /applications-outcomes-chart/,
     'applications page renders the outcomes chart container',
   );

@@ -47,7 +47,11 @@ const bluefinDefaultApps = [
     description: 'The standard web browser in Project Bluefin, configured with strict, immutable system-wide security and sandbox policies.',
     test_file: 'tests/software/features/flatpak.feature',
     test_url: 'https://github.com/projectbluefin/testsuite/blob/main/tests/software/features/flatpak.feature',
-    command: 'behave tests/software/features/flatpak.feature'
+    command: 'behave tests/software/features/flatpak.feature',
+    version: '135.0',
+    architectures: 'x86_64, aarch64',
+    license: 'MPL-2.0',
+    runtime: 'org.freedesktop.Platform'
   },
   {
     id: 'ptyxis',
@@ -59,7 +63,11 @@ const bluefinDefaultApps = [
     description: 'A terminal emulator optimized for containerized workflows, with native, seamless toolbox and distrobox container tab integrations.',
     test_file: 'tests/developer/features/ptyxis.feature',
     test_url: 'https://github.com/projectbluefin/testsuite/blob/main/tests/developer/features/ptyxis.feature',
-    command: 'behave tests/developer/features/ptyxis.feature'
+    command: 'behave tests/developer/features/ptyxis.feature',
+    version: '46.0',
+    architectures: 'x86_64, aarch64',
+    license: 'GPL-3.0-or-later',
+    runtime: 'org.gnome.Platform'
   },
   {
     id: 'podman-desktop',
@@ -71,7 +79,11 @@ const bluefinDefaultApps = [
     description: 'A comprehensive, user-friendly graphical interface for Podman, facilitating local container, pod, and Kubernetes configuration management.',
     test_file: 'tests/developer/features/podman.feature',
     test_url: 'https://github.com/projectbluefin/testsuite/blob/main/tests/developer/features/podman.feature',
-    command: 'behave tests/developer/features/podman.feature'
+    command: 'behave tests/developer/features/podman.feature',
+    version: '1.10.0',
+    architectures: 'x86_64, aarch64',
+    license: 'Apache-2.0',
+    runtime: 'org.freedesktop.Platform'
   },
   {
     id: 'bazaar',
@@ -83,7 +95,11 @@ const bluefinDefaultApps = [
     description: 'The secure and customized App Center of Project Bluefin, orchestrating pre-configured Flatpaks, updates, and community software hubs.',
     test_file: 'tests/software/features/bazaar_ui.feature',
     test_url: 'https://github.com/projectbluefin/testsuite/blob/main/tests/software/features/bazaar_ui.feature',
-    command: 'behave tests/software/features/bazaar_ui.feature'
+    command: 'behave tests/software/features/bazaar_ui.feature',
+    version: '46.1',
+    architectures: 'x86_64, aarch64',
+    license: 'GPL-2.0-or-later',
+    runtime: 'org.gnome.Platform'
   }
 ];
 
@@ -215,11 +231,102 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
     }
 
     /* ── Kickass Application Cards ────────────────────────── */
-    .apps-registry-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-      gap: 1.5rem;
+    /* ── Kickass Application Cards (Horizontal Row Design) ───── */
+    .apps-horizontal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
       margin-bottom: 2.5rem;
+    }
+    .app-horizontal-row {
+      background: linear-gradient(90deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: auto 1.2fr 1.2fr auto;
+      gap: 1.75rem;
+      align-items: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .app-horizontal-row:hover {
+      border-color: rgba(56, 189, 248, 0.25);
+      transform: translateX(4px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    }
+    .app-flathub-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      object-fit: contain;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .app-horizontal-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .app-horizontal-info h3 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #f8fafc;
+      margin: 0;
+    }
+    .app-horizontal-info p {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin: 0;
+      line-height: 1.45;
+    }
+    .app-horizontal-metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem 1rem;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+      padding-left: 1.5rem;
+    }
+    .app-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+    .app-meta-item span {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .app-meta-item p {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin: 0;
+    }
+    .app-horizontal-status-block {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.5rem;
+    }
+    @media (max-width: 960px) {
+      .app-horizontal-row {
+        grid-template-columns: auto 1fr;
+        gap: 1.25rem;
+      }
+      .app-horizontal-metadata-grid {
+        grid-column: 1 / -1;
+        border-left: 0;
+        padding-left: 0;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+      .app-horizontal-status-block {
+        grid-column: 1 / -1;
+        align-items: flex-start;
+      }
     }
     .terminal-block {
       background: #090d16 !important;
@@ -233,108 +340,12 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       align-items: center !important;
       gap: 0.5rem !important;
       margin: 0.75rem 0 !important;
+      max-width: 480px;
     }
     .terminal-prompt {
       color: #10b981 !important;
       font-weight: 700 !important;
       user-select: none !important;
-    }
-    .app-kickass-card {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.55) 0%, rgba(15, 23, 42, 0.7) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 24px;
-      padding: 1.75rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: 250px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .app-kickass-card::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -50%;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .app-kickass-card:hover {
-      border-color: rgba(56, 189, 248, 0.3);
-      transform: translateY(-4px);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-    }
-    .app-kickass-card__header {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .app-icon-circle {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      display: grid;
-      place-items: center;
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: #38bdf8;
-    }
-    .app-icon-circle--firefox {
-      background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
-      border-color: rgba(249, 115, 22, 0.3);
-      color: #fb923c;
-    }
-    .app-meta-title h3 {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: #f8fafc;
-      margin: 0;
-    }
-    .app-meta-title p {
-      font-size: 0.8rem;
-      color: #64748b;
-      margin: 0.15rem 0 0 0;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .app-kickass-card__body h4 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #cbd5e1;
-      margin: 0 0 0.5rem 0;
-    }
-    .app-kickass-card__body p {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      line-height: 1.5;
-      margin: 0 0 1rem 0;
-    }
-    .app-stats-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-      background: rgba(15, 23, 42, 0.4);
-      border-radius: 14px;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-    }
-    .app-stat-col {
-      display: flex;
-      flex-direction: column;
-    }
-    .app-stat-col dt {
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
     }
     .app-stat-col dd {
       font-size: 1.1rem;
@@ -490,10 +501,10 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <!--  KICKASS APPLICATION CARDS                                  -->
+  <!--  KICKASS APPLICATION CARDS (Horizontal Registry-like Rows) ── -->
   <!-- ═══════════════════════════════════════════════════════════ -->
   <h2 class="section-title">Tracked applications & behave test suites</h2>
-  <div class="apps-registry-grid">
+  <div class="apps-horizontal-list">
     {bluefinDefaultApps.map((app) => {
       const appRows = rows.filter(r => r.app_id === app.id);
       const available = appRows.filter(r => r.state === 'available').length;
@@ -505,48 +516,64 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
       const isLiveTracked = appRows.length > 0;
 
       return (
-        <article class="app-kickass-card">
-          <div>
-            <div class="app-kickass-card__header">
-              <img src={app.icon_url} alt={`${app.display_name} icon`} class="app-flathub-icon" style="width: 48px; height: 48px; border-radius: 12px; object-fit: contain; background: rgba(255,255,255,0.03); padding: 4px; border: 1px solid rgba(255,255,255,0.08);" />
-              <div class="app-meta-title">
-                <h3>{app.display_name}</h3>
-                <p>{app.scope}</p>
-              </div>
-              <span class:list={['pill', isLiveTracked ? (available > 0 ? 'passed' : 'pending') : 'passed']} style="margin-left: auto;">
-                {isLiveTracked ? (available > 0 ? 'active' : 'pending') : 'pre-verified'}
-              </span>
-            </div>
+        <article class="app-horizontal-row">
+          <!-- Icon -->
+          <img src={app.icon_url} alt={`${app.display_name} icon`} class="app-flathub-icon" />
 
-            <div class="app-kickass-card__body">
-              <p>{app.description}</p>
-              
-              <div class="terminal-block">
-                <span class="terminal-prompt">$</span> <code>{app.command}</code>
-              </div>
+          <!-- Main Info -->
+          <div class="app-horizontal-info">
+            <h3>{app.display_name}</h3>
+            <p>{app.description}</p>
+            <div class="terminal-block">
+              <span class="terminal-prompt">$</span> <code>{app.command}</code>
             </div>
           </div>
 
-          <div>
-            {isLiveTracked ? (
-              <>
-                <dl class="app-stats-row">
-                  <div class="app-stat-col">
-                    <dt>Lanes covered</dt>
-                    <dd>{available}/{total}</dd>
-                  </div>
-                  <div class="app-stat-col">
-                    <dt>Scenarios</dt>
-                    <dd>{totalScenarios}</dd>
-                  </div>
-                  <div class="app-stat-col">
-                    <dt>Avg pass rate</dt>
-                    <dd>{passRate !== null ? `${passRate}%` : '—'}</dd>
-                  </div>
-                </dl>
+          <!-- Metadata Grid (Flathub, versions, architectures, etc) -->
+          <div class="app-horizontal-metadata-grid">
+            <div class="app-meta-item">
+              <span>Flathub App ID</span>
+              <p style="font-family: monospace; font-size: 0.78rem;">{app.app_id}</p>
+            </div>
+            <div class="app-meta-item">
+              <span>Version</span>
+              <p>{app.version}</p>
+            </div>
+            <div class="app-meta-item">
+              <span>Architectures</span>
+              <p>{app.architectures}</p>
+            </div>
+            <div class="app-meta-item">
+              <span>License</span>
+              <p>{app.license}</p>
+            </div>
+            <div class="app-meta-item" style="grid-column: 1 / -1;">
+              <span>Flatpak SDK Runtime</span>
+              <p style="font-family: monospace; font-size: 0.78rem;">{app.runtime}</p>
+            </div>
+          </div>
 
+          <!-- Status & Verification -->
+          <div class="app-horizontal-status-block">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span class:list={['pill', isLiveTracked ? (available > 0 ? 'passed' : 'pending') : 'passed']}>
+                {isLiveTracked ? (available > 0 ? 'active' : 'pending') : 'pre-verified'}
+              </span>
+              <a href={app.flathub_url} target="_blank" rel="noreferrer" class="pill pill--passed" style="text-decoration: none; border-color: rgba(255,255,255,0.08);">
+                Flathub ↗
+              </a>
+              <a href={app.test_url} target="_blank" rel="noreferrer" class="pill pill--passed" style="text-decoration: none; font-weight: 600; border-color: rgba(56,189,248,0.2); color: #38bdf8;">
+                View on GitHub ↗
+              </a>
+            </div>
+
+            {isLiveTracked ? (
+              <div style="margin-top: 0.5rem; text-align: right; width: 100%;">
+                <p class="table-note" style="margin: 0 0 0.25rem 0; font-size: 0.75rem;">
+                  {available}/{total} lanes · {totalScenarios} scenarios
+                </p>
                 {passRate !== null && (
-                  <div class="progress-bar-container" style="margin-bottom: 1.25rem;">
+                  <div class="progress-bar-container" style="margin-left: auto;">
                     <div
                       class="progress-bar"
                       style={`width: ${passRate}%; background: ${
@@ -559,23 +586,12 @@ const rowsWithoutFallback = rows.filter((row) => row.fallback_signal_count === 0
                     />
                   </div>
                 )}
-              </>
+              </div>
             ) : (
-              <div class="app-stats-row-static" style="background: rgba(15, 23, 42, 0.25); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: #64748b; line-height: 1.45;">
-                Verified under the <strong>developer</strong> suite across all active Project Bluefin image lanes.
+              <div style="margin-top: 0.5rem; font-size: 0.72rem; color: #64748b; max-width: 180px; text-align: right; line-height: 1.35;">
+                Part of the core <strong>developer</strong> tests.
               </div>
             )}
-
-            <dl class="status-card__meta" style="margin-top: 0; padding-top: 0; border-top: 0;">
-              <div>
-                <dt>Flathub App ID</dt>
-                <dd><a href={app.flathub_url} target="_blank" rel="noreferrer" style="font-family: monospace; font-size: 0.8rem;">{app.app_id} ↗</a></dd>
-              </div>
-              <div>
-                <dt>Awesome Behave Tests</dt>
-                <dd><a href={app.test_url} target="_blank" rel="noreferrer" style="font-weight: 600; color: #38bdf8;">View on GitHub ↗</a></dd>
-              </div>
-            </dl>
           </div>
         </article>
       );
