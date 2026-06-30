@@ -5,8 +5,8 @@ metadata:
   namespace: argo
   annotations:
     description: |
-      In-cluster BuildStream build pipeline for bluefin-server.
-      Builds oci/bluefin-server-bootc.bst and publishes to the local Zot registry (:30500).
+      In-cluster BuildStream build pipeline for Bluefin Server.
+      Builds oci/bluefin-server-installer.bst and publishes to the local Zot registry (:30500).
       Triggered on git changes or manual on-demand submission.
   labels:
     app.kubernetes.io/component: bluefin-server-build
@@ -18,7 +18,7 @@ spec:
   arguments:
     parameters:
       - name: repo
-        value: "https://github.com/castrojo/bluefin-server.git"
+        value: "https://github.com/projectbluefin/server.git"
       - name: ref
         value: "main"
       - name: registry
@@ -44,9 +44,9 @@ spec:
             arguments:
               parameters:
                 - name: element
-                  value: "oci/bluefin-server-bootc.bst"
+                  value: "oci/bluefin-server-installer.bst"
                 - name: tag
-                  value: "bluefin-server-bootc"
+                  value: "bluefin-server-installer"
                 - name: ref
                   value: "{{inputs.parameters.ref}}"
                 - name: repo
