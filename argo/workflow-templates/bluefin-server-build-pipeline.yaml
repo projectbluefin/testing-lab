@@ -77,11 +77,11 @@ spec:
             type: spc_t
         resources:
           requests:
-            cpu: "4"
-            memory: 14Gi
+            cpu: "6"
+            memory: 20Gi
           limits:
-            cpu: "8"
-            memory: 28Gi
+            cpu: "10"
+            memory: 34Gi
         env:
           - name: GITHUB_TOKEN
             valueFrom:
