@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-03-29T14:57:49Z",
+  "source_url": "https://github.com/castrojo/bootc-ecosystem/blob/main/src/data/countme.json",
+  "week_start": "2026-03-16",
+  "week_end": "2026-03-22",
+  "distros": {
+    "bluefin": 3502,
+    "aurora": 2527,
+    "bazzite": 71550
+  }
+}

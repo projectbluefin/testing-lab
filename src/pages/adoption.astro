@@ -20,6 +20,7 @@ const formatUtc = (value: string | null) =>
 const serializedPageData = serializeJsonScript(chartData);
 
 const unavailableTrustCards = trustCards.filter((c) => c.state === 'unavailable');
+const transplantedCountmeRow = rows.find((r) => r.countme_active_devices !== null) ?? null;
 ---
 
 <SiteLayout
@@ -92,9 +93,8 @@ const unavailableTrustCards = trustCards.filter((c) => c.state === 'unavailable'
         <li>{unavailableTrustCards.length} of {trustCards.length} trust cards are incomplete due to missing publisher metadata.</li>
       </ul>
       <p class="callout-note">
-        Pull-count data and countme active-device estimates are unavailable until repo-owned artifacts
-        fetched from GHCR package statistics or the Fedora countme infrastructure are committed to
-        <code>docs/data/</code>. This page does not fabricate adoption numbers from partial evidence.
+        Countme active-device coverage is partially available from repo-owned migrated artifacts in <code>docs/data/</code>.
+        Pull-count data is still unavailable until an in-scope registry source is committed, and those gaps stay visible per lane.
       </p>
     </article>
   </section>
@@ -125,6 +125,9 @@ const unavailableTrustCards = trustCards.filter((c) => c.state === 'unavailable'
     <article class="status-card">
       <p class="status-card__eyebrow">Per-lane adoption detail</p>
       <h2>Image lane breakdown</h2>
+      {transplantedCountmeRow && (
+        <p class="callout-note">{transplantedCountmeRow.derivation}</p>
+      )}
       <div class="table-scroll">
         <table class="data-table">
           <thead>

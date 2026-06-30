@@ -147,24 +147,29 @@ def test_homebrew_ecosystem_derives_all_tracked_lanes():
 
     metrics = {m['id']: m for m in dataset['summary_metrics']}
     assert metrics['tracked_image_lanes']['value'] == 10
-    assert metrics['lanes_with_brew_data']['value'] == 0
-    assert metrics['lanes_awaiting_brew_data']['value'] == 10
+    assert metrics['lanes_with_brew_data']['value'] == 4
+    assert metrics['lanes_awaiting_brew_data']['value'] == 6
 
 
-def test_homebrew_ecosystem_all_rows_unavailable_without_brew_data():
+def test_homebrew_ecosystem_non_bluefin_rows_are_unavailable_without_brew_data():
     module = load_module()
 
     dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
 
+    bluefin_family = {'bluefin', 'bluefin-lts'}
     for row in dataset['rows']:
-        assert row['state'] == 'unavailable', f"Expected unavailable for {row['id']}"
-        assert row['state_reason'], f"Missing state_reason for {row['id']}"
+        if row['variant'] in bluefin_family:
+            assert row['state'] == 'available', f"Expected available for {row['id']}"
+            assert row['install_count'] is not None
+            assert row['download_count'] is not None
+        else:
+            assert row['state'] == 'unavailable', f"Expected unavailable for {row['id']}"
+            assert row['state_reason'], f"Missing state_reason for {row['id']}"
+            assert row['install_count'] is None
+            assert row['download_count'] is None
         assert row['source_url'], f"Missing source_url for {row['id']}"
         assert row['collected_at'] == '2026-06-29T19:22:22Z'
         assert row['derivation'], f"Missing derivation for {row['id']}"
-        # Unavailable signals must be null, not fabricated
-        assert row['install_count'] is None
-        assert row['download_count'] is None
 
 
 def test_homebrew_ecosystem_metrics_have_full_provenance():
@@ -191,6 +196,35 @@ def test_homebrew_ecosystem_awaiting_metric_source_url_is_variant_publishers():
     )
 
 
+def test_homebrew_ecosystem_populates_bluefin_family_from_migrated_source():
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+    rows = {row['id']: row for row in dataset['rows']}
+
+    assert rows['bluefin-testing']['state'] == 'available'
+    assert rows['bluefin-testing']['tap_name'] == 'bluefin/brewfile'
+    assert rows['bluefin-testing']['install_count'] > 0
+    assert rows['bluefin-testing']['download_count'] > 0
+
+    assert rows['bluefin-lts-stable']['state'] == 'available'
+    assert rows['aurora-testing']['state'] == 'unavailable'
+    assert rows['flatcar-testing']['state'] == 'unavailable'
+
+
+def test_homebrew_ecosystem_exposes_transplanted_tap_catalog():
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+    taps = {tap['name']: tap for tap in dataset['taps']}
+    metrics = {metric['id']: metric for metric in dataset['summary_metrics']}
+
+    assert 'bluefin/brewfile' in taps
+    assert taps['bluefin/brewfile']['url'] == 'https://github.com/projectbluefin/common'
+    assert metrics['lanes_with_brew_data']['value'] == 4
+    assert metrics['lanes_awaiting_brew_data']['value'] == 6
+
+
 def test_adoption_metrics_derives_all_tracked_lanes():
     module = load_module()
 
@@ -212,7 +246,26 @@ def test_adoption_metrics_derives_all_tracked_lanes():
     metrics = {m['id']: m for m in dataset['summary_metrics']}
     assert metrics['tracked_image_lanes']['value'] == 10
     assert metrics['lanes_with_pull_data']['value'] == 0
-    assert metrics['lanes_with_countme_data']['value'] == 0
+    assert metrics['lanes_with_countme_data']['value'] == 6
+
+
+def test_adoption_metrics_populates_countme_for_in_scope_variants():
+    module = load_module()
+
+    dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
+    rows = {row['id']: row for row in dataset['rows']}
+    metrics = {metric['id']: metric for metric in dataset['summary_metrics']}
+
+    assert rows['bluefin-testing']['state'] == 'available'
+    assert rows['bluefin-testing']['countme_active_devices'] == 3502
+    assert rows['bluefin-stable']['countme_active_devices'] == 3502
+    assert rows['aurora-testing']['countme_active_devices'] == 2527
+    assert rows['bazzite-stable']['countme_active_devices'] == 71550
+
+    assert rows['dakota-testing']['state'] == 'unavailable'
+    assert rows['flatcar-testing']['state'] == 'unavailable'
+    assert metrics['lanes_with_countme_data']['value'] == 6
+    assert metrics['lanes_with_pull_data']['value'] == 0
 
 
 def test_adoption_metrics_has_trust_cards_from_publishers():
@@ -249,19 +302,18 @@ def test_adoption_trust_card_unavailable_when_publisher_unknown():
     assert flatcar_card['state_reason'], "flatcar trust card must have explicit state_reason"
 
 
-def test_adoption_metrics_rows_unavailable_without_pull_data():
+def test_adoption_metrics_pull_count_always_null():
     module = load_module()
 
     dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
 
     for row in dataset['rows']:
         assert row['pull_count'] is None, f"Expected null pull_count for {row['id']}"
-        assert row['countme_active_devices'] is None, f"Expected null countme for {row['id']}"
-        assert row['state'] == 'unavailable', f"Expected unavailable for {row['id']}"
-        assert row['state_reason'], f"Missing state_reason for {row['id']}"
         assert row['source_url'], f"Missing source_url for {row['id']}"
         assert row['collected_at'] == '2026-06-29T19:22:22Z'
         assert row['derivation'], f"Missing derivation for {row['id']}"
+        if row['state'] == 'unavailable':
+            assert row['state_reason'], f"Missing state_reason for unavailable row {row['id']}"
 
 
 def test_adoption_metrics_metrics_have_full_provenance():
@@ -277,18 +329,19 @@ def test_adoption_metrics_metrics_have_full_provenance():
 
 
 def test_homebrew_ecosystem_names_authoritative_upstream_sources():
-    """Derivation and state_reason must name formulae.brew.sh, not bootc-ecosystem site artifacts."""
+    """Derivation and state_reason must name formulae.brew.sh for unavailable rows."""
     module = load_module()
 
     dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
 
     for row in dataset['rows']:
-        assert 'formulae.brew.sh' in row['state_reason'], (
-            f"state_reason for {row['id']} must name formulae.brew.sh as the authoritative source"
-        )
-        assert 'formulae.brew.sh' in row['derivation'], (
-            f"derivation for {row['id']} must name formulae.brew.sh"
-        )
+        if row['state'] == 'unavailable':
+            assert 'formulae.brew.sh' in row['state_reason'], (
+                f"state_reason for {row['id']} must name formulae.brew.sh as the authoritative source"
+            )
+            assert 'formulae.brew.sh' in row['derivation'], (
+                f"derivation for {row['id']} must name formulae.brew.sh"
+            )
 
     metrics = {m['id']: m for m in dataset['summary_metrics']}
     assert 'formulae.brew.sh' in metrics['lanes_with_brew_data']['derivation']
@@ -302,22 +355,129 @@ def test_adoption_metrics_names_authoritative_upstream_sources():
     dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
 
     for row in dataset['rows']:
-        reason = row['state_reason']
         derivation = row['derivation']
-        assert 'GHCR' in reason or 'registry' in reason.lower(), (
-            f"state_reason for {row['id']} must name a registry API (GHCR) as pull_count source"
-        )
-        assert 'countme' in reason.lower(), (
-            f"state_reason for {row['id']} must name Fedora countme as countme_active_devices source"
-        )
-        assert 'GHCR' in derivation or 'registry' in derivation.lower(), (
-            f"derivation for {row['id']} must name a registry API"
-        )
-        assert 'countme' in derivation.lower(), (
-            f"derivation for {row['id']} must name countme data"
-        )
+        if row['state'] == 'unavailable':
+            reason = row['state_reason']
+            assert 'GHCR' in reason or 'registry' in reason.lower(), (
+                f"state_reason for {row['id']} must name a registry API (GHCR) as pull_count source"
+            )
+            assert 'countme' in reason.lower(), (
+                f"state_reason for {row['id']} must name Fedora countme as countme_active_devices source"
+            )
+            assert 'GHCR' in derivation or 'registry' in derivation.lower(), (
+                f"derivation for {row['id']} must name a registry API"
+            )
+            assert 'countme' in derivation.lower(), (
+                f"derivation for {row['id']} must name countme data"
+            )
+        else:
+            assert 'countme' in derivation.lower(), (
+                f"derivation for available row {row['id']} must name countme data source"
+            )
 
     metrics = {m['id']: m for m in dataset['summary_metrics']}
     assert 'GHCR' in metrics['lanes_with_pull_data']['derivation'] or \
            'registry' in metrics['lanes_with_pull_data']['derivation'].lower()
     assert 'countme' in metrics['lanes_with_countme_data']['derivation'].lower()
+
+
+# --- Provenance fix tests (TDD: added to drive the source_url fix) ---
+
+REPO_HB_MIGRATED_URL = (
+    'https://github.com/projectbluefin/testing-lab/blob/main/'
+    'docs/data/homebrew-package-stats-migrated.json'
+)
+REPO_AC_MIGRATED_URL = (
+    'https://github.com/projectbluefin/testing-lab/blob/main/'
+    'docs/data/adoption-countme-migrated.json'
+)
+OLD_UPSTREAM_SLUG = 'castrojo/bootc-ecosystem'
+
+
+def test_homebrew_available_rows_use_repo_owned_source_url():
+    """Available Homebrew rows must point to the repo-owned migrated artifact, not castrojo/bootc-ecosystem."""
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+
+    for row in dataset['rows']:
+        if row['state'] == 'available':
+            assert row['source_url'] == REPO_HB_MIGRATED_URL, (
+                f"Row {row['id']} source_url must be the repo-owned migrated artifact, "
+                f"got: {row['source_url']}"
+            )
+            assert OLD_UPSTREAM_SLUG not in row['source_url'], (
+                f"Row {row['id']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+            )
+
+
+def test_homebrew_tap_entries_use_repo_owned_source_url():
+    """Tap entries transplanted from migrated artifact must use repo-owned source_url."""
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+
+    assert dataset['taps'], "Expected at least one tap entry"
+    for tap in dataset['taps']:
+        assert tap['source_url'] == REPO_HB_MIGRATED_URL, (
+            f"Tap {tap['name']} source_url must be the repo-owned migrated artifact, "
+            f"got: {tap['source_url']}"
+        )
+        assert OLD_UPSTREAM_SLUG not in tap['source_url'], (
+            f"Tap {tap['name']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+        )
+
+
+def test_adoption_available_rows_use_repo_owned_source_url():
+    """Available Adoption rows must point to the repo-owned migrated artifact, not castrojo/bootc-ecosystem."""
+    module = load_module()
+
+    dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
+
+    for row in dataset['rows']:
+        if row['state'] == 'available':
+            assert row['source_url'] == REPO_AC_MIGRATED_URL, (
+                f"Row {row['id']} source_url must be the repo-owned migrated artifact, "
+                f"got: {row['source_url']}"
+            )
+            assert OLD_UPSTREAM_SLUG not in row['source_url'], (
+                f"Row {row['id']} source_url must not point to {OLD_UPSTREAM_SLUG}"
+            )
+
+
+# --- Disclosure tests (TDD: drive explicit provenance text for transplanted signals) ---
+
+def test_homebrew_available_rows_disclose_global_analytics_and_package_count():
+    """Available Homebrew rows must state they are global formula analytics and name the transplanted package count."""
+    module = load_module()
+
+    dataset = module.build_homebrew_ecosystem(ROOT, '2026-06-29T19:22:22Z')
+
+    available = [r for r in dataset['rows'] if r['state'] == 'available']
+    assert available, "Expected at least one available Homebrew row"
+
+    for row in available:
+        derivation = row['derivation']
+        assert 'global' in derivation.lower(), (
+            f"Row {row['id']} derivation must disclose 'global' formula analytics; got: {derivation}"
+        )
+        assert '3' in derivation, (
+            f"Row {row['id']} derivation must name the transplanted package count (3); got: {derivation}"
+        )
+
+
+def test_adoption_available_rows_disclose_snapshot_week_window():
+    """Available Adoption rows must include the countme snapshot week window in their derivation."""
+    module = load_module()
+
+    dataset = module.build_adoption_metrics(ROOT, '2026-06-29T19:22:22Z')
+
+    available = [r for r in dataset['rows'] if r['state'] == 'available']
+    assert available, "Expected at least one available Adoption row"
+
+    for row in available:
+        derivation = row['derivation']
+        # The snapshot week dates from adoption-countme-migrated.json must appear
+        assert '2026-03-16' in derivation or '2026-03-22' in derivation, (
+            f"Row {row['id']} derivation must include the snapshot week window dates; got: {derivation}"
+        )

@@ -6,7 +6,7 @@ import { serializeJsonScript } from '../lib/json-script';
 const baseUrl = import.meta.env.BASE_URL;
 const pageModel = loadHomebrewPageModel(`${process.cwd()}/docs/data/homebrew-ecosystem.json`);
 
-const { dataset, summaryMetrics, summaryMetricMap, taps, rows, unavailableRows, chartData } = pageModel;
+const { dataset, summaryMetrics, summaryMetricMap, taps, rows, availableRows, unavailableRows, chartData } = pageModel;
 
 const serializedPageData = serializeJsonScript(chartData);
 
@@ -99,10 +99,8 @@ const formatUtc = (value: string | null) =>
         </li>
       </ul>
       <p class="callout-note">
-        This page covers all images the Project Bluefin factory actively tracks — Bluefin,
-        Bluefin-LTS, Aurora, Bazzite, Dakota, and Flatcar.
-        Homebrew analytics come from authoritative upstream sources (formulae.brew.sh or
-        upstream tap repos) once a repo-owned artifact is committed to docs/data/.
+        This page reads repo-owned migrated Homebrew artifacts committed under <code>docs/data/</code>.
+        Bluefin-family lanes reuse the transplanted Brewfile package totals; unmatched lanes remain explicitly unavailable.
       </p>
     </article>
   </section>
@@ -124,6 +122,9 @@ const formatUtc = (value: string | null) =>
     <article class="status-card">
       <p class="status-card__eyebrow">Per-lane Homebrew details</p>
       <h2>All tracked image lanes</h2>
+      {availableRows.length > 0 && (
+        <p class="callout-note">{availableRows[0].derivation}</p>
+      )}
       <div class="table-scroll">
         <table class="data-table">
           <thead>

@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-04-07T20:45:10Z",
+  "source_url": "https://github.com/castrojo/bootc-ecosystem/blob/main/src/data/brewfile-stats.json",
+  "taps": [
+    {
+      "name": "bluefin/brewfile",
+      "url": "https://github.com/projectbluefin/common",
+      "description": "Bluefin family Brewfile package set transplanted from bootc-ecosystem source data.",
+      "variant_scope": ["bluefin", "bluefin-lts"],
+      "packages": [
+        { "name": "gh", "downloads": 333799, "installs_90d": 878576 },
+        { "name": "claude-code", "downloads": 173016, "installs_90d": 443649 },
+        { "name": "gemini-cli", "downloads": 117069, "installs_90d": 354174 }
+      ]
+    }
+  ]
+}

@@ -527,11 +527,66 @@ def iter_tracked_lanes(publishers: dict):
             yield variant, branch, details
 
 
+def load_optional_json(path: Path):
+    if not path.exists():
+        return None
+    return load_json(path)
+
+
 def build_homebrew_ecosystem(root: Path, collected_at: str) -> dict:
     publishers = load_json(root / 'docs/data/variant-publishers.json')
+    migrated = load_optional_json(root / 'docs/data/homebrew-package-stats-migrated.json') or {'taps': []}
+    tap_by_variant = {
+        variant: tap
+        for tap in migrated.get('taps', [])
+        for variant in tap.get('variant_scope', [])
+    }
+
+    taps = []
+    for tap in migrated.get('taps', []):
+        taps.append(
+            {
+                'id': tap['name'].replace('/', '-'),
+                'name': tap['name'],
+                'url': tap['url'],
+                'description': tap.get('description'),
+                'state': 'available',
+                'state_reason': None,
+                'source_url': repo_blob_url('docs/data/homebrew-package-stats-migrated.json'),
+                'collected_at': collected_at,
+                'derivation': 'Transplanted from repo-owned docs/data/homebrew-package-stats-migrated.json.',
+            }
+        )
 
     rows = []
     for variant, branch, details in iter_tracked_lanes(publishers):
+        tap = tap_by_variant.get(variant)
+        if tap:
+            install_count = sum(pkg['installs_90d'] for pkg in tap['packages'])
+            download_count = sum(pkg['downloads'] for pkg in tap['packages'])
+            rows.append(
+                {
+                    'id': f'{variant}-{branch}',
+                    'variant': variant,
+                    'branch': branch,
+                    'tap_name': tap['name'],
+                    'tap_url': tap['url'],
+                    'install_count': install_count,
+                    'download_count': download_count,
+                    'state': 'available',
+                    'state_reason': None,
+                    'source_url': repo_blob_url('docs/data/homebrew-package-stats-migrated.json'),
+                    'collected_at': collected_at,
+                    'derivation': (
+                        f'Global formula analytics from formulae.brew.sh transplanted as a {len(tap["packages"])}-package subset '
+                        f'from repo-owned docs/data/homebrew-package-stats-migrated.json. '
+                        f'Numbers are not Bluefin-attributable lane installs — the same values appear on every '
+                        f'Bluefin-family branch row because the source has no branch dimension.'
+                    ),
+                }
+            )
+            continue
+
         repo = details.get('publisher_repo')
         releases_url = (
             f'https://github.com/{repo}/releases'
@@ -615,13 +670,15 @@ def build_homebrew_ecosystem(root: Path, collected_at: str) -> dict:
                 ),
             },
         ],
-        'taps': [],
+        'taps': taps,
         'rows': rows,
     }
 
 
 def build_adoption_metrics(root: Path, collected_at: str) -> dict:
     publishers = load_json(root / 'docs/data/variant-publishers.json')
+    migrated_countme = load_optional_json(root / 'docs/data/adoption-countme-migrated.json') or {'distros': {}}
+    countme_by_variant = migrated_countme.get('distros', {})
 
     trust_cards = []
     for variant, details in (publishers.get('variants') or {}).items():
@@ -656,6 +713,8 @@ def build_adoption_metrics(root: Path, collected_at: str) -> dict:
         )
 
     rows = []
+    week_start = migrated_countme.get('week_start', '')
+    week_end = migrated_countme.get('week_end', '')
     for variant, branch, details in iter_tracked_lanes(publishers):
         repo = details.get('publisher_repo')
         releases_url = (
@@ -663,25 +722,27 @@ def build_adoption_metrics(root: Path, collected_at: str) -> dict:
             if repo
             else repo_blob_url('docs/data/variant-publishers.json')
         )
+        countme_value = countme_by_variant.get(variant)
         rows.append(
             {
                 'id': f'{variant}-{branch}',
                 'variant': variant,
                 'branch': branch,
                 'pull_count': None,
-                'countme_active_devices': None,
-                'state': 'unavailable',
-                'state_reason': (
+                'countme_active_devices': countme_value,
+                'state': 'available' if countme_value is not None else 'unavailable',
+                'state_reason': None if countme_value is not None else (
                     'No registry pull-count data (GHCR or container registry API) or active-device data '
-                    '(Fedora countme infrastructure) is tracked in docs/data/ for this lane. '
-                    'Collector will populate pull_count/countme_active_devices once repo-owned artifacts '
-                    'fetched from those sources are committed.'
+                    '(Fedora countme infrastructure) is tracked in docs/data/ for this lane.'
                 ),
-                'source_url': releases_url,
+                'source_url': repo_blob_url('docs/data/adoption-countme-migrated.json') if countme_value is not None else releases_url,
                 'collected_at': collected_at,
                 'derivation': (
-                    f'Lane derived from docs/data/variant-publishers.json {variant}.branches; '
-                    'no registry pull-count data (GHCR API) or Fedora countme data found in docs/data/.'
+                    f'Distro-wide countme active-device count transplanted from repo-owned '
+                    f'docs/data/adoption-countme-migrated.json (snapshot week {week_start} to {week_end}). '
+                    f'The same value is reused for each tracked branch because the source has no branch dimension.'
+                    if countme_value is not None
+                    else f'Lane derived from docs/data/variant-publishers.json {variant}.branches; no registry pull-count data (GHCR API) or Fedora countme data found in docs/data/.'
                 ),
             }
         )

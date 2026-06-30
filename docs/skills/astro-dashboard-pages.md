@@ -66,6 +66,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 18. If a hero status card is made dynamic, conditionally render it to summarize partial/full primary coverage while preserving any expected smoke-test regex assertions (e.g. `/No completed Bazaar-specific software result is published/i`) in the text output.
 19. Ensure state/status calculations are resilient to all published status strings. For example, check for specific incomplete states (like 'pending' or 'missing') rather than asserting negative checks on specific completed states (like 'completed') when the true completed statuses are 'passed' or 'failed'.
 20. When a page evolves from one tracked entity to multiple (for example adding Firefox alongside Bazaar), include the new dimension in chart/table labels and category keys (app + variant + branch) so rendering stays unambiguous.
+21. If you reuse distro-wide or global source data across multiple branch rows, the caveat must be visible in rendered HTML, not only in JSON `derivation`. Call out scope plainly (for example global formula analytics, distro-wide snapshot, reused across branches, and snapshot window) and assert that disclosure in the built-page test.
 
 ## Common Rationalizations
 
@@ -88,6 +89,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - Runtime script tags lose `data-cfasync="false"` and Cloudflare rewrites the page boot path
 - Route split duplicates collector logic instead of reusing one shared model with page-level filters
 - Validation mentions `astro check` as passing when it actually OOMed
+- Disclosure about reused global or distro-wide values exists only in JSON fields and is absent from rendered HTML
 
 ## Verification
 
@@ -101,5 +103,6 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 - [ ] Built HTML prefixes Astro `_astro` assets with the active domain root path contract (currently `/_astro/*` on `factory.projectbluefin.io`)
 - [ ] Runtime script tags that must execute unmodified keep `data-cfasync="false"` in built HTML
 - [ ] Targeted HTML test covers chart section labels, evidence links, and unavailable copy
+- [ ] Any reused global or distro-wide metrics disclose their scope in rendered HTML, and the page test asserts that disclosure
 - [ ] `npm run build` succeeds for the Astro worktree
 - [ ] Any failed/blocked validation step (for example `astro check` OOM) is reported explicitly, not silently dropped

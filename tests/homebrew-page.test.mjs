@@ -46,11 +46,8 @@ test('homebrew page renders summary metrics, lane details, explicit unavailable 
     'homebrew page includes aurora lane',
   );
 
-  assert.match(
-    homebrewPage,
-    /No Homebrew analytics data/i,
-    'homebrew page renders explicit unavailable state reason',
-  );
+  assert.match(homebrewPage, /bluefin\/brewfile/i, 'homebrew page shows the transplanted tap');
+  assert.match(homebrewPage, /Lanes with Homebrew data/i, 'homebrew metrics still render');
 
   assert.match(
     homebrewPage,
@@ -75,6 +72,24 @@ test('homebrew page renders summary metrics, lane details, explicit unavailable 
     /homebrew-ecosystem\.json/,
     'homebrew page references the raw homebrew-ecosystem dataset',
   );
+
+  assert.match(
+    homebrewPage,
+    /global formula analytics/i,
+    'homebrew page discloses that transplanted values are global formula analytics',
+  );
+  assert.match(
+    homebrewPage,
+    /3-package subset/i,
+    'homebrew page discloses that values come from a 3-package subset reused across branches',
+  );
+});
+
+test('homebrew page renders migrated tap coverage instead of the starter empty state', () => {
+  const homebrewPage = html('docs/homebrew/index.html');
+  assert.match(homebrewPage, /Homebrew data is partially available/i);
+  assert.match(homebrewPage, /bluefin\/brewfile/i);
+  assert.doesNotMatch(homebrewPage, /No Homebrew analytics data is published for any tracked lane/i);
 });
 
 test('homebrew-ecosystem.json contract satisfies the page model contract', () => {
