@@ -116,6 +116,31 @@ test('homebrew page renders summary metrics, lane details, explicit unavailable 
   );
 });
 
+test('homebrew data tables span the full grid width and stay scrollable when squeezed', () => {
+  const homebrewPage = html('docs/homebrew/index.html');
+
+  const cssHref = homebrewPage.match(/href="(\/_astro\/SiteLayout\.[A-Za-z0-9_]+\.css)"/);
+  assert.ok(cssHref, 'homebrew page links a compiled SiteLayout stylesheet');
+
+  const css = html(path.join('docs', cssHref[1].replace(/^\//, '')));
+
+  assert.match(
+    css,
+    /\.detail-grid>article:has\(\.table-scroll\)\{grid-column:1\/-1\}/,
+    'table cards span the full grid row so 6-7 column tables are not crushed into a half-width cell',
+  );
+  assert.match(
+    css,
+    /\.data-table\{[^}]*min-width:48rem[^}]*\}/,
+    'data tables have a min-width floor so .table-scroll scrolls horizontally instead of crushing columns',
+  );
+  assert.match(
+    css,
+    /\.table-scroll\{[^}]*overflow-x:auto[^}]*\}/,
+    'table-scroll wrapper enables horizontal scrolling on narrow viewports',
+  );
+});
+
 test('homebrew page renders migrated tap coverage instead of the starter empty state', () => {
   const homebrewPage = html('docs/homebrew/index.html');
   assert.match(homebrewPage, /Homebrew data is partially available/i);

@@ -187,6 +187,13 @@ code {
   grid-template-columns: 1.35fr 1fr;
 }
 
+/* Wide data tables need the full content width: a 6-7 column table squeezed
+   into a half-width grid cell crushes columns and forces awkward wrapping.
+   Any card that hosts a scrollable table spans the full grid row instead. */
+.detail-grid > article:has(.table-scroll) {
+  grid-column: 1 / -1;
+}
+
 .chart-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -258,12 +265,22 @@ code {
 
 .table-scroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .data-table {
   width: 100%;
+  /* Floor the table width so columns stay aligned and readable; when the
+     container is narrower (mobile/tablet) the .table-scroll wrapper scrolls
+     horizontally instead of crushing the columns. */
+  min-width: 48rem;
   border-collapse: collapse;
   margin-top: 8px;
+}
+
+.data-table thead th {
+  white-space: nowrap;
 }
 
 .data-table th,
