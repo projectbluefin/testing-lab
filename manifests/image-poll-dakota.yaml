@@ -1,4 +1,4 @@
-# CronWorkflow: polls ghcr.io/projectbluefin/dakota:latest hourly.
+# CronWorkflow: polls ghcr.io/projectbluefin/dakota:latest every 10 minutes.
 # Triggers dakota-qa-pipeline only when OCI digest changes vs ConfigMap state.
 apiVersion: argoproj.io/v1alpha1
 kind: CronWorkflow
@@ -11,7 +11,7 @@ metadata:
 spec:
   suspend: true  # dakota composefs image ships no UKI; bootc install to-disk always fails. Do not un-suspend until upstream fixes this.
   schedules:
-    - "2 */3 * * *"
+    - "*/10 * * * *"
   timezone: "UTC"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
