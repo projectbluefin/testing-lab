@@ -74,6 +74,7 @@ Read the published JSON contract at prerender time, join any linked result JSON 
 74. Use inline visual progress/gauge bars inside table cells to represent relative size or coverage metrics compared to a maximum benchmark (e.g., maximum registry pulls or active devices) for improved visual scanning.
 75. When implementing tests or matrix dashboard pages, represent cell or row pass rates using inline visual progress bars with dynamic gradients (e.g., green/emerald for ≥90%, orange/amber for 60%-90%, and red for <60% performance) alongside the text value to enhance scanability and visual hierarchy.
 76. Introduce comprehensive, science-grade KPI metrics such as average pass rate across all active cells and total scenarios verified, accompanied by a "Data Integrity Posture" disclosure block at the bottom of the page to build user trust, clarify evidence-backed authenticity, and explicitly details available vs unavailable counts.
+77. When pulling in container registries or caches data (e.g. Zot local and Zot cache), execute live queries at pre-render build-time using `execSync` with defensive timeouts and error stashing, falling back gracefully to static mock snapshots to ensure builds never fail offline or under homelab network latency.
 
 ## Common Rationalizations
 
