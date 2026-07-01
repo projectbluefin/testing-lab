@@ -590,7 +590,12 @@ spec:
         scp ${SSH_OPTS} "${BIN}" core@"${INSTALLER_IP}":/tmp/knuckle >/dev/null
         ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'chmod +x /tmp/knuckle'
 
-        TARGET_DISK=$(ssh ${SSH_OPTS} core@"${INSTALLER_IP}" "lsblk -dpno NAME,TYPE | awk '\$2 == \"disk\" {print \$1; exit}'")
+        TARGET_DISK=$(ssh ${SSH_OPTS} core@"${INSTALLER_IP}" \
+          'lsblk -dpno NAME,TYPE | while read -r name type; do
+             [ "$type" = disk ] || continue
+             printf "%s\n" "$name"
+             break
+           done')
         if [[ -z "${TARGET_DISK}" ]]; then
           echo "ERROR: unable to resolve target install disk" >&2
           exit 1
