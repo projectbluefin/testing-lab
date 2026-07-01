@@ -336,6 +336,8 @@ spec:
             value: "{{inputs.parameters.namespace}}"
           - name: ignition-json
             value: "{{steps.write-ignition.outputs.parameters.ignition-json}}"
+          - name: ssh-pubkey
+            value: "{{steps.write-ignition.outputs.parameters.ssh-pubkey}}"
 
   - name: write-ignition
     inputs:
@@ -347,6 +349,9 @@ spec:
       - name: ignition-json
         valueFrom:
           path: /work/ignition.json
+      - name: ssh-pubkey
+        valueFrom:
+          path: /work/ssh-pubkey
     volumes:
     - name: work
       emptyDir: {}
@@ -384,6 +389,7 @@ spec:
             "systemd": {"units": [{"name": "sshd.service", "enabled": True}]},
         }, separators=(",", ":")))
         PY
+        printf '%s' "${SSH_PUBKEY}" > /work/ssh-pubkey
         install -D -m 600 /work/ignition.json \
           "/var/mnt/ghost-data/knuckle-test/{{inputs.parameters.vm-name}}-installer.ign"
         echo "Wrote ignition for {{inputs.parameters.vm-name}}" >&2
@@ -458,6 +464,7 @@ spec:
       - name: vm-name
       - name: namespace
       - name: ignition-json
+      - name: ssh-pubkey
     resource:
       action: apply
       manifest: |
@@ -498,6 +505,9 @@ spec:
                       disk:
                         bus: virtio
                       bootOrder: 2
+                    - name: cloudinit
+                      disk:
+                        bus: virtio
                   interfaces:
                     - name: default
                       masquerade: {}
@@ -513,6 +523,17 @@ spec:
                 - name: rootdisk
                   persistentVolumeClaim:
                     claimName: "{{inputs.parameters.vm-name}}-rootdisk"
+                - name: cloudinit
+                  cloudInitNoCloud:
+                    userData: |
+                      #cloud-config
+                      users:
+                        - name: core
+                          ssh_authorized_keys:
+                            - {{inputs.parameters.ssh-pubkey}}
+                        - name: root
+                          ssh_authorized_keys:
+                            - {{inputs.parameters.ssh-pubkey}}
 
   - name: boot-installer
     inputs:
