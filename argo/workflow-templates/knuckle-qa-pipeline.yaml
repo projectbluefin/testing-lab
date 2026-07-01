@@ -587,6 +587,7 @@ spec:
         NS="{{inputs.parameters.namespace}}"
         VM="{{inputs.parameters.vm-name}}"
         KEY="/etc/ssh/test-key/id_ed25519"
+        chmod 600 "${KEY}"
         BIN="/var/mnt/ghost-data/knuckle-test/${VM}-knuckle"
         SSH_OPTS="-i ${KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
@@ -701,6 +702,7 @@ spec:
         NS="{{inputs.parameters.namespace}}"
         VM="{{inputs.parameters.vm-name}}"
         KEY="/etc/ssh/test-key/id_ed25519"
+        chmod 600 "${KEY}"
         SSH_OPTS="-i ${KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
         for _ in $(seq 1 60); do
@@ -861,6 +863,7 @@ spec:
         NS="{{inputs.parameters.namespace}}"
         VM="{{inputs.parameters.vm-name}}"
         KEY="/etc/ssh/test-key/id_ed25519"
+        chmod 600 "${KEY}"
         SSH_OPTS="-i ${KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
         VM_IP=""
