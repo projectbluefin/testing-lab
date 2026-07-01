@@ -586,17 +586,17 @@ spec:
         fi
 
         for _ in $(seq 1 60); do
-          if ssh ${SSH_OPTS} core@"${INSTALLER_IP}" true 2>/dev/null; then
+          if ssh ${SSH_OPTS} root@"${INSTALLER_IP}" true 2>/dev/null; then
             break
           fi
           sleep 5
         done
-        ssh ${SSH_OPTS} core@"${INSTALLER_IP}" true >/dev/null
+        ssh ${SSH_OPTS} root@"${INSTALLER_IP}" true >/dev/null
 
-        scp ${SSH_OPTS} "${BIN}" core@"${INSTALLER_IP}":/tmp/knuckle >/dev/null
-        ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'chmod +x /tmp/knuckle'
+        scp ${SSH_OPTS} "${BIN}" root@"${INSTALLER_IP}":/tmp/knuckle >/dev/null
+        ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'chmod +x /tmp/knuckle'
 
-        TARGET_DISK=$(ssh ${SSH_OPTS} core@"${INSTALLER_IP}" \
+        TARGET_DISK=$(ssh ${SSH_OPTS} root@"${INSTALLER_IP}" \
           'lsblk -dpno NAME,TYPE | while read -r name type; do
              [ "$type" = disk ] || continue
              printf "%s\n" "$name"
@@ -610,9 +610,9 @@ spec:
         cat > /var/mnt/ghost-data/knuckle-test/${VM}-qa.json <<EOF
         {"channel":"stable","hostname":"${VM}","timezone":"UTC","network":{"mode":"dhcp"},"users":[{"username":"bluefin-test","ssh_keys":["${SSH_PUBKEY}"]}],"disk":"${TARGET_DISK}","update_strategy":"off","reboot":false}
         EOF
-        scp ${SSH_OPTS} /var/mnt/ghost-data/knuckle-test/${VM}-qa.json core@"${INSTALLER_IP}":/tmp/qa.json >/dev/null
+        scp ${SSH_OPTS} /var/mnt/ghost-data/knuckle-test/${VM}-qa.json root@"${INSTALLER_IP}":/tmp/qa.json >/dev/null
 
-        ssh ${SSH_OPTS} core@"${INSTALLER_IP}" "sudo systemd-run --unit knuckle-headless-install --collect /bin/bash -lc 'set -euo pipefail; trap \"touch /install-failed\" ERR; /tmp/knuckle --headless --config /tmp/qa.json --log-file /tmp/knuckle-install.log; touch /install-complete'"
+        ssh ${SSH_OPTS} root@"${INSTALLER_IP}" "systemd-run --unit knuckle-headless-install --collect /bin/bash -lc 'set -euo pipefail; trap \"touch /install-failed\" ERR; /tmp/knuckle --headless --config /tmp/qa.json --log-file /tmp/knuckle-install.log; touch /install-complete'"
         echo "Installer booted and headless install launched against ${TARGET_DISK}" >&2
         SCRIPT_EOF
 
@@ -658,13 +658,13 @@ spec:
             sleep 5
             continue
           fi
-          if ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'sudo test -f /install-complete' 2>/dev/null; then
+          if ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'test -f /install-complete' 2>/dev/null; then
             echo "Install complete on ${INSTALLER_IP}" >&2
             exit 0
           fi
-          if ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'sudo test -f /install-failed' 2>/dev/null; then
+          if ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'test -f /install-failed' 2>/dev/null; then
             echo "Installer reported failure" >&2
-            ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'sudo cat /tmp/knuckle-install.log 2>/dev/null || sudo journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
+            ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'cat /tmp/knuckle-install.log 2>/dev/null || journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
             exit 1
           fi
           sleep 5
@@ -672,7 +672,7 @@ spec:
 
         INSTALLER_IP=$(kubectl get vmi -n "${NS}" "${VM}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
         if [[ -n "${INSTALLER_IP}" ]]; then
-          ssh ${SSH_OPTS} core@"${INSTALLER_IP}" 'sudo cat /tmp/knuckle-install.log 2>/dev/null || sudo journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
+          ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'cat /tmp/knuckle-install.log 2>/dev/null || journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
         fi
         echo "ERROR: timed out waiting for /install-complete" >&2
         exit 1
