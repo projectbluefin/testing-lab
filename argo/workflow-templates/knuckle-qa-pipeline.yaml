@@ -677,7 +677,7 @@ spec:
       - name: vm-name
       - name: namespace
       - name: ssh-key-secret
-    activeDeadlineSeconds: 600
+    activeDeadlineSeconds: 1800
     podSpecPatch: |
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -710,7 +710,7 @@ spec:
         chmod 600 "${KEY}"
         SSH_OPTS="-i ${KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
-        for _ in $(seq 1 60); do
+        for i in $(seq 1 180); do
           INSTALLER_IP=$(kubectl get vmi -n "${NS}" "${VM}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
           if [[ -z "${INSTALLER_IP}" ]]; then
             sleep 5
@@ -724,6 +724,14 @@ spec:
             echo "Installer reported failure" >&2
             ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'cat /tmp/knuckle-install.log 2>/dev/null || journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
             exit 1
+          fi
+          if ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'systemctl is-failed --quiet knuckle-headless-install' 2>/dev/null; then
+            echo "Installer unit failed" >&2
+            ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'journalctl -u knuckle-headless-install --no-pager -n 200' >&2 || true
+            exit 1
+          fi
+          if (( i % 12 == 0 )); then
+            ssh ${SSH_OPTS} root@"${INSTALLER_IP}" 'systemctl is-active knuckle-headless-install || true' >&2 || true
           fi
           sleep 5
         done
