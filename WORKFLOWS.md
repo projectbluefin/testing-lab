@@ -77,6 +77,7 @@ workflow artifact while printing a concise findings summary to logs/stdout.
 |---|---|---|
 | `namespace` | `""` | Empty means cluster-wide scan |
 | `filters` | `Pod,Deployment,Service,Ingress,Node` | Default core filters; override for focused triage |
+| `ignored-services` | `argocd/argocd-applicationset-controller,argocd/argocd-dex-server,argocd/argocd-notifications-controller-metrics,kubevirt/virt-exportproxy` | Comma-delimited Service names (`namespace/name`) to suppress known no-endpoint noise |
 
 Output parameter: analyze node emits `k8sgpt-results-json` from `/tmp/results/k8sgpt-results.json`.
 

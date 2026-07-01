@@ -7,7 +7,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nebraska-packages
+  name: nebraska-packages-ghost
   namespace: flatcar-update
   labels:
     app.kubernetes.io/part-of: lab
@@ -36,6 +36,8 @@ spec:
       labels:
         app: nebraska
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
       containers:
         - name: nebraska
           image: ghcr.io/flatcar/nebraska:latest
@@ -73,7 +75,7 @@ spec:
       volumes:
         - name: packages
           persistentVolumeClaim:
-            claimName: nebraska-packages
+            claimName: nebraska-packages-ghost
 ---
 apiVersion: v1
 kind: Service

@@ -15,7 +15,7 @@ stringData:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nebraska-postgres-data
+  name: nebraska-postgres-data-ghost
   namespace: flatcar-update
   labels:
     app.kubernetes.io/part-of: lab
@@ -44,6 +44,8 @@ spec:
       labels:
         app: nebraska-postgres
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: ghost
       containers:
         - name: postgres
           image: cgr.dev/chainguard/postgres:latest
@@ -77,7 +79,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: nebraska-postgres-data
+            claimName: nebraska-postgres-data-ghost
 ---
 apiVersion: v1
 kind: Service

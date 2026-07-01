@@ -25,6 +25,8 @@ spec:
         value: ""
       - name: filters
         value: "Pod,Deployment,Service,Ingress,Node"
+      - name: ignored-services
+        value: "argocd/argocd-applicationset-controller,argocd/argocd-dex-server,argocd/argocd-notifications-controller-metrics,kubevirt/virt-exportproxy"
   templates:
     - name: analyze
       activeDeadlineSeconds: 1800
@@ -44,6 +46,7 @@ spec:
           k8sgpt_version = "v0.4.24"
           namespace = "{{workflow.parameters.namespace}}"
           filters = "{{workflow.parameters.filters}}"
+          ignored_services = "{{workflow.parameters.ignored-services}}"
           results_dir = Path("/tmp/results")
           bin_dir = Path("/tmp/bin")
           results_dir.mkdir(parents=True, exist_ok=True)
@@ -53,6 +56,8 @@ spec:
             raise SystemExit(f"invalid namespace parameter: {namespace}")
           if filters and not re.fullmatch(r"[A-Za-z,]+", filters):
             raise SystemExit(f"invalid filters parameter: {filters}")
+          if ignored_services and not re.fullmatch(r"[a-z0-9./,_-]+", ignored_services):
+            raise SystemExit(f"invalid ignored-services parameter: {ignored_services}")
 
           arch = os.uname().machine
           if arch in {"x86_64", "amd64"}:
@@ -81,12 +86,7 @@ spec:
 
           result = subprocess.run(cmd, check=True, capture_output=True, text=True)
           data = json.loads(result.stdout)
-          ignored = {
-            "argocd/argocd-applicationset-controller",
-            "argocd/argocd-dex-server",
-            "argocd/argocd-notifications-controller-metrics",
-            "kubevirt/virt-exportproxy",
-          }
+          ignored = {item for item in ignored_services.split(",") if item}
           data["results"] = [
             item for item in data.get("results", [])
             if item.get("kind") != "Service" or item.get("name") not in ignored
