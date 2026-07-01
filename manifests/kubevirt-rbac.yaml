@@ -2,7 +2,7 @@
 # Required for create-vm, wait-for-vm-ready, and delete-vm steps.
 # pods/exec is needed to run virsh qemu-agent-command in the virt-launcher compute
 # container (used to start sshd.socket after VMI boot).
-# Namespaces: bluefin-test, bluefin-lts-test, bazzite-test, aurora-test
+# Namespaces: bluefin-test, bluefin-lts-test, bazzite-test, aurora-test, knuckle-test
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -186,6 +186,68 @@ kind: RoleBinding
 metadata:
   name: kubevirt-manager-argo
   namespace: aurora-test
+subjects:
+  - kind: ServiceAccount
+    name: argo
+    namespace: argo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubevirt-manager
+---
+# Knuckle's init-rootdisk step creates a batch Job in the target namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubevirt-manager
+  namespace: knuckle-test
+rules:
+  - apiGroups:
+      - kubevirt.io
+    resources:
+      - virtualmachines
+      - virtualmachineinstances
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubevirt-manager-argo
+  namespace: knuckle-test
 subjects:
   - kind: ServiceAccount
     name: argo
