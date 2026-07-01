@@ -154,7 +154,7 @@ spec:
       parameters:
       - name: vm-name
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
@@ -207,7 +207,7 @@ spec:
     - name: work
       emptyDir: {}
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
@@ -350,7 +350,7 @@ spec:
     - name: work
       emptyDir: {}
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       env:
       - name: SSH_PUBKEY
@@ -526,7 +526,7 @@ spec:
       secret:
          secretName: "{{inputs.parameters.ssh-key-secret}}"
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
@@ -617,7 +617,7 @@ spec:
       secret:
         secretName: "{{inputs.parameters.ssh-key-secret}}"
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
@@ -671,7 +671,7 @@ spec:
       - name: namespace
     activeDeadlineSeconds: 600
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
@@ -769,7 +769,7 @@ spec:
     - name: work
       emptyDir: {}
     script:
-      image: 192.168.1.102:30500/fsdk/lab-runner:latest
+      image: ghcr.io/projectbluefin/lab-runner:latest
       command: [sh]
       resources:
         requests:
