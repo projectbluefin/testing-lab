@@ -280,12 +280,12 @@ spec:
         # The FSDK server image lacks dosfstools (mkfs.fat/mkdosfs) and podman.
         # bootc needs mkfs.fat to format the EFI partition and podman to init
         # the containers-storage imgstorage (CStorage::create runs "podman images").
-        mkdir -p /usr/local/sbin /usr/local/bin
+        mkdir -p /var/usrlocal/sbin /var/usrlocal/bin
         for TOOL in mkfs.fat mkdosfs; do
           if ! command -v "${TOOL}" >/dev/null 2>&1; then
             printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
-              > "/usr/local/sbin/${TOOL}"
-            chmod +x "/usr/local/sbin/${TOOL}"
+              > "/var/usrlocal/sbin/${TOOL}"
+            chmod +x "/var/usrlocal/sbin/${TOOL}"
             echo "[BUILD] ${TOOL} wrapper injected via bootc exec-in-host-mount-namespace"
           fi
         done
@@ -293,16 +293,16 @@ spec:
           if ! command -v "${TOOL}" >/dev/null 2>&1; then
             if [ "${TOOL}" = skopeo ]; then
               printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s --tls-verify=false "$@"\n' "${TOOL}" \
-                > "/usr/local/bin/${TOOL}"
+                > "/var/usrlocal/bin/${TOOL}"
             else
               printf '#!/bin/sh\nexec bootc exec-in-host-mount-namespace %s "$@"\n' "${TOOL}" \
-                > "/usr/local/bin/${TOOL}"
+                > "/var/usrlocal/bin/${TOOL}"
             fi
-            chmod +x "/usr/local/bin/${TOOL}"
+            chmod +x "/var/usrlocal/bin/${TOOL}"
             echo "[BUILD] ${TOOL} wrapper injected via bootc exec-in-host-mount-namespace"
           fi
         done
-        export PATH="/usr/local/sbin:/usr/local/bin:${PATH}"
+        export PATH="/var/usrlocal/sbin:/var/usrlocal/bin:${PATH}"
 
         # bootc requires a bootable source image. bluefin-server-bootc is a
         # server payload image, so derive a temporary copy with the standard
