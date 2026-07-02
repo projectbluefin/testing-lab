@@ -38,3 +38,12 @@ def test_build_containerdisk_bootable_derivation_does_not_require_boot_vmlinuz()
         'test -e \\"/usr/lib/modules/\\${kver}/vmlinuz\\" || cp /boot/vmlinuz '
         '\\"/usr/lib/modules/\\${kver}/vmlinuz\\"'
     ) in workflow
+
+
+def test_build_containerdisk_uses_unverified_registry_transport_for_local_bootable_image():
+    workflow = (ROOT / "argo/workflow-templates/build-containerdisk.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'SOURCE_IMGREF="ostree-unverified-registry:${BOOTABLE_IMAGE_REMOTE}"' in workflow
+    assert 'SOURCE_IMGREF="docker://${BOOTABLE_IMAGE_REMOTE}"' not in workflow
