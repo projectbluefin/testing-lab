@@ -45,5 +45,8 @@ def test_build_containerdisk_uses_unverified_registry_transport_for_local_bootab
         encoding="utf-8"
     )
 
-    assert 'SOURCE_IMGREF="ostree-unverified-registry:${BOOTABLE_IMAGE_REMOTE}"' in workflow
-    assert 'SOURCE_IMGREF="docker://${BOOTABLE_IMAGE_REMOTE}"' not in workflow
+    assert 'SOURCE_IMGREF="docker://${BOOTABLE_IMAGE_REMOTE}"' in workflow
+    assert 'SOURCE_IMGREF="ostree-unverified-registry:${BOOTABLE_IMAGE_REMOTE}"' not in workflow
+    assert 'mkdir -p /etc/containers/registries.conf.d' in workflow
+    assert 'location = "192.168.1.102:30500"' in workflow
+    assert 'insecure = true' in workflow

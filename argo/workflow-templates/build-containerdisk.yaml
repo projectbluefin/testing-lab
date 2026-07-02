@@ -323,7 +323,13 @@ spec:
         echo "[BUILD] deriving bootable source image ${BOOTABLE_IMAGE_LOCAL}"
         podman build --tls-verify=false -t "${BOOTABLE_IMAGE_LOCAL}" -f "${BOOTABLE_CTX}/Containerfile" "${BOOTABLE_CTX}"
         podman push --tls-verify=false "${BOOTABLE_IMAGE_LOCAL}" "docker://${BOOTABLE_IMAGE_REMOTE}"
-        SOURCE_IMGREF="ostree-unverified-registry:${BOOTABLE_IMAGE_REMOTE}"
+        mkdir -p /etc/containers/registries.conf.d
+        cat > /etc/containers/registries.conf.d/bluefin-local-zot.conf <<'EOF'
+        [[registry]]
+        location = "192.168.1.102:30500"
+        insecure = true
+        EOF
+        SOURCE_IMGREF="docker://${BOOTABLE_IMAGE_REMOTE}"
         echo "[BUILD] SOURCE_IMGREF=${SOURCE_IMGREF}"
 
         bootc install to-disk \
