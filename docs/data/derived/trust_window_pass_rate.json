@@ -1,11 +1,11 @@
 {
   "schema_version": "v2",
-  "generated_at": "2026-07-02T14:47:13Z",
+  "generated_at": "2026-07-02T15:47:50Z",
   "generator": {
     "notebook": "notebooks/01_pass_rate_wilson.ipynb",
     "notebook_url": "https://factory.projectbluefin.io/methods/01_pass_rate_wilson.html",
-    "workflow_run_url": "https://github.com/projectbluefin/lab/actions/runs/28599050812",
-    "commit_sha": "025be081c93c1c141af6bc9a6be92fed23492ea9",
+    "workflow_run_url": "https://github.com/projectbluefin/lab/actions/runs/28603056494",
+    "commit_sha": "e4a4ede1e82b84cfb8598d9f000d784f95b4d6d0",
     "inputs_sha256": "af744800290f62b95376ee1055c06649b1d26425c64f84256d9faa746698c57c",
     "library_versions": {
       "statsmodels": "0.14.4",
